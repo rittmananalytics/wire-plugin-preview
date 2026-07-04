@@ -4512,7 +4512,7 @@ Those two can look alike from the outside — both are private repos, both get p
 
 This registry is where that experience now lives: a private library, organised by industry, of the entities RA typically expects to see, the structure and grain that's worked well before, and real worked examples of how a similar model was actually built — not code to copy and paste, but a reference to learn the pattern from. The value to a consultant: when you start a data model for a client in one of these industries, Wire recognises the fit and offers this as a starting point — a genuine head start instead of reasoning up the whole thing from nothing. You can take it, adapt it, or ignore it entirely; it's always a suggestion, never applied automatically. Once the model is built, Wire can also flag if something standard for that industry looks like it's missing.
 
-Because this comes from real client work, it's genuinely confidential — part of what makes RA's delivery experience valuable, not something to publish for anyone who installs the Wire plugin. So it's kept out of the public plugin entirely, and RA consultants get to it by fetching it onto their own machine themselves (`/wire:utils-data-model-registry-setup`, using their own GitHub access), rather than it coming bundled with anything Wire ships. Most consultants just need to know Wire will offer this automatically when it's relevant, and quietly won't when it isn't — the mechanics of dev-mode vs. personal-mode mirrors are in the diagram and table below for anyone who needs them.
+Because this comes from real client work, it's genuinely confidential — part of what makes RA's delivery experience valuable, not something to publish for anyone who installs the Wire plugin. So it's kept out of the public plugin entirely and never bundled in. Instead, run `/wire:utils-data-model-registry-setup` once — it clones the private registry to your machine using your own GitHub access. If you're not an RA staff member with access, this command simply isn't for you, and Wire behaves exactly the same either way. After that one-time setup, Wire finds it automatically on every future engagement.
 
 ```mermaid
 flowchart TB
@@ -4520,31 +4520,22 @@ flowchart TB
         RT["release-types/*.yaml"]
         SP["specs/**/*.md"]
     end
-    subgraph wirerepo["This repo"]
-        SYNC1["sync-process-registry.sh<br/>(pinned SHA)"]
-        LOCAL1["wire/release-types/, wire/specs/"]
-    end
     subgraph pub["Public: wire-plugin / wire-extension"]
         CMDS["commands/*.md (bundled)"]
     end
-    RT --> SYNC1 --> LOCAL1 --> CMDS
-    SP --> SYNC1
+    RT --> CMDS
+    SP --> CMDS
 
     subgraph priv2["Private: wire-data-model-registry"]
-        DMR["verticals/*, cross-vertical/*<br/>+ reference dbt SQL"]
+        DMR["industry entities +<br/>worked examples"]
     end
-    subgraph devmode["Dev mode (this repo only)"]
-        SYNC2["sync-data-model-registry.sh<br/>(pinned SHA)"]
-        LOCAL2["wire/data-model-registry/"]
+    subgraph personal["Your machine"]
+        HOME["~/.wire/data-model-registry/<br/>(via /wire:utils-data-model-registry-setup,<br/>run once, your own GitHub access)"]
     end
-    subgraph personal["Personal mode (RA consultant's machine)"]
-        HOME["~/.wire/data-model-registry/<br/>(via /wire:utils-data-model-registry-setup,<br/>own git credentials, live git pull)"]
-    end
-    DMR --> SYNC2 --> LOCAL2
     DMR --> HOME
-    LOCAL2 -.->|"NOT bundled — confidential"| CMDS
-    LOCAL2 --> GEN["data_model-generate/validate<br/>Step 1.5: check + propose"]
-    HOME --> GEN
+    CMDS -.->|"this content never<br/>bundled here"| DMR
+    HOME --> GEN["data_model-generate<br/>on any future engagement"]
+    GEN --> RESULT["Proposes a matching industry model —<br/>never auto-applied"]
 
     style priv1 fill:#fce4ec,stroke:#c62828
     style priv2 fill:#fce4ec,stroke:#c62828
@@ -4557,10 +4548,9 @@ flowchart TB
 | Content | Release-type YAML, command specs | Canonical entity/schema YAML, reference dbt SQL |
 | Confidentiality | Public (Wire's own operating procedure) | Proprietary (real client engagement content) |
 | Bundled into public plugin? | **Yes** | **No — never** |
-| How an end user gets it | Comes with the plugin | `/wire:utils-data-model-registry-setup` — an individual, live `gh repo clone` gated by the consultant's own GitHub access |
-| Update discipline | Pinned SHA, explicit re-sync — never fetched live | Dev mirror: pinned SHA. Personal copy: live `git pull`, whenever the consultant wants — a deliberate exception, since it's a one-person operation, not a framework-wide sync |
+| How you get it | Comes with the plugin | `/wire:utils-data-model-registry-setup`, once, using your own GitHub access |
 
-See `wire/schemas/release-type-schema.md`, `wire/schemas/command-schema.md`, and `wire/schemas/data-model-registry.md` for the exact contracts, and `wire/specs/design/data_model/generate.md` Step 1.5 for the automatic-detection logic.
+If the setup command fails, that's normal, not a bug — it just means you don't have access to the private repo, and Wire continues to work exactly as it does for anyone else without it.
 
 ### Adding a new command
 
