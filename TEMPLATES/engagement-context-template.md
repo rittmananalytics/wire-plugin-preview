@@ -18,6 +18,11 @@ docstore:
     parent_page_url: null
   notion:
     parent_page_url: null
+
+data_model_registry:
+  vertical: null  # education | insurance | manufacturing | marketplace | retail | subscription-commerce | null
+                  # Advisory only — see wire/schemas/data-model-registry.md. null (the default)
+                  # means data_model-generate/validate behave exactly as if this didn't exist.
 ---
 
 # Engagement Context: {{ENGAGEMENT_NAME}}

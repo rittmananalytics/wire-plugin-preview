@@ -1,10 +1,10 @@
 {
-  "name": "rittman-analytics-preview",
+  "name": "rittman-analytics",
   "owner": {
     "name": "Rittman Analytics",
     "email": "hello@rittmananalytics.com"
   },
-  "description": "Rittman Analytics plugin marketplace (v4.0.0 preview)",
+  "description": "Rittman Analytics plugin marketplace",
   "plugins": [
     {
       "name": "wire-preview",

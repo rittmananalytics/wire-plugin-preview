@@ -1,6 +1,6 @@
 {
   "name": "wire-preview",
-  "description": "The Wire Framework \u2014 AI-accelerated data platform delivery for the full lifecycle: requirements, design, development, testing, deployment, enablement (v4.0.0 PREVIEW build \u2014 installable alongside the stable wire plugin under the /wire-preview:* namespace)",
+  "description": "The Wire Framework \u2014 AI-accelerated data platform delivery for the full lifecycle: requirements, design, development, testing, deployment, enablement",
   "version": "4.0.0-preview",
   "author": {
     "name": "Rittman Analytics",

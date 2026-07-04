@@ -106,6 +106,36 @@ The data model specification narrows the LLM's generation space for the dbt phas
 4. Use Glob to find all files in `.wire/<project_id>/artifacts/**/*`
 5. Read any source schema examples, existing dbt models, or SQL files in `artifacts/`
 
+### Step 1.5: Check for a Canonical Vertical Match (Automatic, Advisory)
+
+This step runs automatically on every engagement — there's no opt-in flag to set. It has three possible outcomes: a proposal to the practitioner, a silent skip, or (if declined) no effect on anything downstream. It can never fail the command and never blocks Step 2.
+
+1. **Resolve the registry location, dev mode first:**
+   - Check for `wire/data-model-registry/` in the repo root (present only when developing Wire itself, from `wire/scripts/sync-data-model-registry.sh`).
+   - If not found, check `~/.wire/data-model-registry/` (present only if this consultant has personally run `/wire:utils-data-model-registry-setup` and has access to the private `wire-data-model-registry` repo).
+   - If neither exists, **skip silently to Step 2** — no message, no note in the output spec. Most engagements and most consultants will land here; this is expected, not a degraded path.
+
+2. **Resolve the vertical:**
+   - Read `.wire/engagement/context.md`. If `data_model_registry.vertical` is already set to a non-null value (a consultant can set this by hand at any time), use it directly and skip to step 3 below — an explicit manual value always wins over inference.
+   - Otherwise, infer a candidate from the requirements and conceptual model already read in Step 1: match the client's stated industry/domain language against the vertical index in the registry root (`education`, `insurance`, `manufacturing`, `marketplace`, `retail`, `subscription-commerce`). This is a judgment call, not a keyword lookup — read the vertical's own schema descriptions to judge fit, don't just string-match the industry name.
+   - If no vertical is a plausible fit, **skip silently to Step 2** — do not ask the practitioner to pick one from a list just to confirm "none apply." A non-match is exactly as valid an outcome as a match, and is the majority case for most industries (there is, for instance, no `saas` vertical yet — flagged as a gap in the registry's own README).
+
+3. **If a vertical is resolved (manual or inferred), propose it — never auto-adopt:**
+   - Read every file in `<registry_root>/verticals/<vertical>/schemas/*.yml` and the entity files each one references in `<registry_root>/verticals/<vertical>/entities/*.yml`.
+   - Check `<registry_root>/cross-vertical/schemas/*.yml` for anything thematically relevant to this client's actual sources — e.g. propose layering `ga4_ecommerce` on top of a `retail` match if the client uses GA4, or `multi_touch_attribution` if they run paid media across multiple channels. Respect each schema's `depends_on_schemas` field for sequencing (e.g. `ga4_ecommerce` depends on `event_tracking_and_sessionization`).
+   - Present the matched schema(s) — entities, `standard_marts`, grain, relationships — as a **proposed starting structure**:
+     ```
+     Wire found a canonical data model that may fit this engagement: [vertical] — [schema_name].
+     Standard marts: [list from standard_marts]
+     Entities: [list]
+
+     Use this as the starting structure for the data model? (yes / adapt / no)
+     ```
+     - **yes** — use the canonical entity list, grain, and naming as the baseline for Steps 2–7, adjusted only for this client's actual source systems and column names. Record `data_model_registry.vertical: <vertical>` in `.wire/engagement/context.md` if it wasn't already set, so `data_model-validate` can find it later.
+     - **adapt** — ask which specific entities/marts to keep, drop, or rename; use the rest as-is. Record the vertical as above.
+     - **no** — proceed with Step 2 onward exactly as if no match were found. Do not write `data_model_registry.vertical` to context.md — an explicit decline should not get treated as a manual override on the next run. Worth a one-line note in the spec that a canonical match existed but wasn't used (useful signal for the registry's own maintainers), but no other effect.
+4. For every model in the final data model that maps to a canonical entity (whether adopted as-is or adapted), carry that entity's `generation_constraints` and `reference_implementation` pointer(s) forward into that model's spec entry in Step 5 (or Step 3 for staging). This is the only place the registry's worked-example SQL becomes reachable — `dbt-generate` reads `data_model_specification.md` as its primary input either way, so it inherits these pointers automatically; no changes to `dbt-generate` itself are needed. Treat `reference_implementation` strictly as a worked example to read and adapt, never to copy verbatim — the registry's own README is explicit that a specific `.sql` file is not reusable across clients, only the pattern it demonstrates is.
+
 ### Step 2: Define Source Definitions
 
 For each source system in the pipeline design, produce a complete dbt `_sources.yml` specification:
@@ -177,6 +207,8 @@ Use this template format:
 **Filters**: `WHERE <condition>`
 
 **Tests**: `not_null(entity_pk)`, `unique(entity_pk)`, `not_null(<business_key>)`
+
+**Canonical entity** (only if sourced from the data model registry per Step 1.5): `<vertical>/<entity>` — constraints: [`generation_constraints` from the entity YAML] — reference: [`reference_implementation` path(s)]
 ```
 
 ### Step 4: Define Integration Models (if applicable)
@@ -211,6 +243,7 @@ For each warehouse model specify:
 - **Measures**: numeric columns with business descriptions
 - **Flags/indicators**: boolean derived columns with their logic
 - **Audit columns**: `dbt_updated_at: current_timestamp()`
+- **Canonical entity** (only if sourced from the data model registry per Step 1.5): `<vertical>/<entity>` — constraints: [`generation_constraints` from the entity YAML] — reference: [`reference_implementation` path(s)]
 
 ### Step 6: Define Seed Files
 
@@ -359,6 +392,7 @@ If docstore sync fails, log the error and continue — do not block the generate
 **Seed files**: [count]
 **Physical ERD**: included ([entity count] entities, [relationship count] relationships)
 **Cross-system joins**: [count — flag if > 0, these are high-risk]
+**Canonical vertical**: [vertical name and schema(s) used, or "None — no canonical match found or proposal declined" if Step 1.5 skipped or was declined]
 
 ### Next Steps
 

@@ -151,6 +151,15 @@ Run: /wire:data_model-generate <project_id>
 | Cross-system joins documented | Section 6 (Cross-System Join Keys) is present and non-empty if multiple sources are joined | Major |
 | Join key types compatible | Left and right join columns have compatible types | Major |
 
+**Canonical Vertical Comparison** — read `.wire/engagement/context.md`'s `data_model_registry.vertical`. If unset or `null`, skip this entirely (no section appears in the report). If set:
+
+Diff the generated warehouse-model list against `wire/data-model-registry/verticals/<vertical>/schemas/*.yml`'s `standard_marts` (and any cross-vertical schema layered in during generation, per that command's Step 1.5):
+- List any `standard_marts` entries with no corresponding generated model.
+- List any generated model whose grain notably diverges from its canonical counterpart's documented grain.
+- Note any `generation_constraints` that were flagged during generation as deliberately not followed, if the spec records that.
+
+**This entire subsection is advisory. It never affects the Critical/Major severity checks above, never changes the overall PASS/FAIL result, and never blocks `data_model-review`.** A generated model legitimately differing from the canonical pattern is an expected, normal outcome — client sources vary — not a defect.
+
 ### Step 4: Generate Validation Report
 
 ```
@@ -202,6 +211,17 @@ Run: /wire:data_model-generate <project_id>
 |-------|--------|-------|
 | Cross-system joins documented | ✅/⚠️ | |
 | Join key type compatibility | ✅/⚠️ | |
+
+[Only include this section if data_model_registry.vertical is set — omit entirely otherwise:]
+### Canonical Vertical Comparison (Advisory — informational only, not part of PASS/FAIL)
+
+**Vertical**: [vertical] — **Schema(s)**: [schema name(s)]
+
+| Comparison | Finding |
+|------------|---------|
+| Missing standard marts | [list, or "None — full coverage"] |
+| Grain divergence | [list, or "None noted"] |
+| generation_constraints not followed | [list with rationale, or "None"] |
 
 ### Issues Found
 
