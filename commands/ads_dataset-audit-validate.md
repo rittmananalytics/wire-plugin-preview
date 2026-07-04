@@ -1,0 +1,249 @@
+---
+description: Verify dataset audit completeness and tier classifications
+argument-hint: <release-folder>
+---
+
+# Verify dataset audit completeness and tier classifications
+
+## User Input
+
+```text
+$ARGUMENTS
+```
+
+## Path Configuration
+
+- **Projects**: `.wire` (project data and status files)
+
+When following the workflow specification below, resolve paths as follows:
+- `.wire/` in specs refers to the `.wire/` directory in the current repository
+- `TEMPLATES/` references refer to the templates section embedded at the end of this command
+
+## Workflow Specification
+
+---
+description: Verify dataset audit completeness, duplicate detection, and tier classification accuracy
+argument-hint: <release-folder>
+---
+
+# Agentic Data Stack — Dataset Audit Validate
+
+## Purpose
+
+Check that the dataset audit is complete, the near-duplicate detection is sound, and the governance tier classifications are defensible. Produce a PASS/FAIL report before the audit goes to stakeholder review.
+
+## Usage
+
+```bash
+/wire:ads_dataset-audit-validate YYYYMMDD_client_agentic_data_stack
+```
+
+## Prerequisites
+
+- `dataset_audit.generate: complete` in status.md
+- `.wire/<release-folder>/artifacts/dataset_audit.md` exists
+
+## Validation Checks
+
+### Completeness Checks
+
+- [ ] Table count matches warehouse information_schema row count (within 5% — some views/temp tables expected to differ)
+- [ ] Every domain mentioned in the SOW or engagement context is represented
+- [ ] Every table in the audit has a tier classification (Semantic / Curated / Raw)
+- [ ] Every near-duplicate group has exactly one canonical candidate identified
+- [ ] Governance grade assigned to every domain
+
+### Near-Duplicate Quality Checks
+
+- [ ] No canonical candidate is a raw or undocumented table (unless no managed alternative exists — must be noted)
+- [ ] Duplicate groups are genuinely overlapping, not just similarly named tables with different grain
+- [ ] All tables flagged for deprecation have a documented canonical replacement
+- [ ] No table is flagged for deprecation without a stated justification
+
+### Tier Classification Checks
+
+- [ ] Semantic tier: every table classified Semantic has a verifiable metric definition in the semantic layer
+- [ ] Curated tier: every table classified Curated has evidence of dbt management (appears in `dbt ls` output or has a documented schema.yml entry)
+- [ ] Raw tier: tables classified Raw are not primary query targets in recent query history (if query_audit has run)
+
+### Governance Grade Calibration
+
+- [ ] Grade A domains genuinely have >80% semantic layer coverage
+- [ ] Grade D domains have documented evidence of widespread duplication
+- [ ] No domain is graded higher than C if it has undocumented canonical tables
+
+## Automated Checks
+
+Where possible, run these automatically:
+
+```bash
+# Check every table in the audit has a tier classification
+grep -c "| Semantic \|| Curated \|| Raw " artifacts/dataset_audit.md
+
+# Check no canonical candidate is raw
+grep -A2 "Canonical — retain" artifacts/dataset_audit.md | grep -i "raw\|undocumented" && echo "WARNING: Raw table marked canonical"
+
+# Check all duplicate groups have a recommendation
+grep -c "Recommendation:" artifacts/dataset_audit.md
+```
+
+## Output Format
+
+```markdown
+## Dataset Audit Validation
+
+**Result: PASS / FAIL / PASS WITH WARNINGS**
+
+### Checks Run: N
+### Checks Passed: N
+### Checks Failed: N
+
+### Failed Checks
+
+| Check | Detail | Severity |
+|---|---|---|
+| Curated tier without dbt evidence | `revenue_summary` classified Curated but not in dbt ls output | High |
+
+### Warnings
+
+| Warning | Detail |
+|---|---|
+| Canonical candidate is undocumented | `orders_combined` marked canonical for orders domain but has no schema.yml entry |
+
+### Recommended Actions Before Review
+
+1. Verify `revenue_summary` dbt management status
+2. Add schema.yml documentation for `orders_combined` before proceeding to canonical_models phase
+```
+
+## Status Update
+
+```yaml
+dataset_audit:
+  validate: complete
+  validate_date: YYYY-MM-DD
+  validation_result: pass  # pass | pass_with_warnings | fail
+  checks_run: N
+  checks_passed: N
+```
+
+Execute the complete workflow as specified above.
+
+## Execution Logging
+
+After completing the workflow, append a log entry to the project's execution_log.md:
+
+# Execution Log — Command and Skill Logging
+
+## Purpose
+
+After completing any generate, validate, or review workflow (or a project management command that changes state), append a single log entry to the project's execution log file. Skills also append an entry on activation, making the log a unified trace of all agent activity — both explicit commands and auto-activated skills.
+
+## Log File Location
+
+```
+<DP_PROJECTS_PATH>/<project_folder>/execution_log.md
+```
+
+Where `<project_folder>` is the project directory passed as an argument (e.g., `20260222_acme_platform`).
+
+## Format
+
+If the file does not exist, create it with the header:
+
+```markdown
+# Execution Log
+
+| Timestamp | Command | Result | Detail |
+|-----------|---------|--------|--------|
+```
+
+Then append one row per execution:
+
+```markdown
+| YYYY-MM-DD HH:MM | /wire:<command> | <result> | <detail> |
+```
+
+### Field Definitions
+
+- **Timestamp**: Current date and time in `YYYY-MM-DD HH:MM` format (24-hour, local time)
+- **Command**: Either the `/wire:*` command invoked, or `skill` for a skill activation entry
+- **Result / Skill name**: For commands, the outcome; for skills, the skill identifier. Use one of:
+  - `complete` — generate command finished successfully
+  - `pass` — validate command passed all checks
+  - `fail` — validate command found failures
+  - `approved` — review command: stakeholder approved
+  - `changes_requested` — review command: stakeholder requested changes
+  - `created` — `/wire:new` created a new project
+  - `archived` — `/wire:archive` archived a project
+  - `removed` — `/wire:remove` deleted a project
+  - `activated` — a skill was auto-activated (used with `skill` in the Command column)
+  - `override` — `specs/utils/precondition_gate.md` recorded a consultant overriding an unmet precondition
+- **Detail**: A concise one-line summary of what happened. Include:
+  - For generate: number of files created or key output filename
+  - For validate: number of checks passed/failed
+  - For review: reviewer name and brief feedback if changes requested
+  - For new: project type and client name
+  - For archive/remove: project name
+  - For skill activations: brief description of what triggered the skill
+  - For override: the unmet precondition, who overrode it, and their reason
+
+## Skill Activation Entries
+
+When a skill activates, it appends a row in the same format as commands, using `skill` in the Command column and the skill identifier in the Result column:
+
+```markdown
+| YYYY-MM-DD HH:MM | skill | <skill-identifier> | activated | <brief trigger description> |
+```
+
+Skill identifiers:
+
+| Skill | Identifier |
+|-------|-----------|
+| Engagement Context | `engagement-context` |
+| Research Persistence | `research-persistence` |
+| dbt Development | `dbt-development` |
+| LookML Content Authoring | `lookml-authoring` |
+| dbt Analytics QA | `dbt-analytics-qa` |
+| dbt Migration | `dbt-migration` |
+| dbt Troubleshooting | `dbt-troubleshooting` |
+| dbt Semantic Layer | `dbt-semantic-layer` |
+| dbt Unit Testing | `dbt-unit-testing` |
+| dbt DAG | `dbt-dag` |
+| Dagster | `dagster` |
+| Fivetran | `fivetran` |
+| Project Review | `project-review` |
+| Looker Dashboard Mockup | `looker-dashboard-mockup` |
+
+This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Rules
+
+1. **Append only** — never modify or delete existing log entries
+2. **One row per command execution** — even if a command is re-run, add a new row (this creates the revision history)
+3. **Always log after status.md is updated** — the log entry should reflect the final state
+4. **Pipe characters in detail** — if the detail text contains `|`, replace with `—` to preserve table formatting
+5. **Keep detail under 120 characters** — be concise
+
+## Example
+
+```markdown
+# Execution Log
+
+| Timestamp | Command | Result | Detail |
+|-----------|---------|--------|--------|
+| 2026-02-22 14:30 | skill | engagement-context | activated | Context loaded for new conversation |
+| 2026-02-22 14:35 | /wire:new | created | Project created (type: full_platform, client: Acme Corp) |
+| 2026-02-22 14:40 | /wire:requirements-generate | complete | Generated requirements specification (3 files) |
+| 2026-02-22 15:12 | /wire:requirements-validate | pass | 14 checks passed, 0 failed |
+| 2026-02-22 16:00 | /wire:requirements-review | approved | Reviewed by Jane Smith |
+| 2026-02-23 09:15 | /wire:conceptual_model-generate | complete | Generated entity model with 8 entities |
+| 2026-02-23 10:30 | /wire:conceptual_model-validate | fail | 2 issues: missing relationship, orphaned entity |
+| 2026-02-23 11:00 | /wire:conceptual_model-generate | complete | Regenerated entity model (fixed 2 issues, 8 entities) |
+| 2026-02-23 11:15 | /wire:conceptual_model-validate | pass | 12 checks passed, 0 failed |
+| 2026-02-23 14:00 | /wire:conceptual_model-review | changes_requested | Reviewed by John Doe — add Customer entity |
+| 2026-02-23 15:30 | /wire:conceptual_model-generate | complete | Regenerated entity model (9 entities, added Customer) |
+| 2026-02-23 15:45 | /wire:conceptual_model-validate | pass | 14 checks passed, 0 failed |
+| 2026-02-23 16:00 | /wire:conceptual_model-review | approved | Reviewed by John Doe |
+| 2026-02-24 09:05 | /wire:migration-strategy-generate | override | migration_inventory.review required approved, was not_started — overridden by Jane Smith: client demo tomorrow, inventory sign-off deferred to Monday |
+```

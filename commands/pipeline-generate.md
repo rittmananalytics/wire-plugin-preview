@@ -1,0 +1,240 @@
+---
+description: Generate data pipeline code
+argument-hint: <project-folder>
+---
+
+# Generate data pipeline code
+
+## User Input
+
+```text
+$ARGUMENTS
+```
+
+## Path Configuration
+
+- **Projects**: `.wire` (project data and status files)
+
+When following the workflow specification below, resolve paths as follows:
+- `.wire/` in specs refers to the `.wire/` directory in the current repository
+- `TEMPLATES/` references refer to the templates section embedded at the end of this command
+
+## Workflow Specification
+
+---
+description: Create and configure data pipeline connections based on approved pipeline design
+argument-hint: <project-folder>
+---
+
+# Pipeline Generate Command
+
+Follow `specs/utils/pipeline_engineer_delegate.md` before executing the workflow below.
+
+## Purpose
+
+Create and configure data pipeline connections based on the approved pipeline architecture. Routes to the appropriate tool-specific spec based on `pipeline_tool` recorded in `status.md` during pipeline design.
+
+## Usage
+
+```bash
+/wire:pipeline-generate YYYYMMDD_project_name
+```
+
+## Prerequisites
+
+- `pipeline_design`: `review: approved`
+- `artifacts.pipeline.pipeline_tool` must be set in `status.md` (written by `/wire:pipeline_design-generate`)
+
+## Workflow
+
+### Step 1: Read Status and Route
+
+1. Read `.wire/<project_id>/status.md`
+2. Verify `pipeline_design.review == approved`. If not:
+   ```
+   Error: Pipeline design must be approved before creating pipeline connections.
+   Run: /wire:pipeline_design-review <project_id>
+   ```
+3. Read `artifacts.pipeline.pipeline_tool`. If null or absent:
+   ```
+   Error: No pipeline tool selected. Re-run pipeline design to choose a tool.
+   Run: /wire:pipeline_design-generate <project_id>
+   ```
+
+### Step 2: Delegate to Tool-Specific Spec
+
+Based on `pipeline_tool`, load and execute the corresponding spec in full:
+
+| `pipeline_tool` | Spec |
+|----------------|------|
+| `fivetran` | `wire/specs/development/pipeline/fivetran/generate.md` |
+| `dlt` | `wire/specs/development/pipeline/dlt/generate.md` |
+| `airbyte` | `wire/specs/development/pipeline/airbyte/generate.md` |
+| `custom` | Follow the bespoke approach documented in `.wire/<project_id>/design/pipeline_architecture.md` |
+
+Pass `project_id` as context to the delegated spec.
+
+### Step 3: Verify Output
+
+After the tool-specific spec completes, confirm:
+- A pipeline connections/config artifact exists under `.wire/<project_id>/development/pipeline/`
+- `artifacts.pipeline.generate == complete` in status.md
+
+If the tool-specific spec did not update status.md, update it now:
+```yaml
+pipeline:
+  generate: complete
+  validate: not_started
+  review: not_started
+  generated_date: <today>
+```
+
+### Step 4: Sync to Jira (Optional)
+
+Follow the Jira sync workflow in `specs/utils/jira_sync.md`:
+- Artifact: `pipeline`
+- Action: `generate`
+- Status: the generate state just written to status.md
+
+### Step 5: Sync to Document Store (Optional)
+
+If a document store is configured, follow `specs/utils/docstore_sync.md`:
+- `artifact_id`: `pipeline`
+- `artifact_name`: `Data Pipeline`
+- `file_path`: `.wire/<project_id>/development/pipeline/pipeline_connections.md`
+- `project_id`: the project folder
+
+### Step 6: Suggest Next Steps
+
+```
+## Pipeline Generated
+
+**Tool**: [pipeline_tool]
+**Artifact**: .wire/<project_id>/development/pipeline/pipeline_connections.md
+
+### Next Steps
+
+1. Validate the pipeline:
+   /wire:pipeline-validate <project_id>
+```
+
+Execute the complete workflow as specified above.
+
+## Execution Logging
+
+After completing the workflow, append a log entry to the project's execution_log.md:
+
+# Execution Log — Command and Skill Logging
+
+## Purpose
+
+After completing any generate, validate, or review workflow (or a project management command that changes state), append a single log entry to the project's execution log file. Skills also append an entry on activation, making the log a unified trace of all agent activity — both explicit commands and auto-activated skills.
+
+## Log File Location
+
+```
+<DP_PROJECTS_PATH>/<project_folder>/execution_log.md
+```
+
+Where `<project_folder>` is the project directory passed as an argument (e.g., `20260222_acme_platform`).
+
+## Format
+
+If the file does not exist, create it with the header:
+
+```markdown
+# Execution Log
+
+| Timestamp | Command | Result | Detail |
+|-----------|---------|--------|--------|
+```
+
+Then append one row per execution:
+
+```markdown
+| YYYY-MM-DD HH:MM | /wire:<command> | <result> | <detail> |
+```
+
+### Field Definitions
+
+- **Timestamp**: Current date and time in `YYYY-MM-DD HH:MM` format (24-hour, local time)
+- **Command**: Either the `/wire:*` command invoked, or `skill` for a skill activation entry
+- **Result / Skill name**: For commands, the outcome; for skills, the skill identifier. Use one of:
+  - `complete` — generate command finished successfully
+  - `pass` — validate command passed all checks
+  - `fail` — validate command found failures
+  - `approved` — review command: stakeholder approved
+  - `changes_requested` — review command: stakeholder requested changes
+  - `created` — `/wire:new` created a new project
+  - `archived` — `/wire:archive` archived a project
+  - `removed` — `/wire:remove` deleted a project
+  - `activated` — a skill was auto-activated (used with `skill` in the Command column)
+  - `override` — `specs/utils/precondition_gate.md` recorded a consultant overriding an unmet precondition
+- **Detail**: A concise one-line summary of what happened. Include:
+  - For generate: number of files created or key output filename
+  - For validate: number of checks passed/failed
+  - For review: reviewer name and brief feedback if changes requested
+  - For new: project type and client name
+  - For archive/remove: project name
+  - For skill activations: brief description of what triggered the skill
+  - For override: the unmet precondition, who overrode it, and their reason
+
+## Skill Activation Entries
+
+When a skill activates, it appends a row in the same format as commands, using `skill` in the Command column and the skill identifier in the Result column:
+
+```markdown
+| YYYY-MM-DD HH:MM | skill | <skill-identifier> | activated | <brief trigger description> |
+```
+
+Skill identifiers:
+
+| Skill | Identifier |
+|-------|-----------|
+| Engagement Context | `engagement-context` |
+| Research Persistence | `research-persistence` |
+| dbt Development | `dbt-development` |
+| LookML Content Authoring | `lookml-authoring` |
+| dbt Analytics QA | `dbt-analytics-qa` |
+| dbt Migration | `dbt-migration` |
+| dbt Troubleshooting | `dbt-troubleshooting` |
+| dbt Semantic Layer | `dbt-semantic-layer` |
+| dbt Unit Testing | `dbt-unit-testing` |
+| dbt DAG | `dbt-dag` |
+| Dagster | `dagster` |
+| Fivetran | `fivetran` |
+| Project Review | `project-review` |
+| Looker Dashboard Mockup | `looker-dashboard-mockup` |
+
+This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Rules
+
+1. **Append only** — never modify or delete existing log entries
+2. **One row per command execution** — even if a command is re-run, add a new row (this creates the revision history)
+3. **Always log after status.md is updated** — the log entry should reflect the final state
+4. **Pipe characters in detail** — if the detail text contains `|`, replace with `—` to preserve table formatting
+5. **Keep detail under 120 characters** — be concise
+
+## Example
+
+```markdown
+# Execution Log
+
+| Timestamp | Command | Result | Detail |
+|-----------|---------|--------|--------|
+| 2026-02-22 14:30 | skill | engagement-context | activated | Context loaded for new conversation |
+| 2026-02-22 14:35 | /wire:new | created | Project created (type: full_platform, client: Acme Corp) |
+| 2026-02-22 14:40 | /wire:requirements-generate | complete | Generated requirements specification (3 files) |
+| 2026-02-22 15:12 | /wire:requirements-validate | pass | 14 checks passed, 0 failed |
+| 2026-02-22 16:00 | /wire:requirements-review | approved | Reviewed by Jane Smith |
+| 2026-02-23 09:15 | /wire:conceptual_model-generate | complete | Generated entity model with 8 entities |
+| 2026-02-23 10:30 | /wire:conceptual_model-validate | fail | 2 issues: missing relationship, orphaned entity |
+| 2026-02-23 11:00 | /wire:conceptual_model-generate | complete | Regenerated entity model (fixed 2 issues, 8 entities) |
+| 2026-02-23 11:15 | /wire:conceptual_model-validate | pass | 12 checks passed, 0 failed |
+| 2026-02-23 14:00 | /wire:conceptual_model-review | changes_requested | Reviewed by John Doe — add Customer entity |
+| 2026-02-23 15:30 | /wire:conceptual_model-generate | complete | Regenerated entity model (9 entities, added Customer) |
+| 2026-02-23 15:45 | /wire:conceptual_model-validate | pass | 14 checks passed, 0 failed |
+| 2026-02-23 16:00 | /wire:conceptual_model-review | approved | Reviewed by John Doe |
+| 2026-02-24 09:05 | /wire:migration-strategy-generate | override | migration_inventory.review required approved, was not_started — overridden by Jane Smith: client demo tomorrow, inventory sign-off deferred to Monday |
+```

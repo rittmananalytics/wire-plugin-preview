@@ -1,0 +1,2169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rittman Analytics — Project Kick-off Deck (Template)</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<link rel="stylesheet" href="deck.css">
+<!-- Mermaid is vendored locally so the deck renders offline / behind corporate proxies. -->
+<script src="mermaid.min.js" defer onload="__initMermaid && __initMermaid()" onerror="console.warn('mermaid failed to load — diagrams disabled')"></script>
+<script>
+  // Initialize mermaid once it's loaded; don't auto-scan the page (we render on demand).
+  function __initMermaid() {
+    if (!window.mermaid) return;
+    window.mermaid.initialize({
+      startOnLoad: false,
+      theme: 'base',
+      themeVariables: {
+        fontFamily: 'Inter, system-ui, sans-serif',
+        primaryColor: '#EFF0FF',
+        primaryTextColor: '#2B3041',
+        primaryBorderColor: '#4F60FF',
+        lineColor: '#4F60FF',
+        secondaryColor: '#F7F7FA',
+        tertiaryColor: '#FFFFFF',
+        textColor: '#2B3041'
+      }
+    });
+    // If slide 10 tried to render before mermaid was ready, re-trigger now.
+    if (typeof window.__retrySlide10Mermaid === 'function') window.__retrySlide10Mermaid();
+  }
+</script>
+</head>
+<body>
+
+<deck-stage width="1920" height="1080">
+
+<!-- ============================================================
+     SLIDE 1 — Title (pitch-deck style: full-bleed photo + vignette)
+     ============================================================ -->
+<section class="slide dark" data-label="01 Title" id="title-slide">
+  <!-- Full-bleed background image -->
+  <img id="title-bg" src="" alt=""
+       style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0;">
+  <!-- Dark left-to-right vignette for legibility -->
+  <div style="position:absolute; inset:0; z-index:1; background:
+    linear-gradient(to right, rgba(15,17,23,0.92) 0%, rgba(15,17,23,0.78) 45%, rgba(15,17,23,0.42) 100%);"></div>
+
+  <!-- RA logo top-left -->
+  <a class="logo" style="z-index:5;"><img src="assets/logo-white-blue.svg" alt="Rittman Analytics"></a>
+
+  <!-- Eyebrow + title -->
+  <p id="title-eyebrow" class="eyebrow on-dark"
+     style="position:absolute; left:84px; top:300px; margin:0; z-index:5; color:#87A0FF;">
+    Discovery Kickoff · 15 September 2025
+  </p>
+  <h1 id="title-headline"
+      style="position:absolute; left:84px; top:354px; right:84px; max-width:1380px;
+             font:700 132px/1.0 var(--ra-font-deck-display); letter-spacing:-0.035em; margin:0;
+             color:#fff; text-shadow:0 2px 24px rgba(0,0,0,0.4); z-index:5;">
+    Example Client &amp; Rittman Analytics:<br>Discovery Kickoff
+  </h1>
+
+  <!-- Presenter list bottom-left (rendered dynamically from tweaks state) -->
+  <div id="title-presenters" style="position:absolute; left:84px; bottom:160px; z-index:5; display:flex; flex-direction:column; gap:14px;"></div>
+
+  <!-- Google Cloud Partner badge bottom-right -->
+  <div style="position:absolute; right:72px; bottom:60px; height:72px; z-index:5;">
+    <img src="assets/google_partner.png" alt="Google Cloud Partner" style="height:100%; display:block;">
+  </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 2 — About Rittman Analytics
+     ============================================================ -->
+<section class="slide" data-label="02 About Rittman">
+  <a class="logo"><img src="assets/logo-black-blue.svg" alt="Rittman Analytics"></a>
+  <div class="body">
+    <p class="eyebrow">About us</p>
+    <h1 class="title sm" style="max-width:1200px; white-space:pre-line;">A boutique partner for ambitious data teams.
+
+</h1>
+
+    <div style="margin-top:32px; display:grid; grid-template-columns:minmax(0, 1.25fr) minmax(0, 1fr); gap:48px; align-items:start; flex:1;">
+      <!-- Left: copy -->
+      <div style="display:flex; flex-direction:column; gap:24px; margin-top:-24px;">
+        <p style="font:700 34px/1.35 var(--ra-font-deck-body); color:var(--ra-ink); margin:0; max-width:780px; letter-spacing:-0.015em; white-space:pre-line;">
+We are a boutique data analytics consultancy that helps ambitious, data-rich businesses scale and modernize their analytics capabilities.
+        </p>
+        <p style="font:400 26px/1.5 var(--ra-font-deck-body); color:var(--ra-ink); margin:0; max-width:780px;">
+          We believe that lasting data maturity is achieved by combining deep technical expertise with a commitment to enabling your team.
+        </p>
+        <p style="font:400 26px/1.5 var(--ra-font-deck-body); color:#4F5564; margin:0; max-width:780px;">
+          Our approach goes beyond traditional implementation. We work as an embedded partner to build your team's skills, establish proven processes, and deliver a data foundation that drives real business value.
+        </p>
+      </div>
+
+      <!-- Right: partner logos -->
+      <div style="position:relative; margin-top:-24px;">
+        <img
+          src="assets/partner_logos.png"
+          alt="Our technology partners — Google Cloud Partner, dbt Labs, Cube, Fivetran, Twilio Segment, Snowflake, Dagster"
+          style="width:100%; height:auto; display:block; border-radius:16px;"
+        >
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <span>Example Client × Rittman Analytics</span>
+    <span>About us</span>
+    <span>15 September 2025</span>
+    <span class="pageno">2</span>
+  </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 3 — Agenda
+     ============================================================ -->
+<section class="slide" data-label="03 Agenda">
+  <a class="logo"><img src="assets/logo-black-blue.svg" alt="Rittman Analytics"></a>
+  <div class="body">
+    <p class="eyebrow">Agenda</p>
+    <h1 class="title md" style="max-width:1300px;">Why we're here today.</h1>
+
+    <div style="margin-top:80px; display:grid; grid-template-columns:1fr 1fr; gap:36px 80px; flex:1;">
+      <div style="display:flex; gap:32px; align-items:flex-start;">
+        <span style="font:700 84px/0.9 var(--ra-font-deck-display); color:var(--ra-indigo); letter-spacing:-0.02em; min-width:120px;">01</span>
+        <div>
+          <p class="kicker" style="font-size:32px;">The diagnosis</p>
+          <p style="font:400 22px/1.45 var(--ra-font-deck-body); color:#4F5564; margin:0; max-width:440px;"
+             data-client-mention data-template="What we've heard about {{client}}'s current situation, played back so we agree on the starting line.">
+            What we've heard about Example Client's current situation, played back so we agree on the starting line.
+          </p>
+        </div>
+      </div>
+      <div style="display:flex; gap:32px; align-items:flex-start;">
+        <span style="font:700 84px/0.9 var(--ra-font-deck-display); color:var(--ra-indigo); letter-spacing:-0.02em; min-width:120px;">02</span>
+        <div>
+          <p class="kicker" style="font-size:32px;">What good looks like</p>
+          <p style="font:400 22px/1.45 var(--ra-font-deck-body); color:#4F5564; margin:0; max-width:440px;">
+            Five concrete outcomes for this engagement, and the methodology and architecture that gets us there.
+          </p>
+        </div>
+      </div>
+      <div style="display:flex; gap:32px; align-items:flex-start;">
+        <span style="font:700 84px/0.9 var(--ra-font-deck-display); color:var(--ra-indigo); letter-spacing:-0.02em; min-width:120px;">03</span>
+        <div>
+          <p class="kicker" style="font-size:32px;">The first two weeks</p>
+          <p style="font:400 22px/1.45 var(--ra-font-deck-body); color:#4F5564; margin:0; max-width:440px;">
+            Sprint plan, deliverables, and how we'll know discovery is done.
+          </p>
+        </div>
+      </div>
+      <div style="display:flex; gap:32px; align-items:flex-start;">
+        <span style="font:700 84px/0.9 var(--ra-font-deck-display); color:var(--ra-indigo); letter-spacing:-0.02em; min-width:120px;">04</span>
+        <div>
+          <p class="kicker" style="font-size:32px;">Ways of working</p>
+          <p style="font:400 22px/1.45 var(--ra-font-deck-body); color:#4F5564; margin:0; max-width:440px;">
+            Cadence, governance, tools, and exactly what we need from your team to start strong.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <span>Example Client × Rittman Analytics</span>
+    <span>Discovery Kickoff</span>
+    <span>15 September 2025</span>
+    <span class="pageno">03</span>
+  </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 4 — Section divider: Diagnosis
+     ============================================================ -->
+<section class="slide indigo" data-label="04 Section · Diagnosis">
+  <a class="logo"><img src="assets/logo-white-blue.svg" alt="Rittman Analytics"></a>
+  <div class="center">
+    <div>
+      <p style="font:600 22px/1 var(--ra-font-deck-ui); color:#D5DDFF; letter-spacing:0.22em; text-transform:uppercase; margin:0 0 36px;">Part one</p>
+      <h2 style="font:700 144px/0.98 var(--ra-font-deck-display); letter-spacing:-0.035em; color:#fff; margin:0; max-width:1500px;"
+          data-client-mention-html data-template="Where {{client}}<br>is today.">
+        Where Example Client<br>is today.
+      </h2>
+      <p class="lede on-indigo" style="margin:48px auto 0; max-width:1100px; text-align:center;">
+        We confront the hard truths first. A clean diagnosis is what makes the next four months go fast.
+      </p>
+    </div>
+  </div>
+  <div class="foot on-indigo">
+    <span>Part 1 of 4</span>
+    <span>The Diagnosis</span>
+    <span class="pageno">04</span>
+  </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 5 — Current state narrative (two-up)
+     ============================================================ -->
+<section class="slide" data-label="05 Current state">
+  <a class="logo"><img src="assets/logo-black-blue.svg" alt="Rittman Analytics"></a>
+  <div class="body">
+    <p class="eyebrow">The current state</p>
+    <h1 id="s4-headline" class="title md" style="max-width:1500px;">
+      A platform built tactically,<br>scaled into complexity.
+    </h1>
+
+    <div style="margin-top:64px; display:grid; grid-template-columns:1.05fr 1fr; gap:80px; flex:1;">
+      <!-- Narrative column (LEFT) — toggles between default copy and AI-generated copy -->
+      <div id="s4-left">
+        <div id="s4-left-default">
+          <p style="font:400 26px/1.55 var(--ra-font-deck-body); color:#2B3041; margin:0 0 24px;"
+             data-client-mention-html data-template="{{client}} operates a complex three-sided marketplace. The data estate has grown alongside the business — but every new question was answered with another analyst and another report, rather than a structural fix to the data platform.">
+            The client’s data estate has grown alongside the business — but every new question was answered with another analyst and another report, rather than a structural fix to the data platform.
+          </p>
+          <p style="font:400 26px/1.55 var(--ra-font-deck-body); color:#2B3041; margin:0;"
+             data-client-mention-html data-template="With new leadership in place and a clear mandate, {{client}} is ready to <strong style='color:var(--ra-ink); font-weight:600;'>transform its data capabilities from a constraint into a competitive advantage.</strong>">
+            With a clear mandate for change, the client is ready to <strong style="color:var(--ra-ink); font-weight:600;">transform its data capabilities from a constraint into a competitive advantage.</strong>
+          </p>
+        </div>
+        <div id="s4-left-generated" style="display:none; font:400 26px/1.55 var(--ra-font-deck-body); color:#2B3041;"></div>
+      </div>
+
+      <!-- Right column — toggles between default illustration and AI-generated diagram -->
+      <div id="s4-right">
+        <!-- Default: Three-sided marketplace card -->
+        <div id="s4-right-default" class="card tinted-indigo" style="padding:44px;">
+          <p style="font:600 18px/1 var(--ra-font-deck-ui); color:var(--ra-indigo); letter-spacing:0.16em; text-transform:uppercase; margin:0 0 28px;">A three-sided marketplace</p>
+          <div style="display:flex; flex-direction:column; gap:20px;">
+            <div style="display:flex; align-items:baseline; gap:20px;">
+              <span style="font:700 44px/1 var(--ra-font-deck-display); color:var(--ra-indigo); letter-spacing:-0.02em; min-width:70px;">P</span>
+              <div>
+                <p style="font:600 26px/1.2 var(--ra-font-deck-body); color:var(--ra-ink); margin:0 0 4px;">Providers</p>
+                <p style="font:400 20px/1.4 var(--ra-font-deck-body); color:#4F5564; margin:0;">Beauty &amp; wellness businesses on the platform</p>
+              </div>
+            </div>
+            <hr class="rule">
+            <div style="display:flex; align-items:baseline; gap:20px;">
+              <span style="font:700 44px/1 var(--ra-font-deck-display); color:var(--ra-indigo); letter-spacing:-0.02em; min-width:70px;">C</span>
+              <div>
+                <p style="font:600 26px/1.2 var(--ra-font-deck-body); color:var(--ra-ink); margin:0 0 4px;">Consumers</p>
+                <p style="font:400 20px/1.4 var(--ra-font-deck-body); color:#4F5564; margin:0;">Customers booking appointments</p>
+              </div>
+            </div>
+            <hr class="rule">
+            <div style="display:flex; align-items:baseline; gap:20px;">
+              <span style="font:700 44px/1 var(--ra-font-deck-display); color:var(--ra-indigo); letter-spacing:-0.02em; min-width:70px;">S</span>
+              <div>
+                <p style="font:600 26px/1.2 var(--ra-font-deck-body); color:var(--ra-ink); margin:0 0 4px;">Staffers</p>
+                <p style="font:400 20px/1.4 var(--ra-font-deck-body); color:#4F5564; margin:0;">Professionals working for providers</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Generated: AI-built diagram lives here -->
+        <div id="s4-right-generated" class="card tinted-indigo" style="display:none; padding:44px;"></div>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <span>Example Client × Rittman Analytics</span>
+    <span>Current state</span>
+    <span>15 September 2025</span>
+    <span class="pageno">05</span>
+  </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 6 — Big number
+     ============================================================ -->
+<section class="slide paper" data-label="06 Big number">
+  <a class="logo"><img src="assets/logo-black-blue.svg" alt="Rittman Analytics"></a>
+  <div class="body" style="justify-content:center;">
+    <p class="eyebrow">The number</p>
+    <div style="display:flex; align-items:baseline; gap:24px; margin-top:8px;">
+      <span id="s5-number" style="font:700 360px/0.85 var(--ra-font-deck-display); color:var(--ra-indigo); letter-spacing:-0.045em;">300</span>
+      <span id="s5-suffix" style="font:700 200px/0.85 var(--ra-font-deck-display); color:var(--ra-ink); letter-spacing:-0.03em;">+</span>
+    </div>
+    <p style="font:600 44px/1.2 var(--ra-font-deck-display); color:var(--ra-ink); letter-spacing:-0.015em; margin:48px 0 0; max-width:1500px;">
+      <span id="s5-bold">Power BI reports across the estate.</span> <span id="s5-tail" style="color:#4F5564; font-weight:400;">Many redundant. Many underutilised. None of them, on their own, telling the executive team how the business is doing.</span>
+    </p>
+  </div>
+  <div class="foot">
+    <span>Example Client × Rittman Analytics</span>
+    <span>Reporting sprawl</span>
+    <span>15 September 2025</span>
+    <span class="pageno">06</span>
+  </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 7 — Four problems (challenge grid)
+     ============================================================ -->
+<section class="slide" data-label="07 Four problems">
+  <a class="logo"><img src="assets/logo-black-blue.svg" alt="Rittman Analytics"></a>
+  <div class="body">
+    <p class="eyebrow">The hard truths</p>
+    <h1 id="s6-headline" class="title sm" style="max-width:1500px;">The four problems we're solving.</h1>
+
+    <div id="s6-grid" style="margin-top:56px; display:grid; gap:28px; flex:1;">
+      <!-- Cards injected by applySlide6() -->
+    </div>
+  </div>
+  <div class="foot">
+    <span>Example Client × Rittman Analytics</span>
+    <span>Current challenges</span>
+    <span>15 September 2025</span>
+    <span class="pageno">07</span>
+  </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 8 — Section divider: Vision
+     ============================================================ -->
+<section class="slide indigo" data-label="08 Section · Vision">
+  <a class="logo"><img src="assets/logo-white-blue.svg" alt="Rittman Analytics"></a>
+  <div class="center">
+    <div>
+      <p style="font:600 22px/1 var(--ra-font-deck-ui); color:#D5DDFF; letter-spacing:0.22em; text-transform:uppercase; margin:0 0 36px;">Part two</p>
+      <h2 style="font:700 144px/0.98 var(--ra-font-deck-display); letter-spacing:-0.035em; color:#fff; margin:0; max-width:1500px;">
+        What good<br>looks like.
+      </h2>
+      <p class="lede on-indigo" style="margin:48px auto 0; max-width:1100px; text-align:center;">
+        The outcomes you'll feel at the end of this engagement — and the way we'll get there.
+      </p>
+    </div>
+  </div>
+  <div class="foot on-indigo">
+    <span>Part 2 of 4</span>
+    <span>The Vision</span>
+    <span class="pageno">08</span>
+  </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 9 — Five outcomes
+     ============================================================ -->
+<section class="slide" data-label="09 Five outcomes">
+  <a class="logo"><img src="assets/logo-black-blue.svg" alt="Rittman Analytics"></a>
+  <div class="body">
+    <p class="eyebrow">Objectives</p>
+    <h1 id="s8-headline" class="title sm" style="max-width:1500px;">Five outcomes for this engagement.</h1>
+
+    <div style="margin-top:56px; flex:1; display:flex; flex-direction:column;">
+      <table class="tbl" id="s8-table" style="font-size:24px;">
+        <colgroup>
+          <col style="width:80px;">
+          <col style="width:380px;">
+          <col>
+        </colgroup>
+        <thead>
+          <tr><th>#</th><th>Outcome</th><th>What it means</th></tr>
+        </thead>
+        <tbody id="s8-rows">
+          <!-- rows injected by applySlide8() -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="foot">
+    <span>Example Client × Rittman Analytics</span>
+    <span>Objectives</span>
+    <span>15 September 2025</span>
+    <span class="pageno">09</span>
+  </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 10 — Methodology (people / process / technology)
+     ============================================================ -->
+<section class="slide" data-label="10 Methodology">
+  <a class="logo"><img src="assets/logo-black-blue.svg" alt="Rittman Analytics"></a>
+  <div class="body">
+    <p class="eyebrow">Our methodology</p>
+    <h1 class="title sm" style="max-width:1500px;">People, process, technology — in that order.</h1>
+
+    <div style="margin-top:64px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:36px; flex:1;">
+      <!-- People -->
+      <div style="display:flex; flex-direction:column;">
+        <div style="display:flex; align-items:center; gap:18px; margin-bottom:24px;">
+          <span style="display:inline-grid; place-items:center; width:64px; height:64px; border-radius:50%; background:var(--ra-indigo); color:#fff; font:700 28px/1 var(--ra-font-deck-display);">1</span>
+          <p class="kicker" style="font-size:32px; margin:0;">People</p>
+        </div>
+        <p style="font:400 22px/1.5 var(--ra-font-deck-body); color:#2B3041; margin:0 0 24px;">
+          We work alongside your team — not in a back room. Pair programming and knowledge transfer are non-negotiable from day one.
+        </p>
+        <ul class="bullets" style="font-size:20px;">
+          <li>Senior consultants only — no juniors, no rotation</li>
+          <li>Pair programming with your data engineers</li>
+          <li>Advisory partnership beyond go-live</li>
+        </ul>
+      </div>
+      <!-- Process -->
+      <div style="display:flex; flex-direction:column; background:var(--ra-paper-2); border-radius:16px; padding:40px; margin:-12px 0;">
+        <div style="display:flex; align-items:center; gap:18px; margin-bottom:24px;">
+          <span style="display:inline-grid; place-items:center; width:64px; height:64px; border-radius:50%; background:var(--ra-indigo); color:#fff; font:700 28px/1 var(--ra-font-deck-display);">2</span>
+          <p class="kicker" style="font-size:32px; margin:0;">Process</p>
+        </div>
+        <p style="font:400 22px/1.5 var(--ra-font-deck-body); color:#2B3041; margin:0 0 24px;">
+          Two-week sprints with planning, demo and retro. You always know where we are, and the work compounds visibly.
+        </p>
+        <ul class="bullets" style="font-size:20px;">
+          <li>Two-week sprint cadence</li>
+          <li>Weekly demos &amp; retrospectives</li>
+          <li>Single shared Jira board, full client access</li>
+        </ul>
+      </div>
+      <!-- Technology -->
+      <div style="display:flex; flex-direction:column;">
+        <div style="display:flex; align-items:center; gap:18px; margin-bottom:24px;">
+          <span style="display:inline-grid; place-items:center; width:64px; height:64px; border-radius:50%; background:var(--ra-indigo); color:#fff; font:700 28px/1 var(--ra-font-deck-display);">3</span>
+          <p class="kicker" style="font-size:32px; margin:0;">Technology</p>
+        </div>
+        <p style="font:400 22px/1.5 var(--ra-font-deck-body); color:#2B3041; margin:0 0 24px;">
+          An opinionated, modern stack we know inside out. Looker, dbt, BigQuery — Google Cloud Data Analytics Specialised Partner.
+        </p>
+        <ul class="bullets" style="font-size:20px;">
+          <li>Looker semantic layer + BigQuery</li>
+          <li>dbt / Dataform for transformations</li>
+          <li>Version-controlled, documented, scalable</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <span>Example Client × Rittman Analytics</span>
+    <span>Methodology</span>
+    <span>15 September 2025</span>
+    <span class="pageno">10</span>
+  </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 11 — Target architecture (diagram)
+     ============================================================ -->
+<section class="slide" data-label="11 Target architecture">
+  <a class="logo"><img src="assets/logo-black-blue.svg" alt="Rittman Analytics"></a>
+  <div class="body">
+    <p class="eyebrow">Target architecture</p>
+    <h1 id="s10-headline" class="title sm" style="max-width:1500px;">From source to insight, governed end-to-end.</h1>
+
+    <!-- Diagram -->
+    <div style="margin-top:56px; flex:1; display:flex; align-items:center;">
+      <!-- Default 4-stage card row -->
+      <div id="s10-default" style="width:100%; display:grid; grid-template-columns:repeat(4, 1fr); gap:0; align-items:stretch; position:relative;">
+
+        <!-- Connector line behind -->
+        <div style="position:absolute; left:7%; right:7%; top:50%; height:2px; background:linear-gradient(to right, var(--ra-line) 0%, var(--ra-indigo) 50%, var(--ra-line) 100%); z-index:0; transform:translateY(-1px);"></div>
+
+        <!-- Stage 1 — Sources -->
+        <div style="position:relative; z-index:1; padding:0 24px;">
+          <div class="card" style="background:#fff; padding:32px 28px; min-height:340px; display:flex; flex-direction:column;">
+            <p style="font:600 18px/1 var(--ra-font-deck-ui); color:var(--ra-indigo); letter-spacing:0.16em; text-transform:uppercase; margin:0 0 16px;">01 · Extract</p>
+            <p class="kicker" style="font-size:26px; margin:0 0 18px;">Source systems</p>
+            <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px;">
+              <li style="font:500 20px/1.3 var(--ra-font-deck-body); color:var(--ra-ink); padding:10px 14px; background:var(--ra-paper-2); border-radius:6px;">PostgreSQL replica</li>
+              <li style="font:500 20px/1.3 var(--ra-font-deck-body); color:var(--ra-ink); padding:10px 14px; background:var(--ra-paper-2); border-radius:6px;">Segment events</li>
+              <li style="font:500 20px/1.3 var(--ra-font-deck-body); color:var(--ra-ink); padding:10px 14px; background:var(--ra-paper-2); border-radius:6px;">GA4 exports</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Stage 2 — Transform -->
+        <div style="position:relative; z-index:1; padding:0 24px;">
+          <div class="card" style="background:#fff; padding:32px 28px; min-height:340px; display:flex; flex-direction:column;">
+            <p style="font:600 18px/1 var(--ra-font-deck-ui); color:var(--ra-indigo); letter-spacing:0.16em; text-transform:uppercase; margin:0 0 16px;">02 · Manage</p>
+            <p class="kicker" style="font-size:26px; margin:0 0 18px;">BigQuery + Dataform</p>
+            <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px;">
+              <li style="font:500 20px/1.3 var(--ra-font-deck-body); color:var(--ra-ink); padding:10px 14px; background:var(--ra-paper-2); border-radius:6px;">Entity model: P · C · S</li>
+              <li style="font:500 20px/1.3 var(--ra-font-deck-body); color:var(--ra-ink); padding:10px 14px; background:var(--ra-paper-2); border-radius:6px;">Physical model for WBR</li>
+              <li style="font:500 20px/1.3 var(--ra-font-deck-body); color:var(--ra-ink); padding:10px 14px; background:var(--ra-paper-2); border-radius:6px;">Tested, version-controlled</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Stage 3 — Semantic -->
+        <div style="position:relative; z-index:1; padding:0 24px;">
+          <div class="card tinted-indigo" style="padding:32px 28px; min-height:340px; display:flex; flex-direction:column;">
+            <p style="font:600 18px/1 var(--ra-font-deck-ui); color:var(--ra-indigo); letter-spacing:0.16em; text-transform:uppercase; margin:0 0 16px;">03 · Present</p>
+            <p class="kicker" style="font-size:26px; margin:0 0 18px;">Looker semantic layer</p>
+            <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px;">
+              <li style="font:500 20px/1.3 var(--ra-font-deck-body); color:var(--ra-ink); padding:10px 14px; background:rgba(255,255,255,0.65); border-radius:6px;">Curated WBR dashboards</li>
+              <li style="font:500 20px/1.3 var(--ra-font-deck-body); color:var(--ra-ink); padding:10px 14px; background:rgba(255,255,255,0.65); border-radius:6px;">Self-service explores</li>
+              <li style="font:500 20px/1.3 var(--ra-font-deck-body); color:var(--ra-ink); padding:10px 14px; background:rgba(255,255,255,0.65); border-radius:6px;">One trusted definition</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Stage 4 — Advanced -->
+        <div style="position:relative; z-index:1; padding:0 24px;">
+          <div class="card" style="background:var(--ra-ink); color:#fff; border-color:transparent; padding:32px 28px; min-height:340px; display:flex; flex-direction:column;">
+            <p style="font:600 18px/1 var(--ra-font-deck-ui); color:#87A0FF; letter-spacing:0.16em; text-transform:uppercase; margin:0 0 16px;">04 · Activate</p>
+            <p class="kicker" style="font-size:26px; margin:0 0 18px; color:#fff;">Advanced analytics</p>
+            <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px;">
+              <li style="font:500 20px/1.3 var(--ra-font-deck-body); color:#fff; padding:10px 14px; background:rgba(255,255,255,0.08); border-radius:6px;">Multi-touch attribution</li>
+              <li style="font:500 20px/1.3 var(--ra-font-deck-body); color:#fff; padding:10px 14px; background:rgba(255,255,255,0.08); border-radius:6px;">Provider churn modelling</li>
+              <li style="font:500 20px/1.3 var(--ra-font-deck-body); color:#fff; padding:10px 14px; background:rgba(255,255,255,0.08); border-radius:6px;">Customer behaviour</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <!-- AI-generated mermaid diagram swap -->
+      <div id="s10-mermaid" style="width:100%; display:none; align-items:center; justify-content:center; min-height:340px;"></div>
+    </div>
+
+    <!-- Annotation strip -->
+    <div style="margin-top:32px; display:flex; gap:24px; align-items:center; padding:18px 24px; background:var(--ra-paper-2); border-radius:8px;">
+      <span id="s10-annot-label" style="font:600 16px/1 var(--ra-font-deck-ui); color:var(--ra-indigo); letter-spacing:0.16em; text-transform:uppercase;">Migration path</span>
+      <span id="s10-annot-text" style="font:400 20px/1.3 var(--ra-font-deck-body); color:#4F5564;">
+        Power BI estate is audited, rationalised, and retired in stages as Looker takes over the WBR and self-service layer.
+      </span>
+    </div>
+  </div>
+  <div class="foot">
+    <span>Example Client × Rittman Analytics</span>
+    <span>Target architecture</span>
+    <span>15 September 2025</span>
+    <span class="pageno">11</span>
+  </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 12 — Section divider: Plan
+     ============================================================ -->
+<section class="slide indigo" data-label="12 Section · Plan">
+  <a class="logo"><img src="assets/logo-white-blue.svg" alt="Rittman Analytics"></a>
+  <div class="center">
+    <div>
+      <p style="font:600 22px/1 var(--ra-font-deck-ui); color:#D5DDFF; letter-spacing:0.22em; text-transform:uppercase; margin:0 0 36px;">Part three</p>
+      <h2 style="font:700 144px/0.98 var(--ra-font-deck-display); letter-spacing:-0.035em; color:#fff; margin:0; max-width:1500px;">
+        The first<br>two weeks.
+      </h2>
+      <p class="lede on-indigo" style="margin:48px auto 0; max-width:1100px; text-align:center;">
+        What to expect from us, as your initial proof of value
+      </p>
+    </div>
+  </div>
+  <div class="foot on-indigo">
+    <span>Part 3 of 4</span>
+    <span>The Plan</span>
+    <span class="pageno">12</span>
+  </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 13 — Two-week timeline
+     ============================================================ -->
+<section class="slide" data-label="13 Timeline">
+  <a class="logo"><img src="assets/logo-black-blue.svg" alt="Rittman Analytics"></a>
+  <div class="body">
+    <p class="eyebrow" id="s12-eyebrow">Discovery sprint</p>
+    <h1 class="title sm" id="s12-headline" style="max-width:1500px;">Two weeks. Eleven deliverables.</h1>
+
+    <div style="margin-top:56px; display:grid; grid-template-columns:1fr 1fr; gap:36px; flex:1;">
+      <!-- Week 1 -->
+      <div style="display:flex; flex-direction:column;">
+        <div style="display:flex; align-items:baseline; gap:24px; padding-bottom:24px; border-bottom:2px solid var(--ra-indigo);">
+          <span style="font:700 56px/1 var(--ra-font-deck-display); color:var(--ra-indigo); letter-spacing:-0.02em;">Week 1</span>
+          <span id="s12-w1-focus" style="font:500 22px/1.2 var(--ra-font-deck-body); color:#4F5564;">Technical foundation &amp; current-state analysis</span>
+        </div>
+        <ol id="s12-w1-list" style="list-style:none; padding:0; margin:24px 0 0; display:flex; flex-direction:column; gap:14px;"></ol>
+      </div>
+
+      <!-- Week 2 -->
+      <div style="display:flex; flex-direction:column;">
+        <div style="display:flex; align-items:baseline; gap:24px; padding-bottom:24px; border-bottom:2px solid var(--ra-indigo);">
+          <span style="font:700 56px/1 var(--ra-font-deck-display); color:var(--ra-indigo); letter-spacing:-0.02em;">Week 2</span>
+          <span id="s12-w2-focus" style="font:500 22px/1.2 var(--ra-font-deck-body); color:#4F5564;">Business requirements &amp; solution design</span>
+        </div>
+        <ol id="s12-w2-list" style="list-style:none; padding:0; margin:24px 0 0; display:flex; flex-direction:column; gap:14px;"></ol>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <span>Example Client × Rittman Analytics</span>
+    <span>Two-week sprint plan</span>
+    <span>15 September 2025</span>
+    <span class="pageno">13</span>
+  </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 14 — Ways of working
+     ============================================================ -->
+<section class="slide" data-label="14 Ways of working">
+  <a class="logo"><img src="assets/logo-black-blue.svg" alt="Rittman Analytics"></a>
+  <div class="body">
+    <p class="eyebrow">Ways of working</p>
+    <h1 class="title sm" style="max-width:1500px;">How we'll run the engagement.</h1>
+
+    <div style="margin-top:56px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:32px; flex:1;">
+      <!-- Cadence -->
+      <div class="card" style="padding:36px 36px 32px;">
+        <p style="font:600 18px/1 var(--ra-font-deck-ui); color:var(--ra-indigo); letter-spacing:0.16em; text-transform:uppercase; margin:0 0 18px;">Meeting cadence</p>
+        <p class="kicker" style="font-size:30px; margin:0 0 24px;">A predictable rhythm.</p>
+        <ul class="bullets" style="font-size:21px;">
+          <li>Two-week sprints; planning at the start</li>
+          <li>Weekly demos &amp; retrospectives</li>
+          <li>Stakeholder touchpoints — 2–4h / month</li>
+          <li>Ad-hoc working sessions for deep dives</li>
+        </ul>
+      </div>
+
+      <!-- Tools -->
+      <div class="card" style="padding:36px 36px 32px;">
+        <p style="font:600 18px/1 var(--ra-font-deck-ui); color:var(--ra-indigo); letter-spacing:0.16em; text-transform:uppercase; margin:0 0 18px;">Tools &amp; collaboration</p>
+        <p class="kicker" style="font-size:30px; margin:0 0 24px;">One set of channels.</p>
+        <ul class="bullets" style="font-size:21px;">
+          <li>RA Jira — full client access</li>
+          <li>Centralised discovery &amp; technical docs</li>
+          <li>Slack / email; calls recorded via Fathom</li>
+          <li>Version control: GitHub / Bitbucket</li>
+        </ul>
+      </div>
+
+      <!-- Governance -->
+      <div class="card tinted-indigo" style="padding:36px 36px 32px;">
+        <p style="font:600 18px/1 var(--ra-font-deck-ui); color:var(--ra-indigo); letter-spacing:0.16em; text-transform:uppercase; margin:0 0 18px;">Governance &amp; compliance</p>
+        <p class="kicker" style="font-size:30px; margin:0 0 24px;">Tracked from day one.</p>
+        <ul class="bullets" style="font-size:21px;">
+          <li>Access &amp; permissions logged from kickoff</li>
+          <li>PII handling documented in discovery</li>
+          <li>Aligned to <span data-client-mention data-template="{{client}}">Example Client</span> supplier-assessment standards</li>
+          <li>Auditable trail through Jira &amp; Git</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <span>Example Client × Rittman Analytics</span>
+    <span>Project management</span>
+    <span>15 September 2025</span>
+    <span class="pageno">14</span>
+  </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 15 — Access requirements (what we need from you)
+     ============================================================ -->
+<section class="slide paper" data-label="15 Access requirements">
+  <a class="logo"><img src="assets/logo-black-blue.svg" alt="Rittman Analytics"></a>
+  <div class="body">
+    <p class="eyebrow">What we need from you</p>
+    <h1 id="s14-headline" class="title sm" style="max-width:1500px;">Three buckets of access to start strong.</h1>
+
+    <div id="s14-grid" style="margin-top:56px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:28px; flex:1;"></div>
+  </div>
+  <div class="foot">
+    <span>Example Client × Rittman Analytics</span>
+    <span>Access requirements</span>
+    <span>15 September 2025</span>
+    <span class="pageno">15</span>
+  </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 16 — Team (monogram avatars)
+     ============================================================ -->
+<section class="slide" data-label="16 Team">
+  <a class="logo"><img src="assets/logo-black-blue.svg" alt="Rittman Analytics"></a>
+  <div class="body">
+    <p class="eyebrow">Your team</p>
+    <h1 id="s15-headline" class="title sm" style="max-width:1500px;">Three senior consultants. The people you meet are the people who do the work.</h1>
+
+    <div id="s15-grid" style="margin-top:64px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:36px; flex:1;"></div>
+  </div>
+  <div class="foot">
+    <span>Example Client × Rittman Analytics</span>
+    <span>Your engagement team</span>
+    <span>15 September 2025</span>
+    <span class="pageno">16</span>
+  </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 17 — Questions / closing
+     ============================================================ -->
+<section class="slide dark" data-label="17 Questions">
+  <div style="position:absolute; right:-280px; bottom:-280px; width:780px; height:780px; border-radius:50%; background:rgba(79,96,255,0.22);"></div>
+  <div style="position:absolute; left:-180px; top:-180px; width:540px; height:540px; border-radius:50%; background:rgba(135,213,252,0.10);"></div>
+
+  <a class="logo"><img src="assets/logo-white-blue.svg" alt="Rittman Analytics"></a>
+
+  <div style="position:absolute; left:84px; right:84px; top:240px; bottom:160px; display:flex; flex-direction:column; justify-content:center;">
+    <p class="eyebrow on-dark" style="margin:0 0 36px;">Over to you</p>
+    <h1 style="font:700 200px/0.95 var(--ra-font-deck-display); letter-spacing:-0.04em; color:#fff; margin:0; max-width:1400px;">
+      Questions<span style="color:#87D5FC;">.</span>
+    </h1>
+    <p style="font:400 32px/1.45 var(--ra-font-deck-body); color:rgba(255,255,255,.78); margin:48px 0 0; max-width:1100px;">
+      What's the first thing you'd like us to dig into in week one?
+    </p>
+
+    <div style="margin-top:auto; display:flex; gap:64px; flex-wrap:wrap; padding-top:64px;">
+      <div>
+        <p style="font:600 16px/1 var(--ra-font-deck-ui); color:#87A0FF; letter-spacing:0.16em; text-transform:uppercase; margin:0 0 12px;">Email</p>
+        <p style="font:500 24px/1.3 var(--ra-font-deck-body); color:#fff; margin:0;">info@rittmananalytics.com</p>
+      </div>
+      <div>
+        <p style="font:600 16px/1 var(--ra-font-deck-ui); color:#87A0FF; letter-spacing:0.16em; text-transform:uppercase; margin:0 0 12px;">Phone</p>
+        <p style="font:500 24px/1.3 var(--ra-font-deck-body); color:#fff; margin:0;">+44 (0)208 058 5951</p>
+      </div>
+      <div>
+        <p style="font:600 16px/1 var(--ra-font-deck-ui); color:#87A0FF; letter-spacing:0.16em; text-transform:uppercase; margin:0 0 12px;">Web</p>
+        <p style="font:500 24px/1.3 var(--ra-font-deck-body); color:#fff; margin:0;">rittmananalytics.com</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot on-dark">
+    <span>Example Client × Rittman Analytics</span>
+    <span>Discovery Kickoff · 15 September 2025</span>
+    <span class="pageno">17</span>
+  </div>
+</section>
+
+</deck-stage>
+
+<!-- Save as PDF button (hidden during print) -->
+<button id="save-pdf-btn" type="button" aria-label="Save deck as PDF"
+  onclick="window.print()"
+  style="position:fixed; left:16px; bottom:16px; z-index:2147483645;
+         display:inline-flex; align-items:center; gap:8px;
+         padding:10px 14px; border-radius:999px; border:1px solid rgba(0,0,0,0.08);
+         background:#ffffff; color:#2B3041; font:500 13px/1 system-ui,-apple-system,sans-serif;
+         box-shadow:0 6px 20px rgba(0,0,0,0.12); cursor:pointer;">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+  </svg>
+  Save as PDF
+</button>
+<style>
+  @media print { #save-pdf-btn, #twk-panel, #twk-toggle { display:none !important; } }
+</style>
+
+<script src="deck-stage.js"></script>
+
+<!-- ============================================================
+     TWEAKS — vanilla JS panel (no React needed)
+     ============================================================ -->
+<script>
+(() => {
+  // Persisted defaults (the host rewrites this block on disk)
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "titleVariant": "pitch",
+  "clientName": "CLIENT NAME",
+  "engagementType": "Project",
+  "engagementDate": "",
+  "titlePhoto": "",
+  "showPartnerBadge": false,
+  "vignetteStrength": 40,
+  "accentColor": "#4F60FF",
+  "slide4Headline": "",
+  "slide4LeftPrompt": "",
+  "slide4RightPrompt": "",
+  "slide4LeftCache": "",
+  "slide4RightCache": "",
+  "slide5Number": "",
+  "slide5Suffix": "",
+  "slide5Bold": "",
+  "slide5Tail": "",
+  "slide6Count": 0,
+  "slide6Problems": [
+    {"headline": "", "detail": ""},
+    {"headline": "", "detail": ""},
+    {"headline": "", "detail": ""},
+    {"headline": "", "detail": ""},
+    {"headline": "", "detail": ""},
+    {"headline": "", "detail": ""},
+    {"headline": "", "detail": ""},
+    {"headline": "", "detail": ""}
+  ],
+  "slide8Count": 0,
+  "slide8Outcomes": [
+    {"headline": "", "detail": ""},
+    {"headline": "", "detail": ""},
+    {"headline": "", "detail": ""},
+    {"headline": "", "detail": ""},
+    {"headline": "", "detail": ""}
+  ],
+  "slide10Headline": "",
+  "slide10Prompt": "",
+  "slide10Direction": "LR",
+  "slide10MermaidCache": "",
+  "slide10AnnotLabel": "",
+  "slide10AnnotText": "",
+  "slide12W1Focus": "",
+  "slide12W2Focus": "",
+  "slide12W1Count": 0,
+  "slide12W2Count": 0,
+  "slide12W1Items": ["", "", "", "", "", ""],
+  "slide12W2Items": ["", "", "", "", "", ""],
+  "slide14Count": 0,
+  "slide14Categories": [
+    {"name": "", "needs": ""},
+    {"name": "", "needs": ""},
+    {"name": "", "needs": ""},
+    {"name": "", "needs": ""}
+  ],
+  "presenters": [
+    {"name": "", "role": ""}
+  ]
+}/*EDITMODE-END*/;
+
+  let state = { ...TWEAK_DEFAULTS };
+
+  // --- Apply state to the DOM ---
+  function apply() {
+    const slide = document.getElementById('title-slide');
+    const eyebrow = document.getElementById('title-eyebrow');
+    const headline = document.getElementById('title-headline');
+    const bg = document.getElementById('title-bg');
+    const partner = document.getElementById('title-partner');
+    const vignette = document.getElementById('title-vignette');
+    const internal = document.getElementById('title-internal-bg');
+
+    // Compute headline + eyebrow from client name, engagement type, and date
+    const client = (state.clientName || '').trim() || 'Client';
+    const eng = (state.engagementType === 'Project') ? 'Project' : 'Discovery';
+    const dateStr = (function fmt(iso){
+      if (!iso) return '';
+      const d = new Date(iso + 'T00:00:00');
+      if (isNaN(d.getTime())) return iso;
+      const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    })(state.engagementDate);
+
+    if (eyebrow) eyebrow.textContent = `${eng} Kickoff${dateStr ? ' · ' + dateStr : ''}`;
+    if (headline) {
+      const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+      headline.innerHTML = `${esc(client)} &amp;<br>Rittman Analytics:<br>${esc(eng)} Kickoff`;
+    }
+
+    // Custom photo overrides the default background
+    if (bg) {
+      const src = (state.titlePhoto && String(state.titlePhoto).length > 8)
+        ? state.titlePhoto : '';
+      if (bg.getAttribute('src') !== src) bg.setAttribute('src', src);
+    }
+
+    // Presenters list — render dynamically
+    const list = document.getElementById('title-presenters');
+    if (list) {
+      const arr = Array.isArray(state.presenters) ? state.presenters : [];
+      list.innerHTML = arr
+        .filter(p => p && (p.name || p.role))
+        .map(p => {
+          const name = (p.name || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+          const role = (p.role || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+          const sep = name && role ? ', ' : '';
+          return `<p style="font:500 28px/1.4 var(--ra-font-deck-body); color:#fff; margin:0;">${name}${sep}${role}</p>`;
+        })
+        .join('');
+    }
+
+    // Title variant — pitch (photo bg) vs internal (indigo block bg)
+    const isPitch = state.titleVariant === 'pitch';
+    if (bg) bg.style.display = isPitch ? '' : 'none';
+    if (vignette) vignette.style.display = isPitch ? '' : 'none';
+    if (internal) internal.style.display = isPitch ? 'none' : '';
+    if (partner) partner.style.display = (isPitch && state.showPartnerBadge) ? '' : 'none';
+
+    // Vignette strength
+    if (vignette) {
+      const s = Math.max(0, Math.min(100, state.vignetteStrength)) / 100;
+      vignette.style.background =
+        `linear-gradient(to right, rgba(15,17,23,${(s*1.18).toFixed(2)}) 0%, rgba(15,17,23,${s.toFixed(2)}) 45%, rgba(15,17,23,${(s*0.55).toFixed(2)}) 100%)`;
+    }
+
+    // Accent colour — inject as CSS variable override
+    document.documentElement.style.setProperty('--ra-indigo', state.accentColor);
+
+    // --- Slide 4 — headline + generated content swap ---
+    applySlide4();
+    // --- Slide 5 — big number + bold subject + tail ---
+    applySlide5();
+    // --- Slide 6 — hard truths grid ---
+    applySlide6();
+    // --- Slide 8 — outcomes table ---
+    applySlide8();
+    // --- Slide 10 — target architecture (mermaid swap + annotation) ---
+    applySlide10();
+    // --- Slide 12 — discovery sprint timeline ---
+    applySlide12();
+    // --- Slide 14 — what we need from you (categories + needs) ---
+    applySlide14();
+    // --- Slide 15 — your team ---
+    applySlide15();
+
+    // --- Propagate client/engagement/date through every footer + slide-2 copy ---
+    propagateBranding(client, eng, dateStr);
+
+    // --- Speaker notes — substitute client + engagement type into slide 1 ---
+    updateTitleSpeakerNote(client, eng);
+  }
+
+  // Replace the default client name with the real client name, "Discovery" (in kickoff context) with
+  // engagement type, and "15 September 2025" with the chosen date — across every
+  // footer row and a couple of in-body lines on slide 2.
+  function propagateBranding(client, eng, dateStr) {
+    const date = dateStr || '15 September 2025';
+
+    document.querySelectorAll('section.slide .foot').forEach(foot => {
+      foot.querySelectorAll('span').forEach(sp => {
+        if (sp.classList.contains('pageno')) return;
+        const txt = sp.textContent;
+
+        // "Example Client × Rittman Analytics"  →  "<Client> × Rittman Analytics"
+        if (/Rittman Analytics/.test(txt) && /×/.test(txt)) {
+          sp.textContent = `${client} × Rittman Analytics`;
+          return;
+        }
+        // "Discovery Kickoff"  →  "<Eng> Kickoff"  (slide 2 only)
+        if (/^\s*Discovery Kickoff\s*$/.test(txt)) {
+          sp.textContent = `${eng} Kickoff`;
+          return;
+        }
+        // "Discovery Kickoff · 15 September 2025"  →  combined
+        if (/Kickoff\s*·/.test(txt)) {
+          sp.textContent = `${eng} Kickoff · ${date}`;
+          return;
+        }
+        // Any standalone date stamp
+        if (/\b\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/.test(txt)) {
+          sp.textContent = date;
+          return;
+        }
+      });
+    });
+
+    // Slide 2/3/4 body copy — replace {{client}} placeholders
+    document.querySelectorAll('[data-client-mention]').forEach(el => {
+      const tpl = el.getAttribute('data-template');
+      if (tpl) el.textContent = tpl.replace(/\{\{client\}\}/g, client);
+    });
+    document.querySelectorAll('[data-client-mention-html]').forEach(el => {
+      const tpl = el.getAttribute('data-template');
+      if (tpl) el.innerHTML = tpl.replace(/\{\{client\}\}/g, client);
+    });
+  }
+
+  // --- Slide 4 — headline + AI-generated swap-ins ---
+  function applySlide4() {
+    // Headline (\n becomes <br>)
+    const h = document.getElementById('s4-headline');
+    if (h) {
+      const txt = (state.slide4Headline || '').trim();
+      if (txt) {
+        const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        h.innerHTML = txt.split(/\r?\n/).map(esc).join('<br>');
+      }
+    }
+
+    // LEFT column — show generated content if cache present, else default
+    const leftDef = document.getElementById('s4-left-default');
+    const leftGen = document.getElementById('s4-left-generated');
+    if (leftDef && leftGen) {
+      const cache = (state.slide4LeftCache || '').trim();
+      if (cache) {
+        leftGen.innerHTML = renderParagraphs(cache);
+        leftDef.style.display = 'none';
+        leftGen.style.display = '';
+      } else {
+        leftDef.style.display = '';
+        leftGen.style.display = 'none';
+      }
+    }
+
+    // RIGHT column — show generated diagram if cache present, else default
+    const rightDef = document.getElementById('s4-right-default');
+    const rightGen = document.getElementById('s4-right-generated');
+    if (rightDef && rightGen) {
+      const cache = (state.slide4RightCache || '').trim();
+      if (cache) {
+        rightGen.innerHTML = cache; // SVG / HTML diagram from Claude
+        rightDef.style.display = 'none';
+        rightGen.style.display = '';
+      } else {
+        rightDef.style.display = '';
+        rightGen.style.display = 'none';
+      }
+    }
+  }
+
+  // --- Slide 5 — big number + bold subject + tail copy ---
+  function applySlide5() {
+    const num = document.getElementById('s5-number');
+    const suf = document.getElementById('s5-suffix');
+    const bold = document.getElementById('s5-bold');
+    const tail = document.getElementById('s5-tail');
+    if (num)  num.textContent  = (state.slide5Number ?? '').toString();
+    if (suf)  suf.textContent  = (state.slide5Suffix ?? '').toString();
+    if (bold) bold.textContent = (state.slide5Bold   ?? '').toString();
+    if (tail) tail.textContent = (state.slide5Tail   ?? '').toString();
+
+    // Auto-shrink the number when it gets longer (1–2 chars: 360px, 3: 320, 4: 260, 5+: 200)
+    if (num) {
+      const len = (state.slide5Number || '').toString().length;
+      const sz = len <= 2 ? 360 : len === 3 ? 320 : len === 4 ? 260 : 200;
+      num.style.fontSize = sz + 'px';
+    }
+  }
+
+  // --- Slide 10 — target architecture (headline, mermaid swap, annotation) ---
+  let s10MermaidSeq = 0;
+  function applySlide10() {
+    const head = document.getElementById('s10-headline');
+    const def  = document.getElementById('s10-default');
+    const merm = document.getElementById('s10-mermaid');
+    const lbl  = document.getElementById('s10-annot-label');
+    const txt  = document.getElementById('s10-annot-text');
+
+    if (head) head.textContent = (state.slide10Headline || '').trim() || 'From source to insight, governed end-to-end.';
+    if (lbl)  lbl.textContent  = (state.slide10AnnotLabel || '').toString();
+    if (txt)  txt.textContent  = (state.slide10AnnotText || '').toString();
+
+    const cache = (state.slide10MermaidCache || '').trim();
+    if (def && merm) {
+      if (cache) {
+        def.style.display = 'none';
+        merm.style.display = 'flex';
+        // Render mermaid into merm
+        const id = 'mmd-' + (++s10MermaidSeq);
+        merm.innerHTML = '';
+        if (window.mermaid && typeof window.mermaid.render === 'function') {
+          window.mermaid.render(id, cache).then(({ svg }) => {
+            merm.innerHTML = svg;
+            // Force the SVG to fill the slot
+            const svgEl = merm.querySelector('svg');
+            if (svgEl) {
+              svgEl.style.width = '100%';
+              svgEl.style.maxHeight = '420px';
+              svgEl.style.height = 'auto';
+            }
+          }).catch(err => {
+            console.warn('Mermaid render error', err);
+            merm.innerHTML = `<div style="font:400 18px/1.4 var(--ra-font-deck-body); color:#B91C1C; padding:16px;">Mermaid render failed. Edit the prompt or check the diagram syntax.</div>`;
+          });
+        } else {
+          // Mermaid isn't ready yet. Show a loading state and retry once it arrives,
+          // either via __initMermaid's callback or short polling as a safety net.
+          merm.innerHTML = `<div style="font:400 18px/1.4 var(--ra-font-deck-body); color:#4F5564; padding:16px;">Loading diagram engine…</div>`;
+          window.__retrySlide10Mermaid = applySlide10;
+          let tries = 0;
+          const iv = setInterval(() => {
+            tries++;
+            if (window.mermaid && typeof window.mermaid.render === 'function') {
+              clearInterval(iv);
+              applySlide10();
+            } else if (tries > 40) { // ~10s
+              clearInterval(iv);
+              merm.innerHTML = `<div style="font:400 18px/1.4 var(--ra-font-deck-body); color:#B91C1C; padding:16px;">Diagram engine failed to load. Check that <code>mermaid.min.js</code> is alongside this HTML file.</div>`;
+            }
+          }, 250);
+        }
+      } else {
+        def.style.display = 'grid';
+        merm.style.display = 'none';
+      }
+    }
+  }
+
+  // --- Slide 12 — Discovery sprint timeline ---
+  function applySlide12() {
+    const eyebrow = document.getElementById('s12-eyebrow');
+    const headline = document.getElementById('s12-headline');
+    const w1Focus = document.getElementById('s12-w1-focus');
+    const w2Focus = document.getElementById('s12-w2-focus');
+    const w1List  = document.getElementById('s12-w1-list');
+    const w2List  = document.getElementById('s12-w2-list');
+    if (!w1List || !w2List) return;
+
+    const eng = (state.engagementType === 'Project') ? 'Project' : 'Discovery';
+    const engLower = eng.toLowerCase();
+
+    if (eyebrow) eyebrow.textContent = `${eng} sprint`;
+
+    const n1 = Math.max(1, Math.min(6, parseInt(state.slide12W1Count, 10) || 5));
+    const n2 = Math.max(1, Math.min(6, parseInt(state.slide12W2Count, 10) || 6));
+    const total = n1 + n2;
+
+    if (headline) {
+      const totalWord = NUM_WORDS[total] ? (NUM_WORDS[total].charAt(0).toUpperCase() + NUM_WORDS[total].slice(1)) : String(total);
+      const noun = (total === 1) ? 'deliverable' : 'deliverables';
+      headline.textContent = `Two weeks. ${totalWord} ${noun}.`;
+    }
+
+    if (w1Focus) w1Focus.textContent = (state.slide12W1Focus || '').trim() || 'Technical foundation & current-state analysis';
+    if (w2Focus) w2Focus.textContent = (state.slide12W2Focus || '').trim() || 'Business requirements & solution design';
+
+    const w1 = (Array.isArray(state.slide12W1Items) ? state.slide12W1Items : []).slice(0, n1);
+    while (w1.length < n1) w1.push('');
+    const w2 = (Array.isArray(state.slide12W2Items) ? state.slide12W2Items : []).slice(0, n2);
+    while (w2.length < n2) w2.push('');
+
+    const escape = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+    function renderItem(text, num, isFinal) {
+      const numStr = String(num).padStart(2, '0');
+      const bg = isFinal ? 'var(--ra-indigo-haze)' : 'var(--ra-paper-2)';
+      const border = isFinal ? 'border:1px solid var(--ra-indigo-soft);' : '';
+      const body = isFinal
+        ? `<strong style="font-weight:600;">${escape(text)}</strong>`
+        : escape(text);
+      return `<li style="font:400 22px/1.45 var(--ra-font-deck-body); color:var(--ra-ink); padding:14px 18px 14px 56px; background:${bg}; border-radius:8px; position:relative; ${border}">
+        <span style="position:absolute; left:18px; top:14px; font:600 22px/1.45 var(--ra-font-deck-ui); color:var(--ra-indigo); width:28px;">${numStr}</span>
+        ${body}
+      </li>`;
+    }
+
+    w1List.innerHTML = w1.map((t, i) => renderItem(t, i + 1, false)).join('');
+    w2List.innerHTML = w2.map((t, i) => {
+      const num = n1 + i + 1;
+      const isFinal = (i === n2 - 1);
+      // Default last-item finale text reflects engagement type if user left it as the original sign-off line.
+      let text = t;
+      if (isFinal && /discovery document/i.test(text)) {
+        text = text.replace(/discovery document/i, `${eng} document`);
+      }
+      return renderItem(text, num, isFinal);
+    }).join('');
+  }
+
+  // --- Slide 14 — What we need from you (1–4 categories, comma-separated needs up to 8) ---
+  function applySlide14() {
+    const grid = document.getElementById('s14-grid');
+    const head = document.getElementById('s14-headline');
+    if (!grid) return;
+
+    const n = Math.max(1, Math.min(4, parseInt(state.slide14Count, 10) || 3));
+    const cats = (Array.isArray(state.slide14Categories) ? state.slide14Categories : []).slice(0, n);
+    while (cats.length < n) cats.push({ name: '', needs: '' });
+
+    if (head) {
+      const word = NUM_WORDS[n] ? (NUM_WORDS[n].charAt(0).toUpperCase() + NUM_WORDS[n].slice(1)) : String(n);
+      const noun = (n === 1) ? 'bucket' : 'buckets';
+      head.textContent = `${word} ${noun} of access to start strong.`;
+    }
+
+    // Responsive column count: 1 → 1 col, 2 → 2 cols, 3 → 3 cols, 4 → 4 cols
+    grid.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+
+    const escape = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+    grid.innerHTML = cats.map((c, i) => {
+      const num = String(i + 1).padStart(2, '0');
+      const items = String(c.needs || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+        .slice(0, 8);
+      const li = items.map(t => `<li>${escape(t)}</li>`).join('');
+      // Slightly tighter padding & font when 4 columns
+      const pad   = (n === 4) ? '28px 24px 26px' : '36px 36px 32px';
+      const kSize = (n === 4) ? '24px' : '28px';
+      const lSize = (n === 4) ? '19px' : '21px';
+      return `
+        <div class="card" style="background:#fff; padding:${pad};">
+          <div style="display:flex; align-items:baseline; gap:14px; margin-bottom:24px;">
+            <span style="font:700 32px/1 var(--ra-font-deck-display); color:var(--ra-indigo);">${num}</span>
+            <p class="kicker" style="font-size:${kSize}; margin:0;">${escape(c.name) || '&nbsp;'}</p>
+          </div>
+          <ul class="bullets" style="font-size:${lSize};">${li}</ul>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // --- Slide 15 — Your team (driven by state.presenters) ---
+  // Map slug → role description (defaults). Slug is computed from the name.
+  const TEAM_DESCRIPTIONS = {
+    'mark-rittman': 'Founder and CEO. Sets the strategic direction for the engagement, brings two decades of analytics leadership, and stays close to the work as a senior advisor.',
+    'lewis-baker': 'Engagement sponsor. Single point of escalation, commercial owner, and the person you call when things change.',
+    'olivier-dupuis': 'Principal Consultant and technical lead. Hands-on with the entity model, BigQuery foundation, and pair-programming with your data engineers.',
+    'alex-caldwell': 'Senior data engineer. Builds the production-grade ingestion and transformation pipelines, and pairs with your engineers on testing and CI.',
+    'jordan-ilyat': 'Analytics engineer. Translates business questions into modelled, tested, version-controlled data — the backbone of self-service.',
+    'lydia-blackley': 'Senior analytics consultant. Leads the Looker semantic layer and reporting redesign, partnering with stakeholders to land trusted dashboards.',
+    'saverro-suseno': 'Data engineer. Hands-on with source integration, replication, and the day-to-day care of the data platform.',
+    'tim-griew': 'Senior analytics consultant. Drives WBR design, KPI definition, and the analytics rituals that turn data into operating cadence.'
+  };
+  // Role-keyword fallbacks if no slug match (rough mapping → first matching wins)
+  const ROLE_FALLBACKS = [
+    { rx: /ceo|founder/i,                    text: 'Strategic sponsor. Sets the engagement direction and stays close to the work as a senior advisor.' },
+    { rx: /coo|chief operating/i,            text: 'Engagement sponsor. Single point of escalation, commercial owner, and the person you call when things change.' },
+    { rx: /principal/i,                      text: 'Technical lead for the engagement. Hands-on with the data model, platform foundation, and pair-programming with your engineers.' },
+    { rx: /senior analytics/i,               text: 'Senior analytics consultant. Leads reporting design and partners with your stakeholders to land trusted, well-defined metrics.' },
+    { rx: /analytics engineer/i,             text: 'Analytics engineer. Turns business questions into modelled, tested, version-controlled data — the backbone of self-service.' },
+    { rx: /data engineer/i,                  text: 'Data engineer. Builds and operates the ingestion, replication, and transformation pipelines that feed every downstream layer.' },
+    { rx: /consultant/i,                     text: 'Senior consultant on the engagement. Pairs with your team day-to-day to build, test, and document the work.' }
+  ];
+  const AVATAR_TINTS = ['var(--ra-indigo)', 'var(--ra-violet)', 'var(--ra-sky)', 'var(--ra-peach)', 'var(--ra-mint)'];
+
+  function slugify(name) {
+    return String(name || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+  }
+  function initials(name) {
+    return String(name || '').trim().split(/\s+/).map(s => s.charAt(0).toUpperCase()).slice(0, 2).join('') || '–';
+  }
+  function descriptionFor(name, role) {
+    const slug = slugify(name);
+    if (TEAM_DESCRIPTIONS[slug]) return TEAM_DESCRIPTIONS[slug];
+    for (const f of ROLE_FALLBACKS) if (f.rx.test(role || '')) return f.text;
+    return 'Senior member of the engagement team. Hands-on with delivery and pairing with your team day-to-day.';
+  }
+
+  // Track which photos exist (avoid 404 broken images by HEAD-checking once and caching)
+  const photoCache = Object.create(null);
+  function checkPhoto(slug) {
+    if (slug in photoCache) return photoCache[slug];
+    const url = `assets/team/${slug}.png`;
+    const promise = new Promise(resolve => {
+      const img = new Image();
+      img.onload  = () => resolve(url);
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+    photoCache[slug] = promise;
+    return promise;
+  }
+
+  async function applySlide15() {
+    const grid = document.getElementById('s15-grid');
+    const head = document.getElementById('s15-headline');
+    if (!grid) return;
+
+    const presenters = (Array.isArray(state.presenters) ? state.presenters : []).filter(p => p && (p.name || p.role));
+    const n = presenters.length;
+
+    if (head) {
+      const word = NUM_WORDS[n] ? (NUM_WORDS[n].charAt(0).toUpperCase() + NUM_WORDS[n].slice(1)) : String(n);
+      const noun = (n === 1) ? 'consultant' : 'consultants';
+      head.textContent = `${word} senior ${noun}. The people you meet are the people who do the work.`;
+    }
+
+    // Layout: 1 → 1 col, 2 → 2 cols, 3 → 3 cols, 4+ → 4 cols
+    const cols = Math.min(Math.max(n || 1, 1), 4);
+    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    grid.style.gap = (cols >= 4) ? '28px' : '36px';
+
+    const escape = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+    // Resolve all photos concurrently
+    const slugs = presenters.map(p => slugify(p.name));
+    const photoUrls = await Promise.all(slugs.map(checkPhoto));
+
+    grid.innerHTML = presenters.map((p, i) => {
+      const slug = slugs[i];
+      const url = photoUrls[i];
+      const role = (p.role || '').replace(/^,\s*|,\s*Rittman Analytics$/i, '').trim();
+      const desc = descriptionFor(p.name, p.role);
+
+      // Image-block size scales down a bit when 4+ columns
+      const size = (cols >= 4) ? 168 : 200;
+      const initSize = (cols >= 4) ? 76 : 96;
+      const tint = AVATAR_TINTS[i % AVATAR_TINTS.length];
+      const avatar = url
+        ? `<div style="width:${size}px; height:${size}px; border-radius:50%; background:#EFF0FF center/cover no-repeat url('${url}'); margin-bottom:32px; box-shadow:0 1px 0 rgba(43,48,65,0.05);"></div>`
+        : `<div style="width:${size}px; height:${size}px; border-radius:50%; background:${tint}; color:#fff; display:grid; place-items:center; font:700 ${initSize}px/1 var(--ra-font-deck-display); letter-spacing:-0.02em; margin-bottom:32px;">${initials(p.name)}</div>`;
+
+      const nameSize = (cols >= 4) ? '30px' : '36px';
+      const roleSize = (cols >= 4) ? '20px' : '22px';
+      const descSize = (cols >= 4) ? '20px' : '22px';
+
+      return `
+        <div style="display:flex; flex-direction:column;">
+          ${avatar}
+          <p style="font:700 ${nameSize}/1.1 var(--ra-font-deck-display); color:var(--ra-ink); letter-spacing:-0.015em; margin:0 0 8px;">${escape(p.name) || '&nbsp;'}</p>
+          <p style="font:500 ${roleSize}/1.3 var(--ra-font-deck-body); color:var(--ra-indigo); margin:0 0 24px;">${escape(role) || '&nbsp;'}</p>
+          <p style="font:400 ${descSize}/1.5 var(--ra-font-deck-body); color:#4F5564; margin:0;">${escape(desc)}</p>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // --- Slide 8 — outcomes table (1–5 outcomes, headline reflects count as word) ---
+  function applySlide8() {
+    const head = document.getElementById('s8-headline');
+    const tbody = document.getElementById('s8-rows');
+    if (!tbody) return;
+
+    const n = Math.max(1, Math.min(5, parseInt(state.slide8Count, 10) || 5));
+    const outcomes = (Array.isArray(state.slide8Outcomes) ? state.slide8Outcomes : []).slice(0, n);
+    while (outcomes.length < n) outcomes.push({ headline: '', detail: '' });
+
+    if (head) {
+      const word = NUM_WORDS[n] || String(n);
+      const Cap = word.charAt(0).toUpperCase() + word.slice(1);
+      const noun = (n === 1) ? 'outcome' : 'outcomes';
+      head.textContent = `${Cap} ${noun} for this engagement.`;
+    }
+
+    tbody.innerHTML = outcomes.map((o, i) => {
+      const num = String(i + 1).padStart(2, '0');
+      const headline = (o.headline || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+      const detail   = (o.detail   || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+      return `
+        <tr>
+          <td style="font:700 32px/1 var(--ra-font-deck-display); color:var(--ra-indigo);">${num}</td>
+          <td><strong style="font-weight:600; font-size:26px;">${headline}</strong></td>
+          <td style="color:#4F5564;">${detail}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  // --- Slide 6 — hard truths grid (1–8 problems, auto-fit) ---
+  const NUM_WORDS = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve'];
+  const TINTS = ['tinted-peach','tinted-violet','tinted-mint','tinted-sky','tinted-indigo','tinted-peach','tinted-violet','tinted-mint'];
+  function applySlide6() {
+    const grid = document.getElementById('s6-grid');
+    const head = document.getElementById('s6-headline');
+    if (!grid) return;
+
+    const n = Math.max(1, Math.min(8, parseInt(state.slide6Count, 10) || 4));
+    const problems = (Array.isArray(state.slide6Problems) ? state.slide6Problems : []).slice(0, n);
+    while (problems.length < n) problems.push({ headline: '', detail: '' });
+
+    if (head) {
+      const word = NUM_WORDS[n] || String(n);
+      const noun = (n === 1) ? 'problem' : 'problems';
+      head.textContent = `The ${word} ${noun} we're solving.`;
+    }
+
+    // Layout: choose column count + row count; let CSS auto-size rows to flex:1.
+    // 1→1×1, 2→2×1, 3→3×1, 4→2×2, 5→3×2 (last row 2-wide cells), 6→3×2, 7→4×2, 8→4×2
+    const cols = (n <= 3) ? n : (n <= 4) ? 2 : (n <= 6) ? 3 : 4;
+    const rows = Math.ceil(n / cols);
+    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+    grid.style.gap = (n >= 7) ? '20px' : (n >= 5 ? '24px' : '28px');
+
+    // Auto-scale typography by density
+    const density = n / (cols * rows); // higher = tighter
+    const headSz   = (n >= 7) ? 24 : (n >= 5 ? 26 : 30);
+    const detailSz = (n >= 7) ? 18 : (n >= 5 ? 20 : 22);
+    const numSz    = (n >= 7) ? 24 : (n >= 5 ? 28 : 32);
+    const padV     = (n >= 7) ? 24 : (n >= 5 ? 32 : 40);
+    const padH     = (n >= 7) ? 26 : (n >= 5 ? 36 : 44);
+
+    grid.innerHTML = problems.map((p, i) => {
+      const num = String(i + 1).padStart(2, '0');
+      const tint = TINTS[i % TINTS.length];
+      const headline = (p.headline || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+      const detail   = (p.detail   || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+      return `
+        <div class="card ${tint}" style="padding:${padV}px ${padH}px; min-height:0;">
+          <div style="display:flex; align-items:baseline; gap:14px; margin-bottom:14px;">
+            <span style="font:700 ${numSz}px/1 var(--ra-font-deck-display); color:var(--ra-ink); letter-spacing:-0.01em;">${num}</span>
+            <p class="kicker" style="font-size:${headSz}px; margin:0;">${headline || '&nbsp;'}</p>
+          </div>
+          <p style="font:400 ${detailSz}px/1.5 var(--ra-font-deck-body); color:#2B3041; margin:0;">${detail}</p>
+        </div>`;
+    }).join('');
+  }
+
+  // Cached generated text → <p> blocks, preserving any HTML tags the model returned.
+  // We don't escape because Claude is asked to return safe inline tags only (<strong>, <em>);
+  // we DO normalise paragraph splitting on blank lines and convert single \n to <br>.
+  function renderParagraphs(txt) {
+    return txt.split(/\n\s*\n/).map(p =>
+      `<p style="font:400 26px/1.55 var(--ra-font-deck-body); color:#2B3041; margin:0 0 24px;">${p.trim().replace(/\n/g,'<br>')}</p>`
+    ).join('');
+  }
+
+  // Title-slide speaker note template — engagement-type-aware article + lowercase noun
+  function updateTitleSpeakerNote(client, eng) {
+    const tag = document.getElementById('speaker-notes');
+    if (!tag) return;
+    let notes;
+    try { notes = JSON.parse(tag.textContent); } catch (e) { return; }
+    if (!Array.isArray(notes) || !notes.length) return;
+    const article = (eng === 'Project') ? 'the' : 'the';
+    const noun = (eng === 'Project') ? 'project' : 'discovery';
+    notes[0] = `Good morning everyone, and thank you for making the time. I'm Lewis Baker, COO at Rittman Analytics, and I'm joined today by Olivier Dupuis, our Principal Consultant who'll be hands-on with the build, and Colin Berry, our Senior Analytics Consultant. Today is our formal kickoff for ${article} ${client} ${noun} engagement. The next 45 minutes are about three things: making sure we share the same picture of where ${client} is today, agreeing on what good looks like at the end, and walking through exactly what happens in the first two weeks. Let's get into it.`;
+    tag.textContent = JSON.stringify(notes, null, 2);
+    // Refresh deck-stage's cached notes if it's already booted
+    const stage = document.querySelector('deck-stage');
+    if (stage && typeof stage._loadNotes === 'function') {
+      stage._loadNotes();
+      // Re-broadcast current slide so any open notes panel re-reads
+      try {
+        const idx = stage._currentIndex || 0;
+        window.postMessage({ slideIndexChanged: idx }, '*');
+      } catch (e) {}
+    }
+  }
+
+  // Add an "internal" variant background div + partner id if not already present
+  (function injectVariantElements(){
+    const slide = document.getElementById('title-slide');
+    if (!slide) return;
+    // tag vignette div (the second child)
+    const children = slide.children;
+    // first child is the img (id title-bg). second is the gradient div.
+    const grad = slide.querySelector('img + div');
+    if (grad && !grad.id) grad.id = 'title-vignette';
+    // add an internal-style bg (hidden by default)
+    if (!document.getElementById('title-internal-bg')) {
+      const wrap = document.createElement('div');
+      wrap.id = 'title-internal-bg';
+      wrap.style.cssText = 'position:absolute; inset:0; z-index:0; background:#0F1117; display:none;';
+      wrap.innerHTML = `
+        <div style="position:absolute; left:0; top:0; bottom:0; width:42%; background:var(--ra-indigo);"></div>
+        <div style="position:absolute; left:-160px; bottom:-220px; width:560px; height:560px; border-radius:50%; background:rgba(255,255,255,0.06);"></div>
+        <div style="position:absolute; right:-220px; top:-220px; width:640px; height:640px; border-radius:50%; background:rgba(79,96,255,0.18);"></div>
+      `;
+      slide.insertBefore(wrap, slide.firstChild);
+    }
+    // tag partner badge wrapper
+    const partner = slide.querySelector('img[alt="Google Cloud Partner"]');
+    if (partner && partner.parentElement && !partner.parentElement.id) {
+      partner.parentElement.id = 'title-partner';
+    }
+  })();
+
+  // --- Tweaks panel UI ---
+  const css = `
+    #twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:300px;
+      max-height:calc(100vh - 32px);display:none;flex-direction:column;
+      background:rgba(255,255,255,.94);color:#181B25;
+      backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
+      border:1px solid rgba(0,0,0,.08);border-radius:14px;
+      box-shadow:0 12px 40px rgba(0,0,0,.18);
+      font:13px/1.4 'Google Sans','Inter',system-ui,sans-serif;overflow:hidden;}
+    #twk-panel.show{display:flex;}
+    #twk-hd{display:flex;align-items:center;justify-content:space-between;
+      padding:12px 10px 12px 16px;border-bottom:1px solid rgba(0,0,0,.06);}
+    #twk-hd b{font-size:13px;font-weight:600;letter-spacing:.005em;}
+    #twk-x{appearance:none;border:0;background:transparent;color:rgba(24,27,37,.55);
+      width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:16px;line-height:1;}
+    #twk-x:hover{background:rgba(0,0,0,.06);color:#181B25;}
+    #twk-body{padding:14px 16px 18px;display:flex;flex-direction:column;gap:14px;
+      overflow-y:auto;min-height:0;}
+    .twk-section{font:600 11px/1 'Google Sans',sans-serif;text-transform:uppercase;
+      letter-spacing:.12em;color:#4F60FF;margin:6px 0 -2px;}
+    .twk-row{display:flex;flex-direction:column;gap:6px;}
+    .twk-label{font-size:12px;color:#383C48;font-weight:500;}
+    .twk-value{font-size:11px;color:#6B7280;font-variant-numeric:tabular-nums;}
+    .twk-row input[type=range]{width:100%;}
+    .twk-row input[type=text],.twk-row textarea{width:100%;font:13px/1.4 inherit;color:#181B25;
+      background:#F7F7FA;border:1px solid #E1E1E9;border-radius:6px;padding:8px 10px;resize:vertical;}
+    .twk-row input[type=color]{width:42px;height:28px;border:1px solid #E1E1E9;border-radius:6px;background:none;cursor:pointer;padding:2px;}
+    .twk-seg{display:flex;background:#F1F1F4;border-radius:7px;padding:3px;gap:3px;}
+    .twk-seg button{flex:1;appearance:none;border:0;background:transparent;
+      font:600 12px/1 'Google Sans',sans-serif;color:#4F5564;padding:7px 8px;border-radius:5px;cursor:pointer;}
+    .twk-seg button.on{background:#fff;color:#181B25;box-shadow:0 1px 2px rgba(0,0,0,.06);}
+    .twk-toggle{display:flex;align-items:center;justify-content:space-between;}
+    .twk-toggle input{width:32px;height:18px;}
+    .twk-file-btn{display:inline-block;font:600 12px/1 'Google Sans',sans-serif;color:#fff;
+      background:#4F60FF;padding:8px 12px;border-radius:6px;cursor:pointer;text-align:center;}
+    .twk-file-btn:hover{background:#4F5FFE;}
+    .twk-file-btn input{display:none;}
+    .twk-file-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+    .twk-file-clear{appearance:none;border:0;background:transparent;color:#6B7280;
+      font:500 11px/1 inherit;cursor:pointer;text-decoration:underline;}
+    .twk-photo-thumb{width:100%;height:64px;border-radius:6px;background-size:cover;background-position:center;
+      border:1px solid #E1E1E9;background-color:#F1F1F4;}
+    .twk-pr-row{display:flex;flex-direction:column;gap:4px;padding:10px;background:#F7F7FA;
+      border:1px solid #E1E1E9;border-radius:8px;position:relative;}
+    .twk-pr-row input{width:100%;font:13px/1.4 inherit;color:#181B25;
+      background:#fff;border:1px solid #E1E1E9;border-radius:5px;padding:6px 8px;}
+    .twk-pr-rm{position:absolute;top:6px;right:6px;appearance:none;border:0;background:transparent;
+      color:#9BA1A6;font-size:14px;line-height:1;width:22px;height:22px;border-radius:5px;cursor:pointer;}
+    .twk-pr-rm:hover{background:rgba(0,0,0,.06);color:#E5484D;}
+    .twk-add{appearance:none;border:1px dashed #C7C9D3;background:transparent;color:#4F60FF;
+      font:600 12px/1 'Google Sans',sans-serif;padding:9px;border-radius:6px;cursor:pointer;}
+    .twk-add:hover{background:#EFF0FF;border-color:#4F60FF;}
+    .twk-mini{font-size:11px;color:#6B7280;margin-top:-2px;}
+  `;
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+
+  const panel = document.createElement('div');
+  panel.id = 'twk-panel';
+  panel.innerHTML = `
+    <div id="twk-hd"><b>Tweaks</b><button id="twk-x" aria-label="Close">×</button></div>
+    <div id="twk-body">
+      <div class="twk-section">Title slide</div>
+
+      <div class="twk-row">
+        <span class="twk-label">Variant</span>
+        <div class="twk-seg" data-key="titleVariant">
+          <button data-val="pitch">Pitch (photo)</button>
+          <button data-val="internal">Internal (indigo)</button>
+        </div>
+      </div>
+
+      <div class="twk-row">
+        <span class="twk-label">Client name</span>
+        <input type="text" data-key="clientName" placeholder="e.g. Acme Corp">
+      </div>
+
+      <div class="twk-row">
+        <span class="twk-label">Engagement type</span>
+        <div class="twk-seg" data-key="engagementType">
+          <button data-val="Project">Project</button>
+          <button data-val="Discovery">Discovery</button>
+        </div>
+      </div>
+
+      <div class="twk-row">
+        <span class="twk-label">Kickoff date</span>
+        <input type="date" data-key="engagementDate">
+      </div>
+
+      <div class="twk-section">Background photo</div>
+      <div class="twk-row">
+        <div id="twk-photo-thumb" class="twk-photo-thumb"></div>
+        <div class="twk-file-meta">
+          <label class="twk-file-btn">Upload photo<input type="file" id="twk-photo-input" accept="image/*"></label>
+          <button class="twk-file-clear" id="twk-photo-reset" type="button">Reset to default</button>
+        </div>
+        <p class="twk-mini">PNG, JPG or WebP. Cropped to fill 1920×1080.</p>
+      </div>
+
+      <div class="twk-section">Presenters</div>
+      <div class="twk-row" id="twk-presenters">
+        <!-- rows injected -->
+        <button class="twk-add" id="twk-pr-add" type="button">+ Add presenter</button>
+      </div>
+
+      <div class="twk-row twk-toggle">
+        <span class="twk-label">Show Google Cloud Partner badge</span>
+        <input type="checkbox" data-key="showPartnerBadge">
+      </div>
+
+      <div class="twk-row">
+        <div style="display:flex;justify-content:space-between;">
+          <span class="twk-label">Vignette strength</span>
+          <span class="twk-value" id="twk-vig-val"></span>
+        </div>
+        <input type="range" min="0" max="100" step="1" data-key="vignetteStrength">
+      </div>
+
+      <div class="twk-section">Slide 4 — Current state</div>
+      <div class="twk-row">
+        <span class="twk-label">Headline</span>
+        <textarea data-key="slide4Headline" rows="2" placeholder="Use Enter for line breaks"></textarea>
+        <p class="twk-mini">Press Enter for a line break in the headline.</p>
+      </div>
+
+      <div class="twk-row">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <span class="twk-label">Left-hand text — prompt</span>
+          <button class="twk-add" id="twk-s4-left-go" type="button" style="padding:6px 10px;">Generate</button>
+        </div>
+        <textarea data-key="slide4LeftPrompt" rows="3" placeholder="e.g. Two short paragraphs explaining how the data team has scaled tactically and what good now looks like."></textarea>
+        <p class="twk-mini" id="twk-s4-left-status">Output replaces the narrative column. Leave blank to restore default.</p>
+        <button class="twk-file-clear" id="twk-s4-left-reset" type="button">Reset to default</button>
+      </div>
+
+      <div class="twk-row">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <span class="twk-label">Right-hand diagram — prompt</span>
+          <button class="twk-add" id="twk-s4-right-go" type="button" style="padding:6px 10px;">Generate</button>
+        </div>
+        <textarea data-key="slide4RightPrompt" rows="3" placeholder="e.g. A simple labelled SVG diagram showing three personas connected to a central platform."></textarea>
+        <p class="twk-mini" id="twk-s4-right-status">Output replaces the right-hand card. Leave blank to restore default.</p>
+        <button class="twk-file-clear" id="twk-s4-right-reset" type="button">Reset to default</button>
+      </div>
+
+      <div class="twk-section">Slide 5 — The number</div>
+      <div class="twk-row" style="flex-direction:row;align-items:center;gap:8px;">
+        <span class="twk-label" style="flex:1;">Number</span>
+        <input type="text" data-key="slide5Number" style="width:90px;text-align:center;" placeholder="300">
+        <span class="twk-label" style="margin-left:8px;">Suffix</span>
+        <input type="text" data-key="slide5Suffix" style="width:60px;text-align:center;" placeholder="+">
+      </div>
+      <div class="twk-row">
+        <span class="twk-label">What the number counts (bold)</span>
+        <input type="text" data-key="slide5Bold" placeholder="e.g. Power BI reports across the estate.">
+      </div>
+      <div class="twk-row">
+        <span class="twk-label">Trailing context</span>
+        <textarea data-key="slide5Tail" rows="3" placeholder="The grey copy that follows the bold subject."></textarea>
+      </div>
+
+      <div class="twk-section">Slide 6 — Hard truths</div>
+      <div class="twk-row">
+        <div style="display:flex;justify-content:space-between;">
+          <span class="twk-label">How many problems</span>
+          <span class="twk-value" id="twk-s6-cnt-val"></span>
+        </div>
+        <input type="range" min="1" max="8" step="1" data-key="slide6Count">
+        <p class="twk-mini">Tiles auto-size to fit on the slide. Headline renders the count as a word.</p>
+      </div>
+      <div class="twk-row" id="twk-s6-problems">
+        <!-- problem rows injected -->
+      </div>
+
+      <div class="twk-section">Slide 8 — Outcomes</div>
+      <div class="twk-row">
+        <div style="display:flex;justify-content:space-between;">
+          <span class="twk-label">How many outcomes</span>
+          <span class="twk-value" id="twk-s8-cnt-val"></span>
+        </div>
+        <input type="range" min="1" max="5" step="1" data-key="slide8Count">
+        <p class="twk-mini">Headline renders the count as a word ("Three outcomes…", etc.).</p>
+      </div>
+      <div class="twk-row" id="twk-s8-outcomes">
+        <!-- outcome rows injected -->
+      </div>
+
+      <div class="twk-section">Slide 10 — Target architecture</div>
+      <div class="twk-row">
+        <span class="twk-label">Headline</span>
+        <input type="text" data-key="slide10Headline" placeholder="e.g. From source to insight, governed end-to-end.">
+      </div>
+      <div class="twk-row">
+        <span class="twk-label">Direction</span>
+        <div class="twk-seg" data-key="slide10Direction">
+          <button data-val="LR">Left → Right</button>
+          <button data-val="TB">Top → Bottom</button>
+        </div>
+      </div>
+      <div class="twk-row">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <span class="twk-label">Diagram prompt</span>
+          <button class="twk-add" id="twk-s10-go" type="button" style="padding:6px 10px;">Generate</button>
+        </div>
+        <textarea data-key="slide10Prompt" rows="3" placeholder="e.g. Show source systems flowing through BigQuery, Dataform, then Looker semantic layer with curated WBR and self-service explores, finishing in advanced analytics."></textarea>
+        <p class="twk-mini" id="twk-s10-status">Generates a Mermaid flowchart and replaces the default 4-stage diagram.</p>
+        <button class="twk-file-clear" id="twk-s10-reset" type="button">Reset to default</button>
+      </div>
+      <div class="twk-row">
+        <span class="twk-label">Annotation label</span>
+        <input type="text" data-key="slide10AnnotLabel" placeholder="e.g. Migration path">
+      </div>
+      <div class="twk-row">
+        <span class="twk-label">Annotation text</span>
+        <textarea data-key="slide10AnnotText" rows="2" placeholder="The grey supporting copy next to the label."></textarea>
+      </div>
+
+      <div class="twk-section">Slide 12 — Sprint timeline</div>
+      <div class="twk-row">
+        <div style="display:flex;justify-content:space-between;">
+          <span class="twk-label">Week 1 deliverables</span>
+          <span class="twk-value" id="twk-s12-w1-cnt-val"></span>
+        </div>
+        <input type="range" min="1" max="6" step="1" data-key="slide12W1Count">
+      </div>
+      <div class="twk-row">
+        <span class="twk-label">Week 1 focus</span>
+        <input type="text" data-key="slide12W1Focus" placeholder="e.g. Technical foundation &amp; current-state analysis">
+      </div>
+      <div class="twk-row" id="twk-s12-w1-items"><!-- W1 item rows injected --></div>
+
+      <div class="twk-row">
+        <div style="display:flex;justify-content:space-between;">
+          <span class="twk-label">Week 2 deliverables</span>
+          <span class="twk-value" id="twk-s12-w2-cnt-val"></span>
+        </div>
+        <input type="range" min="1" max="6" step="1" data-key="slide12W2Count">
+      </div>
+      <div class="twk-row">
+        <span class="twk-label">Week 2 focus</span>
+        <input type="text" data-key="slide12W2Focus" placeholder="e.g. Business requirements &amp; solution design">
+      </div>
+      <div class="twk-row" id="twk-s12-w2-items"><!-- W2 item rows injected --></div>
+
+      <div class="twk-section">Slide 14 — What we need from you</div>
+      <div class="twk-row">
+        <div style="display:flex;justify-content:space-between;">
+          <span class="twk-label">How many categories</span>
+          <span class="twk-value" id="twk-s14-cnt-val"></span>
+        </div>
+        <input type="range" min="1" max="4" step="1" data-key="slide14Count">
+        <p class="twk-mini">Each category lists its needs as a comma-separated string (max 8 shown).</p>
+      </div>
+      <div class="twk-row" id="twk-s14-cats"><!-- category rows injected --></div>
+
+      <div class="twk-section">Brand</div>
+      <div class="twk-row" style="flex-direction:row;align-items:center;justify-content:space-between;">
+        <span class="twk-label">Accent colour</span>
+        <input type="color" data-key="accentColor">
+      </div>
+    </div>
+  `;
+  document.body.appendChild(panel);
+
+  // --- State sync helpers ---
+  function persist(patch) {
+    state = { ...state, ...patch };
+    apply();
+    syncControls();
+    try {
+      window.parent.postMessage({ type: '__edit_mode_set_keys', edits: patch }, '*');
+    } catch (e) {}
+  }
+
+  function syncControls() {
+    panel.querySelectorAll('[data-key]').forEach(el => {
+      const key = el.dataset.key;
+      const v = state[key];
+      if (el.classList.contains('twk-seg')) {
+        el.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.val === v));
+      } else if (el.type === 'checkbox') {
+        el.checked = !!v;
+      } else if (el.type === 'range') {
+        el.value = v;
+        if (el.dataset.key === 'vignetteStrength') {
+          const vv = document.getElementById('twk-vig-val');
+          if (vv) vv.textContent = v + '%';
+        } else if (el.dataset.key === 'slide6Count') {
+          const cv = document.getElementById('twk-s6-cnt-val');
+          if (cv) cv.textContent = v;
+        } else if (el.dataset.key === 'slide8Count') {
+          const cv = document.getElementById('twk-s8-cnt-val');
+          if (cv) cv.textContent = v;
+        } else if (el.dataset.key === 'slide12W1Count') {
+          const cv = document.getElementById('twk-s12-w1-cnt-val');
+          if (cv) cv.textContent = v;
+        } else if (el.dataset.key === 'slide12W2Count') {
+          const cv = document.getElementById('twk-s12-w2-cnt-val');
+          if (cv) cv.textContent = v;
+        } else if (el.dataset.key === 'slide14Count') {
+          const cv = document.getElementById('twk-s14-cnt-val');
+          if (cv) cv.textContent = v;
+        }
+      } else {
+        el.value = v ?? '';
+      }
+    });
+  }
+
+  // --- Wire controls ---
+  panel.querySelectorAll('.twk-seg').forEach(seg => {
+    seg.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      persist({ [seg.dataset.key]: b.dataset.val });
+    });
+  });
+  panel.querySelectorAll('input[type=text][data-key], input[type=date][data-key], textarea[data-key]').forEach(el => {
+    el.addEventListener('input', () => persist({ [el.dataset.key]: el.value }));
+    el.addEventListener('change', () => persist({ [el.dataset.key]: el.value }));
+  });
+  panel.querySelectorAll('input[type=checkbox]').forEach(el => {
+    el.addEventListener('change', () => persist({ [el.dataset.key]: el.checked }));
+  });
+  panel.querySelectorAll('input[type=range]').forEach(el => {
+    el.addEventListener('input', () => {
+      persist({ [el.dataset.key]: parseInt(el.value, 10) });
+      if (el.dataset.key === 'slide6Count') renderProblemRows();
+      if (el.dataset.key === 'slide8Count') renderOutcomeRows();
+      if (el.dataset.key === 'slide12W1Count') { renderS12W1Rows(); renderS12W2Rows(); }
+      if (el.dataset.key === 'slide12W2Count') renderS12W2Rows();
+      if (el.dataset.key === 'slide14Count') renderS14Rows();
+    });
+  });
+  panel.querySelectorAll('input[type=color]').forEach(el => {
+    el.addEventListener('input', () => persist({ [el.dataset.key]: el.value }));
+  });
+  document.getElementById('twk-x').addEventListener('click', () => {
+    panel.classList.remove('show');
+    try { window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*'); } catch (e) {}
+  });
+
+  // --- Photo upload ---
+  const photoInput = document.getElementById('twk-photo-input');
+  const photoThumb = document.getElementById('twk-photo-thumb');
+  const photoReset = document.getElementById('twk-photo-reset');
+  function refreshThumb() {
+    const src = (state.titlePhoto && String(state.titlePhoto).length > 8)
+      ? state.titlePhoto : '';
+    photoThumb.style.backgroundImage = `url("${src.replace(/"/g,'\\"')}")`;
+  }
+  photoInput.addEventListener('change', () => {
+    const f = photoInput.files && photoInput.files[0];
+    if (!f) return;
+    if (f.size > 8 * 1024 * 1024) {
+      alert('Image is over 8MB — please pick a smaller file.');
+      photoInput.value = '';
+      return;
+    }
+    const fr = new FileReader();
+    fr.onload = () => {
+      persist({ titlePhoto: fr.result });
+      refreshThumb();
+    };
+    fr.readAsDataURL(f);
+  });
+  photoReset.addEventListener('click', () => {
+    persist({ titlePhoto: '' });
+    photoInput.value = '';
+    refreshThumb();
+  });
+
+  // --- Slide 10 — generate / reset Mermaid diagram via Claude ---
+  const s10Go = document.getElementById('twk-s10-go');
+  const s10Status = document.getElementById('twk-s10-status');
+  const s10Reset = document.getElementById('twk-s10-reset');
+
+  function s10SetStatus(msg, isError) {
+    if (!s10Status) return;
+    s10Status.textContent = msg;
+    s10Status.style.color = isError ? '#B91C1C' : '';
+  }
+
+  function extractMermaidCode(raw) {
+    if (!raw) return '';
+    let s = String(raw).trim();
+    // Pull out fenced ```mermaid ... ``` block if present
+    const fence = s.match(/```(?:mermaid)?\s*\n([\s\S]*?)```/i);
+    if (fence) s = fence[1].trim();
+    // If model returned commentary before the diagram, drop everything before the first valid diagram keyword
+    const m = s.match(/(flowchart|graph)\s+(LR|RL|TB|TD|BT)[\s\S]+/i);
+    if (m) s = m[0].trim();
+    return s;
+  }
+
+  function ensureDirection(code, dir) {
+    const want = (dir === 'TB') ? 'TB' : 'LR';
+    return code.replace(/^(flowchart|graph)\s+(LR|RL|TB|TD|BT)/i, (_, kw) => `${kw} ${want}`);
+  }
+
+  s10Go && s10Go.addEventListener('click', async () => {
+    const prompt = (state.slide10Prompt || '').trim();
+    const dir = state.slide10Direction === 'TB' ? 'TB' : 'LR';
+    if (!prompt) { s10SetStatus('Type a prompt above first.', true); return; }
+    if (!window.claude || typeof window.claude.complete !== 'function') {
+      s10SetStatus('Claude is not available in this preview.', true);
+      return;
+    }
+    s10Go.disabled = true;
+    s10SetStatus('Generating diagram…');
+    try {
+      const sys = `You generate Mermaid.js flowchart diagrams for an architecture slide. Output ONLY a Mermaid diagram — no prose, no markdown fences. Start with "flowchart ${dir}". Use clear, short node labels (max ~30 chars). Group related nodes with subgraphs when it helps. Use --> for flow. Keep it under ~14 nodes. Prefer rectangular nodes; use [Label] syntax. Do not use HTML in labels. Do not include styling directives.`;
+      const user = `Direction: ${dir === 'TB' ? 'top-to-bottom' : 'left-to-right'}\n\nDescribe this architecture as a Mermaid flowchart:\n${prompt}`;
+      const out = await window.claude.complete({
+        messages: [
+          { role: 'user', content: sys + '\n\n' + user }
+        ]
+      });
+      let code = extractMermaidCode(out);
+      if (!code) { s10SetStatus('Couldn\'t parse a diagram from the response. Try rewording.', true); return; }
+      code = ensureDirection(code, dir);
+      // Validate by attempting to parse
+      try {
+        if (window.mermaid && typeof window.mermaid.parse === 'function') {
+          await window.mermaid.parse(code);
+        }
+      } catch (parseErr) {
+        console.warn('Mermaid parse failed', parseErr);
+        s10SetStatus('Diagram syntax error — try a simpler prompt.', true);
+        return;
+      }
+      persist({ slide10MermaidCache: code });
+      s10SetStatus('Diagram updated.');
+    } catch (err) {
+      console.warn(err);
+      s10SetStatus('Generation failed. Try again.', true);
+    } finally {
+      s10Go.disabled = false;
+    }
+  });
+
+  s10Reset && s10Reset.addEventListener('click', () => {
+    persist({ slide10MermaidCache: '' });
+    s10SetStatus('Reverted to default 4-stage diagram.');
+  });
+
+  // Re-render mermaid when direction changes (if a cached diagram exists)
+  panel.querySelector('.twk-seg[data-key="slide10Direction"]')?.addEventListener('click', () => {
+    const cache = (state.slide10MermaidCache || '').trim();
+    if (!cache) return;
+    const dir = state.slide10Direction === 'TB' ? 'TB' : 'LR';
+    const updated = ensureDirection(cache, dir);
+    if (updated !== cache) persist({ slide10MermaidCache: updated });
+  });
+
+  // --- Presenters list (repeating rows) ---
+  const prContainer = document.getElementById('twk-presenters');
+  const prAddBtn = document.getElementById('twk-pr-add');
+  function renderPresenterRows() {
+    // clear existing rows but keep the add button
+    [...prContainer.querySelectorAll('.twk-pr-row')].forEach(n => n.remove());
+    const arr = Array.isArray(state.presenters) ? state.presenters : [];
+    arr.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.className = 'twk-pr-row';
+      row.innerHTML = `
+        <button class="twk-pr-rm" type="button" aria-label="Remove">×</button>
+        <input type="text" placeholder="Name" data-pr-i="${i}" data-pr-k="name" value="${(p.name||'').replace(/"/g,'&quot;')}">
+        <input type="text" placeholder="Role" data-pr-i="${i}" data-pr-k="role" value="${(p.role||'').replace(/"/g,'&quot;')}">
+      `;
+      row.querySelectorAll('input').forEach(input => {
+        input.addEventListener('input', () => {
+          const idx = +input.dataset.prI;
+          const key = input.dataset.prK;
+          const next = (Array.isArray(state.presenters) ? [...state.presenters] : []);
+          next[idx] = { ...(next[idx]||{}), [key]: input.value };
+          persistArray('presenters', next);
+        });
+      });
+      row.querySelector('.twk-pr-rm').addEventListener('click', () => {
+        const next = [...(state.presenters || [])];
+        next.splice(i, 1);
+        persistArray('presenters', next);
+      });
+      prContainer.insertBefore(row, prAddBtn);
+    });
+  }
+  function persistArray(key, arr) {
+    state = { ...state, [key]: arr };
+    apply();
+    renderPresenterRows();
+    try { window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [key]: arr } }, '*'); } catch (e) {}
+  }
+  prAddBtn.addEventListener('click', () => {
+    const next = [...(state.presenters || []), { name: '', role: '' }];
+    persistArray('presenters', next);
+    // focus the new name field
+    setTimeout(() => {
+      const inputs = prContainer.querySelectorAll('input[data-pr-k="name"]');
+      const last = inputs[inputs.length - 1];
+      if (last) last.focus();
+    }, 0);
+  });
+
+  // --- Slide 6 problem rows (visible count = slide6Count) ---
+  const probContainer = document.getElementById('twk-s6-problems');
+  function renderProblemRows() {
+    if (!probContainer) return;
+    probContainer.innerHTML = '';
+    const n = Math.max(1, Math.min(8, parseInt(state.slide6Count, 10) || 4));
+    const arr = (Array.isArray(state.slide6Problems) ? state.slide6Problems : []).slice();
+    while (arr.length < 8) arr.push({ headline: '', detail: '' });
+    for (let i = 0; i < n; i++) {
+      const p = arr[i] || { headline: '', detail: '' };
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid #E1E1E9;border-radius:8px;background:#FAFAFC;';
+      const num = String(i + 1).padStart(2, '0');
+      row.innerHTML = `
+        <div style="font:600 11px/1 'Google Sans',sans-serif;color:#4F60FF;letter-spacing:0.08em;text-transform:uppercase;">Problem ${num}</div>
+        <input type="text" placeholder="Headline" data-pb-i="${i}" data-pb-k="headline" value="${(p.headline||'').replace(/"/g,'&quot;')}">
+        <textarea rows="2" placeholder="Detail (1–2 sentences)" data-pb-i="${i}" data-pb-k="detail">${(p.detail||'').replace(/</g,'&lt;')}</textarea>
+      `;
+      row.querySelectorAll('input,textarea').forEach(input => {
+        const handler = () => {
+          const idx = +input.dataset.pbI;
+          const key = input.dataset.pbK;
+          const next = (Array.isArray(state.slide6Problems) ? [...state.slide6Problems] : []);
+          while (next.length < 8) next.push({ headline: '', detail: '' });
+          next[idx] = { ...(next[idx]||{}), [key]: input.value };
+          persistArrayNoRender('slide6Problems', next);
+        };
+        input.addEventListener('input', handler);
+      });
+      probContainer.appendChild(row);
+    }
+  }
+  // Like persistArray but doesn't re-render the rows (we don't want to lose focus while typing)
+  function persistArrayNoRender(key, arr) {
+    state = { ...state, [key]: arr };
+    apply();
+    try { window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [key]: arr } }, '*'); } catch (e) {}
+  }
+
+  // --- Slide 8 outcome rows (visible count = slide8Count) ---
+  const outContainer = document.getElementById('twk-s8-outcomes');
+  function renderOutcomeRows() {
+    if (!outContainer) return;
+    outContainer.innerHTML = '';
+    const n = Math.max(1, Math.min(5, parseInt(state.slide8Count, 10) || 5));
+    const arr = (Array.isArray(state.slide8Outcomes) ? state.slide8Outcomes : []).slice();
+    while (arr.length < 5) arr.push({ headline: '', detail: '' });
+    for (let i = 0; i < n; i++) {
+      const o = arr[i] || { headline: '', detail: '' };
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid #E1E1E9;border-radius:8px;background:#FAFAFC;';
+      const num = String(i + 1).padStart(2, '0');
+      row.innerHTML = `
+        <div style="font:600 11px/1 'Google Sans',sans-serif;color:#4F60FF;letter-spacing:0.08em;text-transform:uppercase;">Outcome ${num}</div>
+        <input type="text" placeholder="Outcome headline" data-oc-i="${i}" data-oc-k="headline" value="${(o.headline||'').replace(/"/g,'&quot;')}">
+        <textarea rows="2" placeholder="What it means" data-oc-i="${i}" data-oc-k="detail">${(o.detail||'').replace(/</g,'&lt;')}</textarea>
+      `;
+      row.querySelectorAll('input,textarea').forEach(input => {
+        const handler = () => {
+          const idx = +input.dataset.ocI;
+          const key = input.dataset.ocK;
+          const next = (Array.isArray(state.slide8Outcomes) ? [...state.slide8Outcomes] : []);
+          while (next.length < 5) next.push({ headline: '', detail: '' });
+          next[idx] = { ...(next[idx]||{}), [key]: input.value };
+          persistArrayNoRender('slide8Outcomes', next);
+        };
+        input.addEventListener('input', handler);
+      });
+      outContainer.appendChild(row);
+    }
+  }
+
+  // --- Slide 12 deliverable rows (W1 + W2, max 6 each) ---
+  const s12W1Container = document.getElementById('twk-s12-w1-items');
+  const s12W2Container = document.getElementById('twk-s12-w2-items');
+  function renderS12Side(container, key, count, label, numOffset) {
+    if (!container) return;
+    container.innerHTML = '';
+    const n = Math.max(1, Math.min(6, parseInt(count, 10) || 1));
+    const arr = (Array.isArray(state[key]) ? state[key] : []).slice();
+    while (arr.length < 6) arr.push('');
+    for (let i = 0; i < n; i++) {
+      const v = arr[i] || '';
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid #E1E1E9;border-radius:8px;background:#FAFAFC;';
+      const num = String(numOffset + i + 1).padStart(2, '0');
+      row.innerHTML = `
+        <div style="font:600 11px/1 'Google Sans',sans-serif;color:#4F60FF;letter-spacing:0.08em;text-transform:uppercase;">${label} ${num}</div>
+        <input type="text" placeholder="Deliverable name" data-s12-i="${i}" value="${String(v).replace(/"/g,'&quot;')}">
+      `;
+      row.querySelector('input').addEventListener('input', (e) => {
+        const idx = +e.target.dataset.s12I;
+        const next = (Array.isArray(state[key]) ? [...state[key]] : []);
+        while (next.length < 6) next.push('');
+        next[idx] = e.target.value;
+        persistArrayNoRender(key, next);
+      });
+      container.appendChild(row);
+    }
+  }
+  function renderS12W1Rows() {
+    renderS12Side(s12W1Container, 'slide12W1Items', state.slide12W1Count, 'W1 deliverable', 0);
+  }
+  function renderS12W2Rows() {
+    const n1 = Math.max(1, Math.min(6, parseInt(state.slide12W1Count, 10) || 5));
+    renderS12Side(s12W2Container, 'slide12W2Items', state.slide12W2Count, 'W2 deliverable', n1);
+  }
+
+  // --- Slide 14 category rows (1–4 categories, comma-separated needs) ---
+  const s14Container = document.getElementById('twk-s14-cats');
+  function renderS14Rows() {
+    if (!s14Container) return;
+    s14Container.innerHTML = '';
+    const n = Math.max(1, Math.min(4, parseInt(state.slide14Count, 10) || 3));
+    const arr = (Array.isArray(state.slide14Categories) ? state.slide14Categories : []).slice();
+    while (arr.length < 4) arr.push({ name: '', needs: '' });
+    for (let i = 0; i < n; i++) {
+      const c = arr[i] || { name: '', needs: '' };
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid #E1E1E9;border-radius:8px;background:#FAFAFC;';
+      const num = String(i + 1).padStart(2, '0');
+      row.innerHTML = `
+        <div style="font:600 11px/1 'Google Sans',sans-serif;color:#4F60FF;letter-spacing:0.08em;text-transform:uppercase;">Category ${num}</div>
+        <input type="text" placeholder="Category name (e.g. Source systems)" data-s14-i="${i}" data-s14-k="name" value="${(c.name||'').replace(/"/g,'&quot;')}">
+        <textarea rows="3" placeholder="Comma-separated needs (max 8 shown)" data-s14-i="${i}" data-s14-k="needs">${(c.needs||'').replace(/</g,'&lt;')}</textarea>
+        <div style="font:400 10px/1.3 'Google Sans',sans-serif;color:#4F5564;" class="twk-mini">Separate items with commas. The first 8 are rendered as bullets.</div>
+      `;
+      row.querySelectorAll('input,textarea').forEach(input => {
+        input.addEventListener('input', () => {
+          const idx = +input.dataset.s14I;
+          const key = input.dataset.s14K;
+          const next = (Array.isArray(state.slide14Categories) ? [...state.slide14Categories] : []);
+          while (next.length < 4) next.push({ name: '', needs: '' });
+          next[idx] = { ...(next[idx]||{}), [key]: input.value };
+          persistArrayNoRender('slide14Categories', next);
+        });
+      });
+      s14Container.appendChild(row);
+    }
+  }
+
+  // --- Slide 4 generate / reset ---
+  async function generateSlide4(side) {
+    const promptKey = side === 'left' ? 'slide4LeftPrompt' : 'slide4RightPrompt';
+    const cacheKey  = side === 'left' ? 'slide4LeftCache'  : 'slide4RightCache';
+    const statusEl  = document.getElementById('twk-s4-' + side + '-status');
+    const btn       = document.getElementById('twk-s4-' + side + '-go');
+    const userPrompt = (state[promptKey] || '').trim();
+    if (!userPrompt) {
+      if (statusEl) statusEl.textContent = 'Enter a prompt above first.';
+      return;
+    }
+    if (!window.claude || typeof window.claude.complete !== 'function') {
+      if (statusEl) statusEl.textContent = 'AI generation not available in this preview.';
+      return;
+    }
+    const client = (state.clientName || 'the client').trim();
+
+    let systemDirective;
+    if (side === 'left') {
+      systemDirective = [
+        `You are writing the LEFT-HAND narrative column of a kickoff slide titled "Current state" for ${client}.`,
+        `Write 2 short paragraphs (each ~2 sentences, max ~55 words total).`,
+        `Voice: senior consultant, plainspoken, no buzzwords, no headers, no bullets.`,
+        `End the second paragraph with a single bolded clause wrapped in <strong style="color:#2B3041; font-weight:600;">...</strong> tags.`,
+        `Output ONLY the paragraph text — raw HTML allowed for the <strong> tag, no other tags, no markdown, no preamble.`,
+        `Use a single blank line between the two paragraphs.`,
+        ``,
+        `User intent for this slide:`,
+        userPrompt
+      ].join('\n');
+    } else {
+      systemDirective = [
+        `You are generating an inline SVG diagram for the RIGHT-HAND card of a kickoff slide titled "Current state" for ${client}.`,
+        `Constraints:`,
+        `- Output ONLY a single self-contained <svg> element. No markdown, no commentary, no <html>, no scripts.`,
+        `- Use viewBox="0 0 600 600". Set width="100%" and height="auto".`,
+        `- Use only these colours: #4F60FF (indigo accent), #2B3041 (ink), #4F5564 (muted), #D5DDFF (light fill), #FFFFFF.`,
+        `- Background should be transparent — the parent card is already tinted.`,
+        `- Use clear, large labels (font-size 20–28). Sans-serif system stack: font-family="Inter, system-ui, sans-serif".`,
+        `- Strokes 2–3px. Keep it minimal: a few shapes + labels, no decoration.`,
+        `- Add a small uppercase title text at the top in #4F60FF, letter-spacing 2.`,
+        ``,
+        `User intent for the diagram:`,
+        userPrompt
+      ].join('\n');
+    }
+
+    btn.disabled = true;
+    const oldLabel = btn.textContent;
+    btn.textContent = 'Generating…';
+    if (statusEl) statusEl.textContent = 'Calling Claude…';
+    try {
+      const out = await window.claude.complete(systemDirective);
+      let cleaned = String(out || '').trim();
+      // Strip code fences if Claude added any
+      cleaned = cleaned.replace(/^```(?:html|svg|xml)?\s*/i, '').replace(/```\s*$/, '').trim();
+      if (side === 'right') {
+        // Be defensive: pull the first <svg>...</svg>
+        const m = cleaned.match(/<svg[\s\S]*<\/svg>/i);
+        if (m) cleaned = m[0];
+      }
+      persist({ [cacheKey]: cleaned });
+      if (statusEl) statusEl.textContent = 'Updated. Edit the prompt and re-generate to refine.';
+    } catch (err) {
+      console.error('Claude error', err);
+      if (statusEl) statusEl.textContent = 'Generation failed. Try again.';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = oldLabel;
+    }
+  }
+  document.getElementById('twk-s4-left-go').addEventListener('click', () => generateSlide4('left'));
+  document.getElementById('twk-s4-right-go').addEventListener('click', () => generateSlide4('right'));
+  document.getElementById('twk-s4-left-reset').addEventListener('click', () => {
+    persist({ slide4LeftPrompt: '', slide4LeftCache: '' });
+    const s = document.getElementById('twk-s4-left-status');
+    if (s) s.textContent = 'Output replaces the narrative column. Leave blank to restore default.';
+  });
+  document.getElementById('twk-s4-right-reset').addEventListener('click', () => {
+    persist({ slide4RightPrompt: '', slide4RightCache: '' });
+    const s = document.getElementById('twk-s4-right-status');
+    if (s) s.textContent = 'Output replaces the right-hand card. Leave blank to restore default.';
+  });
+
+  // --- Host protocol ---
+  window.addEventListener('message', (e) => {
+    const t = e?.data?.type;
+    if (t === '__activate_edit_mode')   panel.classList.add('show');
+    if (t === '__deactivate_edit_mode') panel.classList.remove('show');
+  });
+
+  // Initial paint, then advertise availability AFTER listener is registered
+  apply();
+  syncControls();
+  refreshThumb();
+  renderPresenterRows();
+  renderProblemRows();
+  renderOutcomeRows();
+  renderS12W1Rows();
+  renderS12W2Rows();
+  renderS14Rows();
+  try { window.parent.postMessage({ type: '__edit_mode_available' }, '*'); } catch (e) {}
+})();
+</script>
+</body>
+</html>

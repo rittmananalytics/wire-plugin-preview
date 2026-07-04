@@ -1,0 +1,219 @@
+---
+description: Execute and sign off logical-access UAT — the isolation-proof gate before cutover
+argument-hint: <release-folder>
+---
+
+# Execute and sign off logical-access UAT — the isolation-proof gate before cutover
+
+## User Input
+
+```text
+$ARGUMENTS
+```
+
+## Path Configuration
+
+- **Projects**: `.wire` (project data and status files)
+
+When following the workflow specification below, resolve paths as follows:
+- `.wire/` in specs refers to the `.wire/` directory in the current repository
+- `TEMPLATES/` references refer to the templates section embedded at the end of this command
+
+## Workflow Specification
+
+---
+description: Execute and sign off region-scoped logical-access UAT — the isolation-proof gate before cutover
+---
+
+# Logical-Access UAT — Review
+
+## Purpose
+
+The sign-off gate where logical-access UAT is executed (or witnessed) and the evidence pack is completed. Approval is the written attestation that the tenant carve-out's access boundaries hold: users in the tenant's project reach only that project and see no other tenant's data. This gate sits before cutover — a failed or unsigned UAT blocks it.
+
+## Prerequisites
+
+- `migration/logical_access_uat_plan.md` with `validate: pass`
+
+## Workflow
+
+### Step 1: Load meeting context
+
+Follow `specs/utils/meeting_context.md` to surface any Fathom recordings touching data-residency, tenant isolation, or security sign-off requirements.
+
+### Step 2: Execute the test matrix and capture evidence
+
+Run each test (or witness the tester run it). For every test ID, fill the evidence block in the plan: actual result, evidence reference (query output, error text, masked value, or screenshot), PASS/FAIL, tester, date.
+
+Pay special attention to the negative tests — each must produce a hard denial, zero cross-tenant rows, or a masked value. A negative test that returns another tenant's data is a **fail** and blocks sign-off regardless of how many positive tests pass.
+
+### Step 3: Record outcomes and complete sign-off
+
+Update the evidence blocks, then complete the sign-off block:
+
+```markdown
+## Sign-off
+- All positive tests passed: ☑ / ☐
+- At least one negative test passed per IAM boundary: ☑ / ☐
+- No cross-tenant data was reachable in any negative test: ☑ / ☐
+
+**Signed off by**: {{REVIEWER_NAME}}   **Role**: {{ROLE}}   **Date**: {{TODAY}}
+**Decision**: approved | changes_requested
+```
+
+Approve only when all three attestations are checked. If any negative test failed, record `changes_requested`, note the boundary that leaked, and route back to `/wire:target-setup-generate` / `/wire:target-setup-review` to fix the IAM boundary before re-testing.
+
+### Step 4: Update status
+
+```yaml
+artifacts:
+  logical_access_uat:
+    review: approved | changes_requested
+    reviewed_by: "{{REVIEWER_NAME}}"
+    reviewed_date: "{{TODAY}}"
+```
+
+### Step 5: Output next command
+
+If approved:
+```
+/wire:cutover-generate $ARGUMENTS
+```
+
+## Review Gate
+
+This review proves tenant isolation. Cutover must not proceed until logical-access UAT is `approved` with every negative test passing. Re-running the security DDL after sign-off invalidates the attestation and requires re-execution of the affected tests.
+
+
+## Post-Execution Hooks
+
+After updating `status.md`, run these in sequence:
+
+1. **Execution log** — Append one row to `.wire/releases/$ARGUMENTS/execution_log.md` following `specs/utils/execution_log.md`.
+
+2. **Jira sync** — Follow `specs/utils/jira_sync.md`. Pass `$ARGUMENTS` as project_folder, `logical_access_uat` as artifact, `review` as action.
+
+3. **Document store** — Follow `specs/utils/docstore_sync.md`. Pass `$ARGUMENTS` as project_folder, `logical_access_uat` as artifact_id, `Logical-Access UAT` as artifact_name, and the `file` value from `artifacts.logical_access_uat` in status.md as file_path.
+
+4. **Auto-commit** — Follow `specs/utils/commit.md`. Pass `$ARGUMENTS` as release_folder, `logical_access_uat` as artifact, `review` as action.
+
+Execute the complete workflow as specified above.
+
+## Execution Logging
+
+After completing the workflow, append a log entry to the project's execution_log.md:
+
+# Execution Log — Command and Skill Logging
+
+## Purpose
+
+After completing any generate, validate, or review workflow (or a project management command that changes state), append a single log entry to the project's execution log file. Skills also append an entry on activation, making the log a unified trace of all agent activity — both explicit commands and auto-activated skills.
+
+## Log File Location
+
+```
+<DP_PROJECTS_PATH>/<project_folder>/execution_log.md
+```
+
+Where `<project_folder>` is the project directory passed as an argument (e.g., `20260222_acme_platform`).
+
+## Format
+
+If the file does not exist, create it with the header:
+
+```markdown
+# Execution Log
+
+| Timestamp | Command | Result | Detail |
+|-----------|---------|--------|--------|
+```
+
+Then append one row per execution:
+
+```markdown
+| YYYY-MM-DD HH:MM | /wire:<command> | <result> | <detail> |
+```
+
+### Field Definitions
+
+- **Timestamp**: Current date and time in `YYYY-MM-DD HH:MM` format (24-hour, local time)
+- **Command**: Either the `/wire:*` command invoked, or `skill` for a skill activation entry
+- **Result / Skill name**: For commands, the outcome; for skills, the skill identifier. Use one of:
+  - `complete` — generate command finished successfully
+  - `pass` — validate command passed all checks
+  - `fail` — validate command found failures
+  - `approved` — review command: stakeholder approved
+  - `changes_requested` — review command: stakeholder requested changes
+  - `created` — `/wire:new` created a new project
+  - `archived` — `/wire:archive` archived a project
+  - `removed` — `/wire:remove` deleted a project
+  - `activated` — a skill was auto-activated (used with `skill` in the Command column)
+  - `override` — `specs/utils/precondition_gate.md` recorded a consultant overriding an unmet precondition
+- **Detail**: A concise one-line summary of what happened. Include:
+  - For generate: number of files created or key output filename
+  - For validate: number of checks passed/failed
+  - For review: reviewer name and brief feedback if changes requested
+  - For new: project type and client name
+  - For archive/remove: project name
+  - For skill activations: brief description of what triggered the skill
+  - For override: the unmet precondition, who overrode it, and their reason
+
+## Skill Activation Entries
+
+When a skill activates, it appends a row in the same format as commands, using `skill` in the Command column and the skill identifier in the Result column:
+
+```markdown
+| YYYY-MM-DD HH:MM | skill | <skill-identifier> | activated | <brief trigger description> |
+```
+
+Skill identifiers:
+
+| Skill | Identifier |
+|-------|-----------|
+| Engagement Context | `engagement-context` |
+| Research Persistence | `research-persistence` |
+| dbt Development | `dbt-development` |
+| LookML Content Authoring | `lookml-authoring` |
+| dbt Analytics QA | `dbt-analytics-qa` |
+| dbt Migration | `dbt-migration` |
+| dbt Troubleshooting | `dbt-troubleshooting` |
+| dbt Semantic Layer | `dbt-semantic-layer` |
+| dbt Unit Testing | `dbt-unit-testing` |
+| dbt DAG | `dbt-dag` |
+| Dagster | `dagster` |
+| Fivetran | `fivetran` |
+| Project Review | `project-review` |
+| Looker Dashboard Mockup | `looker-dashboard-mockup` |
+
+This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Rules
+
+1. **Append only** — never modify or delete existing log entries
+2. **One row per command execution** — even if a command is re-run, add a new row (this creates the revision history)
+3. **Always log after status.md is updated** — the log entry should reflect the final state
+4. **Pipe characters in detail** — if the detail text contains `|`, replace with `—` to preserve table formatting
+5. **Keep detail under 120 characters** — be concise
+
+## Example
+
+```markdown
+# Execution Log
+
+| Timestamp | Command | Result | Detail |
+|-----------|---------|--------|--------|
+| 2026-02-22 14:30 | skill | engagement-context | activated | Context loaded for new conversation |
+| 2026-02-22 14:35 | /wire:new | created | Project created (type: full_platform, client: Acme Corp) |
+| 2026-02-22 14:40 | /wire:requirements-generate | complete | Generated requirements specification (3 files) |
+| 2026-02-22 15:12 | /wire:requirements-validate | pass | 14 checks passed, 0 failed |
+| 2026-02-22 16:00 | /wire:requirements-review | approved | Reviewed by Jane Smith |
+| 2026-02-23 09:15 | /wire:conceptual_model-generate | complete | Generated entity model with 8 entities |
+| 2026-02-23 10:30 | /wire:conceptual_model-validate | fail | 2 issues: missing relationship, orphaned entity |
+| 2026-02-23 11:00 | /wire:conceptual_model-generate | complete | Regenerated entity model (fixed 2 issues, 8 entities) |
+| 2026-02-23 11:15 | /wire:conceptual_model-validate | pass | 12 checks passed, 0 failed |
+| 2026-02-23 14:00 | /wire:conceptual_model-review | changes_requested | Reviewed by John Doe — add Customer entity |
+| 2026-02-23 15:30 | /wire:conceptual_model-generate | complete | Regenerated entity model (9 entities, added Customer) |
+| 2026-02-23 15:45 | /wire:conceptual_model-validate | pass | 14 checks passed, 0 failed |
+| 2026-02-23 16:00 | /wire:conceptual_model-review | approved | Reviewed by John Doe |
+| 2026-02-24 09:05 | /wire:migration-strategy-generate | override | migration_inventory.review required approved, was not_started — overridden by Jane Smith: client demo tomorrow, inventory sign-off deferred to Monday |
+```

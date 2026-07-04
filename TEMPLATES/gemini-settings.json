@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "atlassian": {
+      "url": "https://mcp.atlassian.com/v1/mcp"
+    },
+    "fathom": {
+      "httpUrl": "https://your-fathom-mcp-server/mcp"
+    },
+    "context7": {
+      "httpUrl": "https://mcp.context7.com/mcp"
+    },
+    "amplitude": {
+      "httpUrl": "https://mcp.amplitude.com/mcp"
+    }
+  }
+}

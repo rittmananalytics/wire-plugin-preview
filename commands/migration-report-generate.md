@@ -1,0 +1,248 @@
+---
+description: Generate post-migration report
+argument-hint: <release-folder>
+---
+
+# Generate post-migration report
+
+## User Input
+
+```text
+$ARGUMENTS
+```
+
+## Path Configuration
+
+- **Projects**: `.wire` (project data and status files)
+
+When following the workflow specification below, resolve paths as follows:
+- `.wire/` in specs refers to the `.wire/` directory in the current repository
+- `TEMPLATES/` references refer to the templates section embedded at the end of this command
+
+## Workflow Specification
+
+---
+description: Generate post-migration report
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/migration_agent_delegate.md` before executing the workflow below.
+Follow `specs/utils/stale_artifact_check.md` with `artifact_id: migration_report` and `artifact_file_path: migration/migration_report.md` before proceeding.
+
+---
+
+# Migration Report — Generate
+
+## Purpose
+
+Generates the post-migration report summarising what was migrated, the final equivalency state, any known differences accepted, lessons learned, and recommendations for decommissioning the source platform. This is the final deliverable of the platform_migration release.
+
+## Prerequisites
+
+- `cutover review: approved`
+- Cutover runbook executed (manual confirmation required)
+
+## Workflow
+
+### Step 1: Confirm cutover is complete
+
+Ask: "Has the production cutover been executed?" Wait for explicit confirmation before proceeding.
+
+### Step 2: Gather final state
+
+Read:
+- All 5 audit files — source platform object counts
+- Migration inventory — scoped object counts and effort estimates
+- Latest equivalency report — final check results
+- Cutover runbook — actual cutover date and duration
+- Loop history from status.md — how many equivalency cycles were required
+
+### Step 3: Write the report
+
+**Output location**: `.wire/releases/$ARGUMENTS/migration/migration_report.md`
+
+Use the template at `TEMPLATES/migration/migration_report.md`. Include:
+
+**Executive summary**:
+- Migration completed on [date] from [source] to [target]
+- N objects migrated: X connectors, Y tables, Z dbt models, W jobs
+- Final equivalency state: N/N passing, N accepted differences
+- Actual vs estimated effort
+- Cutover duration
+
+**What was migrated**:
+- Per-category counts matching the migration inventory
+- Key decisions made during migration (from audit reviews and strategy sign-offs)
+
+**Equivalency outcomes**:
+- Final equivalency report summary
+- Accepted differences table (object, difference, business justification)
+- Equivalency loop history (how many runs were needed)
+
+**Issues encountered**:
+- Issues discovered during migration with how they were resolved
+- Any issues deferred to post-migration cleanup
+
+**Lessons learned**:
+- What worked well
+- What would be done differently
+- Recommendations for future migrations
+
+**Source platform decommission plan**:
+- Recommended timeline for decommissioning source platform
+- Objects to retain on source platform (if any)
+- Cost savings expected after decommission
+
+### Step 4: Update status
+
+```yaml
+artifacts:
+  migration_report:
+    generate: complete
+    file: migration/migration_report.md
+    generated_date: "{{TODAY}}"
+migration:
+  status: complete
+  completed_date: "{{TODAY}}"
+```
+
+### Step 5: Output next command
+
+```
+/wire:migration-report-validate $ARGUMENTS
+```
+
+
+## Post-Execution Hooks
+
+After updating `status.md`, run these in sequence:
+
+1. **Execution log** — Append one row to `.wire/releases/$ARGUMENTS/execution_log.md` following `specs/utils/execution_log.md`.
+
+2. **Jira sync** — Follow `specs/utils/jira_sync.md`. Pass `$ARGUMENTS` as project_folder, `migration_report` as artifact, `generate` as action.
+
+3. **Document store** — Follow `specs/utils/docstore_sync.md`. Pass `$ARGUMENTS` as project_folder, `migration_report` as artifact_id, `Migration Report` as artifact_name, and the `file` value from `artifacts.migration_report` in status.md as file_path.
+
+4. **Auto-commit** — Follow `specs/utils/commit.md`. Pass `$ARGUMENTS` as release_folder, `migration_report` as artifact, `generate` as action.
+
+Execute the complete workflow as specified above.
+
+## Execution Logging
+
+After completing the workflow, append a log entry to the project's execution_log.md:
+
+# Execution Log — Command and Skill Logging
+
+## Purpose
+
+After completing any generate, validate, or review workflow (or a project management command that changes state), append a single log entry to the project's execution log file. Skills also append an entry on activation, making the log a unified trace of all agent activity — both explicit commands and auto-activated skills.
+
+## Log File Location
+
+```
+<DP_PROJECTS_PATH>/<project_folder>/execution_log.md
+```
+
+Where `<project_folder>` is the project directory passed as an argument (e.g., `20260222_acme_platform`).
+
+## Format
+
+If the file does not exist, create it with the header:
+
+```markdown
+# Execution Log
+
+| Timestamp | Command | Result | Detail |
+|-----------|---------|--------|--------|
+```
+
+Then append one row per execution:
+
+```markdown
+| YYYY-MM-DD HH:MM | /wire:<command> | <result> | <detail> |
+```
+
+### Field Definitions
+
+- **Timestamp**: Current date and time in `YYYY-MM-DD HH:MM` format (24-hour, local time)
+- **Command**: Either the `/wire:*` command invoked, or `skill` for a skill activation entry
+- **Result / Skill name**: For commands, the outcome; for skills, the skill identifier. Use one of:
+  - `complete` — generate command finished successfully
+  - `pass` — validate command passed all checks
+  - `fail` — validate command found failures
+  - `approved` — review command: stakeholder approved
+  - `changes_requested` — review command: stakeholder requested changes
+  - `created` — `/wire:new` created a new project
+  - `archived` — `/wire:archive` archived a project
+  - `removed` — `/wire:remove` deleted a project
+  - `activated` — a skill was auto-activated (used with `skill` in the Command column)
+  - `override` — `specs/utils/precondition_gate.md` recorded a consultant overriding an unmet precondition
+- **Detail**: A concise one-line summary of what happened. Include:
+  - For generate: number of files created or key output filename
+  - For validate: number of checks passed/failed
+  - For review: reviewer name and brief feedback if changes requested
+  - For new: project type and client name
+  - For archive/remove: project name
+  - For skill activations: brief description of what triggered the skill
+  - For override: the unmet precondition, who overrode it, and their reason
+
+## Skill Activation Entries
+
+When a skill activates, it appends a row in the same format as commands, using `skill` in the Command column and the skill identifier in the Result column:
+
+```markdown
+| YYYY-MM-DD HH:MM | skill | <skill-identifier> | activated | <brief trigger description> |
+```
+
+Skill identifiers:
+
+| Skill | Identifier |
+|-------|-----------|
+| Engagement Context | `engagement-context` |
+| Research Persistence | `research-persistence` |
+| dbt Development | `dbt-development` |
+| LookML Content Authoring | `lookml-authoring` |
+| dbt Analytics QA | `dbt-analytics-qa` |
+| dbt Migration | `dbt-migration` |
+| dbt Troubleshooting | `dbt-troubleshooting` |
+| dbt Semantic Layer | `dbt-semantic-layer` |
+| dbt Unit Testing | `dbt-unit-testing` |
+| dbt DAG | `dbt-dag` |
+| Dagster | `dagster` |
+| Fivetran | `fivetran` |
+| Project Review | `project-review` |
+| Looker Dashboard Mockup | `looker-dashboard-mockup` |
+
+This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Rules
+
+1. **Append only** — never modify or delete existing log entries
+2. **One row per command execution** — even if a command is re-run, add a new row (this creates the revision history)
+3. **Always log after status.md is updated** — the log entry should reflect the final state
+4. **Pipe characters in detail** — if the detail text contains `|`, replace with `—` to preserve table formatting
+5. **Keep detail under 120 characters** — be concise
+
+## Example
+
+```markdown
+# Execution Log
+
+| Timestamp | Command | Result | Detail |
+|-----------|---------|--------|--------|
+| 2026-02-22 14:30 | skill | engagement-context | activated | Context loaded for new conversation |
+| 2026-02-22 14:35 | /wire:new | created | Project created (type: full_platform, client: Acme Corp) |
+| 2026-02-22 14:40 | /wire:requirements-generate | complete | Generated requirements specification (3 files) |
+| 2026-02-22 15:12 | /wire:requirements-validate | pass | 14 checks passed, 0 failed |
+| 2026-02-22 16:00 | /wire:requirements-review | approved | Reviewed by Jane Smith |
+| 2026-02-23 09:15 | /wire:conceptual_model-generate | complete | Generated entity model with 8 entities |
+| 2026-02-23 10:30 | /wire:conceptual_model-validate | fail | 2 issues: missing relationship, orphaned entity |
+| 2026-02-23 11:00 | /wire:conceptual_model-generate | complete | Regenerated entity model (fixed 2 issues, 8 entities) |
+| 2026-02-23 11:15 | /wire:conceptual_model-validate | pass | 12 checks passed, 0 failed |
+| 2026-02-23 14:00 | /wire:conceptual_model-review | changes_requested | Reviewed by John Doe — add Customer entity |
+| 2026-02-23 15:30 | /wire:conceptual_model-generate | complete | Regenerated entity model (9 entities, added Customer) |
+| 2026-02-23 15:45 | /wire:conceptual_model-validate | pass | 14 checks passed, 0 failed |
+| 2026-02-23 16:00 | /wire:conceptual_model-review | approved | Reviewed by John Doe |
+| 2026-02-24 09:05 | /wire:migration-strategy-generate | override | migration_inventory.review required approved, was not_started — overridden by Jane Smith: client demo tomorrow, inventory sign-off deferred to Monday |
+```
