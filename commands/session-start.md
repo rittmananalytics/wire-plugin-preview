@@ -22,10 +22,22 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: utility
+artifact: session
+domain: session
+release_types: []
+action_type: lifecycle
+logs_execution: false
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: "DEPRECATED — session:start has been replaced by the engagement-context skill and /wire:plan"
 deprecated: true
 replaced_by: "engagement-context skill (auto-fires) + /wire:plan (optional planning ritual)"
 since: "3.4.20"
+
 ---
 
 # ⚠️ Deprecated: /wire:session:start

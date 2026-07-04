@@ -22,7 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: utility
+artifact: equivalency
+domain: migration
+release_types:
+  - platform_migration
+action_type: utility
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: orchestration_migration
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
 description: Deep diagnostics for a specific failing equivalency object
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Equivalency — Investigate

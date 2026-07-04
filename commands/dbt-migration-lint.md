@@ -22,7 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: utility
+artifact: dbt_migration
+domain: migration
+release_types:
+  - platform_migration
+action_type: utility
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: ingestion_migration
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
 description: Static pre-warehouse equivalence lint — dialect parse-check plus silent-behaviour-change rules on translated dbt models
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # dbt Migration — Lint (Tier 1 equivalence pre-flight)

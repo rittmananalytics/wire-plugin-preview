@@ -22,8 +22,20 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: lifecycle
+artifact: start
+domain: start
+release_types: []
+action_type: lifecycle
+logs_execution: false
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: Session entry point and Wire co-pilot — orients new users, surfaces the right next action, and helps navigating consultants pick up where they left off
 argument-hint: [new|resume|explain]
+
 ---
 
 # Wire Start

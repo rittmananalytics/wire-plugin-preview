@@ -22,8 +22,33 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: droughty_qa
+domain: droughty
+release_types:
+  - droughty
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: droughty_introspect
+    action: generate
+    outcome: complete
+delegates_to:
+  - utils/precondition_gate
 description: Run the LangGraph data quality agent against the warehouse and produce a structured quality report
 argument-hint: <release-folder>
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Droughty QA Command

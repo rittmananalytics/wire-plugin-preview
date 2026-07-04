@@ -22,7 +22,26 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: migration_drift
+domain: migration
+release_types:
+  - platform_migration
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: migration_register
+    action: generate
+    outcome: complete
+delegates_to:
+  - utils/precondition_gate
 description: Scheduled drift gate — diff the live source dbt repo against each migrated model's last-migrated commit, classify new/modified/removed, flag downstream Hightouch syncs, and trigger the masking-policy hook
+
 ---
 
 ## Auto-Delegation

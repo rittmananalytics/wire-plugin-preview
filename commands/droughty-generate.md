@@ -22,8 +22,21 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: droughty_generate
+domain: droughty
+release_types:
+  - droughty
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: Run the full Droughty phase in sequence — setup, introspect, dbml, docs, qa, stage, dbt-tests, lookml
 argument-hint: <release-folder>
+
 ---
 
 # Droughty Generate Command

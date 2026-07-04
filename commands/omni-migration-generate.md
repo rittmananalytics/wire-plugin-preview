@@ -22,7 +22,29 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: omni_migration
+domain: migration
+release_types:
+  - platform_migration
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: target_setup
+    action: review
+    outcome: approved
+  - artifact: omni_audit
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
 description: Generate the Omni reporting-layer migration runbook — translate model view SQL on a branch, validate the branch against a pilot connection scope, promote and cut over the connection in two stages with rollback
+
 ---
 
 ## Auto-Delegation

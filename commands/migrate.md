@@ -22,8 +22,20 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: lifecycle
+artifact: migrate
+domain: migrate
+release_types: []
+action_type: lifecycle
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: Migrate an engagement repository to the current Wire v3.4+ structure, auto-detecting the source layout
 argument-hint: (no arguments — auto-detects the layout)
+
 ---
 
 # Wire Migrate Command

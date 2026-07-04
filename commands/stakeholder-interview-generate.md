@@ -22,8 +22,33 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: stakeholder_interview
+domain: sop_discovery
+release_types:
+  - sop_discovery
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: stakeholder_map
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
 description: Generate a stakeholder interview write-up with the mandatory four-tag template
 argument-hint: "[release-folder] --stakeholder <slug>"
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Stakeholder Interview — Generate

@@ -22,7 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: validate
+artifact: security_audit
+domain: migration
+release_types:
+  - platform_migration
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: security_audit
+    action: generate
+    outcome: complete
+delegates_to:
+  - utils/precondition_gate
 description: Validate security audit completeness
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Security Audit — Validate

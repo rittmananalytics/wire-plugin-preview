@@ -22,8 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: validate
+artifact: kickoff
+domain: kickoff
+release_types: []
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: kickoff
+    action: generate
+    outcome: complete
+delegates_to:
+  - utils/precondition_gate
 description: Validate kick-off deck JSON structure and content completeness
 argument-hint: "[release-folder]"
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Kickoff Deck — Validate

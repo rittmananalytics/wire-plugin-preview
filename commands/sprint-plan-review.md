@@ -22,7 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: review
+artifact: sprint_plan
+domain: discovery
+release_types:
+  - discovery_shape_up
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: sprint_plan
+    action: validate
+    outcome: PASS
+delegates_to:
+  - utils/precondition_gate
 description: Review sprint plan with delivery team and record approval
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Sprint Plan Review Command

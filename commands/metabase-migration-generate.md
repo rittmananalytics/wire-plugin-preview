@@ -22,7 +22,29 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: metabase_migration
+domain: migration
+release_types:
+  - platform_migration
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: target_setup
+    action: review
+    outcome: approved
+  - artifact: metabase_audit
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
 description: Generate the Metabase reporting-layer migration runbook — translate card SQL to the target dialect, remap permission groups, validate on a decoy collection/connection, two-stage connection repoint with per-stage rollback
+
 ---
 
 ## Auto-Delegation

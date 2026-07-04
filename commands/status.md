@@ -22,7 +22,19 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: lifecycle
+artifact: status
+domain: status
+release_types: []
+action_type: lifecycle
+logs_execution: false
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: Report on all project statuses
+
 ---
 
 # Data Platform Project Status Report

@@ -22,8 +22,38 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: review
+artifact: deployment
+domain: deployment
+release_types:
+  - full_platform
+  - dbt_development
+  - dashboard_first
+  - pipeline_only
+  - dashboard_extension
+  - enablement
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: deployment
+    action: validate
+    outcome: PASS
+delegates_to:
+  - utils/precondition_gate
 description: Record stakeholder review feedback on deployment
 argument-hint: <project-folder>
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # deployment Review Command

@@ -22,8 +22,33 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: droughty_docs
+domain: droughty
+release_types:
+  - droughty
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: droughty_introspect
+    action: generate
+    outcome: complete
+delegates_to:
+  - utils/precondition_gate
 description: Generate AI-powered field descriptions for all warehouse columns using the OpenAI API
 argument-hint: <release-folder>
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Droughty Docs Command

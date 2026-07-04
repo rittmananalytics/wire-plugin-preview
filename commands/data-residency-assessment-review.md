@@ -22,7 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: review
+artifact: data_residency_assessment
+domain: migration
+release_types:
+  - platform_migration
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: data_residency_assessment
+    action: validate
+    outcome: PASS
+delegates_to:
+  - utils/precondition_gate
 description: Sign-off gate for the data residency assessment — client DPO/legal determines the flagged items and signs off
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Data Residency Assessment — Review

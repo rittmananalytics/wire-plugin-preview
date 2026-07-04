@@ -22,7 +22,26 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: cutover
+domain: migration
+release_types:
+  - platform_migration
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: equivalency
+    action: validate
+    outcome: PASS
+delegates_to:
+  - utils/precondition_gate
 description: Generate cutover runbook (SAFETY GATE — point of no return)
+
 ---
 
 ## Auto-Delegation

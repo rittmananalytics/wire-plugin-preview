@@ -22,7 +22,15 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: lifecycle
+artifact: new
+domain: new
+release_types: []
+action_type: lifecycle
+logs_execution: true
 description: Create a new Wire engagement or add a release to an existing engagement
+
 ---
 
 # Wire New Command

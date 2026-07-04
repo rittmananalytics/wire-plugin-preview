@@ -22,7 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: release_brief
+domain: discovery
+release_types:
+  - discovery_shape_up
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: pitch
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
 description: Generate formal release brief from the approved pitch
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Release Brief Generate Command

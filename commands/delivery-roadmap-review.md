@@ -22,7 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: review
+artifact: delivery_roadmap
+domain: sop_discovery
+release_types:
+  - sop_discovery
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: delivery_roadmap
+    action: validate
+    outcome: PASS
+delegates_to:
+  - utils/precondition_gate
 description: Sponsor review of the delivery roadmap and Release 1 scope
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Delivery Roadmap — Review

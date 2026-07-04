@@ -22,8 +22,33 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: validate
+artifact: equivalency
+domain: migration
+release_types:
+  - platform_migration
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: orchestration_migration
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
 description: Run equivalency checks across all in-scope tables (repeatable loop, parallel fan-out, optional frozen-baseline tier-3 mode)
 argument-hint: <release-folder> [--batch N] [--baseline]
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 ## Data Safety — Read Before Proceeding

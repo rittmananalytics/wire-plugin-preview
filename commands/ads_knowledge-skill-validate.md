@@ -22,8 +22,33 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: validate
+artifact: knowledge_skill
+domain: agentic_data_stack
+release_types:
+  - agentic_data_stack
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: knowledge_skill
+    action: generate
+    outcome: complete
+delegates_to:
+  - utils/precondition_gate
 description: Check knowledge skill files are complete, accurate, and correctly colocated
 argument-hint: <release-folder>
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Agentic Data Stack — Knowledge Skill Validate

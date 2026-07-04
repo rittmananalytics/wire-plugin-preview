@@ -22,7 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: validate
+artifact: omni_audit
+domain: migration
+release_types:
+  - platform_migration
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: omni_audit
+    action: generate
+    outcome: complete
+delegates_to:
+  - utils/precondition_gate
 description: Validate Omni audit completeness, warehouse dependency coverage, connection documentation, and migration approach assignments
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Omni Audit — Validate

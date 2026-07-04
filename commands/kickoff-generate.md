@@ -22,8 +22,20 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: kickoff
+domain: kickoff
+release_types: []
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: Generate client kick-off presentation deck from SoW and engagement context
 argument-hint: "[release-folder]"
+
 ---
 
 # Kickoff Deck — Generate

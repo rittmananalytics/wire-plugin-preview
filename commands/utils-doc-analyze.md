@@ -22,8 +22,20 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: utility
+artifact: utils
+domain: utils
+release_types: []
+action_type: utility
+logs_execution: false
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: Extract deliverables, acceptance criteria, timeline, and stakeholders from SoW or project documents
 argument-hint: <file-path-or-url> [<file-path-2> ...]
+
 ---
 
 # Document Analysis Utility

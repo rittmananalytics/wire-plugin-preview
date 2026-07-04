@@ -22,8 +22,20 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: lifecycle
+artifact: upgrade
+domain: upgrade
+release_types: []
+action_type: lifecycle
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: Upgrade a release folder's status.md and Wire files to the current plugin version schema — adds missing sections, surfaces new commands, never overwrites existing values
 argument-hint: [release-folder]
+
 ---
 
 # Wire Upgrade Command

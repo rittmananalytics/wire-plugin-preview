@@ -22,7 +22,29 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: data_residency_assessment
+domain: migration
+release_types:
+  - platform_migration
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: migration_inventory
+    action: review
+    outcome: approved
+  - artifact: region_tagging
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
 description: Generate the GDPR and data-residency assessment for a tenant carve-out — including the legal review of the historical data window (RA prepares as processor; client DPO/legal determines and signs off)
+
 ---
 
 ## Auto-Delegation

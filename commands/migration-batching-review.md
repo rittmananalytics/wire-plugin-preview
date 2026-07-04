@@ -22,7 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: review
+artifact: migration_batching
+domain: migration
+release_types:
+  - platform_migration
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: migration_batching
+    action: validate
+    outcome: PASS
+delegates_to:
+  - utils/precondition_gate
 description: Human/client adjudication gate — turn the proposed domain-batch partition into a committed schedule
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Migration Batching — Review

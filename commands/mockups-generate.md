@@ -22,8 +22,35 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: mockups
+domain: design
+release_types:
+  - full_platform
+  - dbt_development
+  - dashboard_first
+  - pipeline_only
+  - dashboard_extension
+  - enablement
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions: dynamic
+delegates_to:
+  - utils/precondition_gate
 description: Generate mockups from design and requirements
 argument-hint: <project-folder>
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # mockups Generate Command
@@ -44,7 +71,15 @@ Generate dashboard mockups based on requirements. Supports two modes:
 
 ## Prerequisites
 
-- `requirements.review` must be `approved` in status.md
+Enforced by the precondition gate (`preconditions: dynamic` — see
+`wire/release-types/<project_type>.yaml`), release-type dependent:
+
+- **`dashboard_first`**: `requirements`: `review: approved`. Mockups are built
+  directly from the SoW/requirements — there's no separate data model yet at
+  this point in the sequence (mockups feed `viz_catalog`, which in turn
+  informs `data_model`).
+- **`full_platform`** (and any other regular release type): `data_model`:
+  `review: approved`. Mockups here illustrate an already-designed data model.
 
 ## Workflow
 

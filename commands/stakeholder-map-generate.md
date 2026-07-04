@@ -22,7 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: stakeholder_map
+domain: sop_discovery
+release_types:
+  - sop_discovery
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: engagement_brief
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
 description: Generate the stakeholder map for a SOP discovery release
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Stakeholder Map — Generate

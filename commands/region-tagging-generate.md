@@ -22,7 +22,29 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: region_tagging
+domain: migration
+release_types:
+  - platform_migration
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: dbt_audit
+    action: review
+    outcome: approved
+  - artifact: ingestion_audit
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
 description: Classify in-scope items into region buckets for a tenant carve-out — candidates for adjudication, never auto-removal
+
 ---
 
 ## Auto-Delegation

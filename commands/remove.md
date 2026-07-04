@@ -22,7 +22,19 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: lifecycle
+artifact: remove
+domain: remove
+release_types: []
+action_type: lifecycle
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: Remove an existing Data Platform project with confirmation
+
 ---
 
 # Data Platform Remove Project Command

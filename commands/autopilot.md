@@ -22,8 +22,20 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: lifecycle
+artifact: autopilot
+domain: autopilot
+release_types: []
+action_type: lifecycle
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: Autonomous end-to-end engagement execution from SOW — discovery sprint + all delivery releases
 argument-hint: <path-to-sow>
+
 ---
 
 # Wire Autopilot — Autonomous Engagement Execution
@@ -446,217 +458,17 @@ Beginning discovery sprint...
 
 # Phase 3: Discovery Sprint (Autonomous)
 
-The discovery sprint runs the full Shape Up planning cycle autonomously. All four artifacts are generated, validated, and self-approved without human intervention. Autopilot makes all planning decisions from the SOW and supporting material.
+The discovery sprint runs the full Shape Up planning cycle autonomously: `problem_definition` → `pitch` → `release_brief` → `sprint_plan`, per `wire/release-types/discovery_shape_up.yaml` (a single, unambiguous release type — no order-resolution ambiguity here, unlike Phase 4's shared-domain types).
 
-## Step 3.1: Problem Definition
+Run this exactly like Phase 4's Step 4.3 procedure: resolve the order from `discovery_shape_up.yaml` (in practice, always the fixed sequence above — the release type has no branching), then for each artifact run the real `/wire:{command}-generate`, `/wire:{command}-validate`, and self-reviewed `/wire:{command}-review` against `.wire/releases/01-discovery/`, exactly as Step 4.3b describes. The same Self-Review Mode applies for review steps.
 
-**Inputs**: `.wire/engagement/sow.md`, `.wire/engagement/context.md`, supporting docs
-**Output**: `.wire/releases/01-discovery/planning/problem_definition.md`
+Generate steps here occasionally have a "wait for the user" checkpoint written for a human filling the document in interactively (see e.g. `discovery/pitch/generate.md`) — apply the same self-answer principle Self-Review Mode uses: don't wait, make the call yourself from the SOW and supporting material, autonomously. This is where Autopilot's planning judgment matters most — e.g. for `pitch`, infer appetite from the SOW's stated timeline (6+ weeks → big batch; 2-3 weeks → small batch; ambiguous → default big batch) rather than asking; for `sprint_plan`, use a 5-points-per-consultant-day velocity assumption with 20% buffer. Apply this kind of inference wherever a generate spec would otherwise pause for input, sourced from what the spec actually asks for — not a separately maintained copy of its logic.
 
-**Autonomous generation process**:
+`sprint_plan`'s output includes the "Downstream Releases" table (name, type, scope, priority) that Step 3.5 below reads — confirm during self-review that every release type listed there is one Wire actually supports (has a `wire/release-types/*.yaml`): `discovery_shape_up`, `sop_discovery`, `full_platform`, `dbt_development`, `dashboard_first`, `platform_migration`, `droughty`, `agentic_data_stack`, `pipeline_only`, `dashboard_extension`, `enablement`.
 
-1. Read all engagement context (SOW, context.md, supporting docs, additional_context)
-2. Extract answers to the seven problem-framing questions directly from the source material:
-   - **Who has the problem**: Identify the primary stakeholder role(s) from the SOW
-   - **What they're trying to do**: Extract the job-to-be-done (not the solution)
-   - **What's in the way**: Extract the friction, gap, or current-state pain points
-   - **Current workarounds**: Infer from SOW's "as-is" description or context
-   - **What "solved" looks like**: Extract desired outcomes and success criteria
-   - **Constraints**: Extract budget ceiling, timeline, technology constraints, compliance
-   - **Previously ruled out**: Extract any exclusions, assumptions, or "out of scope" clauses
-3. Generate the full 10-section problem_definition document following the structure in `specs/discovery/problem_definition/generate.md`
-4. Where information is genuinely absent from source material, write "[To confirm with client]" — do not fabricate
+After all four discovery artifacts are `review: approved`, proceed to Step 3.5.
 
-**Validate**:
-- [ ] All 10 sections populated (sections with no source data marked "[To confirm]")
-- [ ] Constraints section has budget/timeline/technology entries
-- [ ] "What solved looks like" is outcome-oriented (not solution-prescribing)
-- [ ] Impact table completed with current vs desired state
-
-**Self-approve** if all validate checks pass. Update status.md:
-```yaml
-problem_definition:
-  generate: "complete"
-  validate: "pass"
-  review: "approved"
-  reviewed_by: "Wire Autopilot (self-review)"
-  reviewed_date: [today]
-  file: "planning/problem_definition.md"
-```
-
-**Self-review criteria**:
-1. Problem is framed without prescribing a solution
-2. Stakeholders are specific (not "the business" or "users")
-3. SOW deliverables trace to the problem statement
-4. Constraints are concrete, not abstract
-
-**Document store sync**: If `docstore_provider` is set, follow `specs/utils/docstore_sync.md` to publish `planning/problem_definition.md` to the configured store. Fail gracefully — do not block if the sync fails.
-
-Report:
-```
---- Discovery: Problem Definition ---
-Status: approved (self-reviewed)
-File: .wire/releases/01-discovery/planning/problem_definition.md
 ---
-```
-
-## Step 3.2: Pitch
-
-**Input**: `planning/problem_definition.md`
-**Output**: `planning/pitch.md`
-
-**Autonomous generation process**:
-
-Generate the 10-section Shape Up pitch. Make all shaping decisions autonomously from the source material:
-
-1. **Appetite**: Infer from SOW timeline —
-   - 6+ weeks stated duration → Big batch (6 weeks)
-   - 2–3 weeks → Small batch (1–2 weeks)
-   - Ambiguous → Default to Big batch
-2. **Problem statement**: Condense from problem_definition Section 3
-3. **Appetite statement**: State the time budget and what that means for scope
-4. **Solution**: Shape the core solution element — the one thing that, if done, solves the problem. Base on SOW deliverables. Use fat-marker description (rough but solved). Document trade-offs and autonomous decisions.
-5. **Rabbit holes**: Identify 3–5 specific things to avoid based on SOW scope boundaries and constraints
-6. **No-gos**: Extract explicitly out-of-scope items from SOW
-7. **Open questions**: List 3–5 questions that need client confirmation before delivery starts
-8. **Downstream releases**: Based on SOW deliverables and appetite, propose delivery release types:
-   - Map each SOW deliverable category to the appropriate release type
-   - Order releases logically (data-first before dashboards, etc.)
-   - Assign a name and type to each (e.g., `02-data-foundation: pipeline_only`, `03-reporting: dashboard_extension`)
-9. **Betting table case**: 2–3 bullet points making the case for proceeding
-10. **Metrics for success**: Extract from SOW acceptance criteria or success criteria
-
-Generate the pitch document following the full structure in `specs/discovery/pitch/generate.md`.
-
-**Validate**:
-- [ ] All 10 pitch sections populated
-- [ ] Appetite defined (small/big batch)
-- [ ] At least one downstream release identified in Section 8
-- [ ] Rabbit holes list has at least 3 items
-- [ ] No-gos list populated from SOW out-of-scope
-
-**Self-approve** if validate passes. Update status.md:
-```yaml
-pitch:
-  generate: "complete"
-  validate: "pass"
-  review: "approved"
-  reviewed_by: "Wire Autopilot (self-review)"
-  reviewed_date: [today]
-  file: "planning/pitch.md"
-```
-
-**Self-review criteria**:
-1. Solution is shaped — rough but solved, not open-ended
-2. Appetite is fixed — not adjusted to fit the solution
-3. Downstream releases are typed and named
-4. Rabbit holes are concrete things (not abstract risks)
-
-**Document store sync**: If `docstore_provider` is set, follow `specs/utils/docstore_sync.md` to publish `planning/pitch.md` to the configured store. Fail gracefully — do not block if the sync fails.
-
-Report:
-```
---- Discovery: Pitch ---
-Status: approved (self-reviewed)
-Downstream releases identified: [list]
-File: .wire/releases/01-discovery/planning/pitch.md
----
-```
-
-## Step 3.3: Release Brief
-
-**Input**: `planning/pitch.md`, `engagement/context.md`, `engagement/sow.md`
-**Output**: `planning/release_brief.md`
-
-**Autonomous generation process**:
-
-Generate the formal 12-section release brief following the structure in `specs/discovery/release_brief/generate.md`. Make all content decisions from the pitch and SOW:
-
-1. Extract deliverables from pitch Sections 3 (solution) and 8 (downstream releases)
-2. Define acceptance criteria from SOW success criteria and pitch metrics
-3. Extract budget from SOW contract terms
-4. Populate downstream releases table from pitch Section 8 — this is the authoritative list of delivery releases to spawn
-5. Mark sign-off block as "[Signature required before sprint plan]"
-
-**Validate**:
-- [ ] Deliverables table has at least one row with acceptance criteria
-- [ ] Downstream releases table populated from pitch Section 8
-- [ ] Timeline section populated (even if "TBD — to confirm with client")
-- [ ] Out-of-scope section matches pitch no-gos
-
-**Self-approve** if validate passes. Update status.md:
-```yaml
-release_brief:
-  generate: "complete"
-  validate: "pass"
-  review: "approved"
-  reviewed_by: "Wire Autopilot (self-review)"
-  reviewed_date: [today]
-  file: "planning/release_brief.md"
-```
-
-**Document store sync**: If `docstore_provider` is set, follow `specs/utils/docstore_sync.md` to publish `planning/release_brief.md` to the configured store. Fail gracefully — do not block if the sync fails.
-
-Report:
-```
---- Discovery: Release Brief ---
-Status: approved (self-reviewed)
-Delivery releases planned: [list from Section 4]
-File: .wire/releases/01-discovery/planning/release_brief.md
----
-```
-
-## Step 3.4: Sprint Plan
-
-**Input**: `planning/release_brief.md`, `planning/pitch.md`
-**Output**: `planning/sprint_plan.md`
-
-**Autonomous generation process**:
-
-Generate the sprint plan following `specs/discovery/sprint_plan/generate.md`. Make all planning decisions autonomously:
-
-1. Determine sprint length from appetite (small batch → 1 sprint, big batch → 3–5 sprints of ~1 week)
-2. For each deliverable in the release brief, generate epics
-3. For each epic, generate stories with Fibonacci point estimates (1/2/3/5/8 — no 13-point stories)
-4. Assign each story to a sprint
-5. Include a "Downstream Releases" table at the end — this is the canonical list of delivery releases that Phase 4 will execute:
-
-   | Release Name | Type | Scope Summary | Priority |
-   |---|---|---|---|
-   | [e.g. 02-data-foundation] | [e.g. pipeline_only] | [1-line scope] | 1 |
-
-**Velocity assumption**: 5 points per consultant day. Include buffer of 20%.
-
-**Validate**:
-- [ ] All release_brief deliverables have epics
-- [ ] No story exceeds 8 points
-- [ ] Point totals add up correctly
-- [ ] Downstream Releases table has at least one row with name and type
-- [ ] Every release type in the table is a valid Wire release type: full_platform, pipeline_only, dbt_development, dashboard_extension, dashboard_first, enablement, platform_migration, agentic_data_stack
-
-**Self-approve** if validate passes. Update status.md:
-```yaml
-sprint_plan:
-  generate: "complete"
-  validate: "pass"
-  review: "approved"
-  reviewed_by: "Wire Autopilot (self-review)"
-  reviewed_date: [today]
-  file: "planning/sprint_plan.md"
-```
-
-**Document store sync**: If `docstore_provider` is set, follow `specs/utils/docstore_sync.md` to publish `planning/sprint_plan.md` to the configured store. Fail gracefully — do not block if the sync fails.
-
-Report:
-```
---- Discovery: Sprint Plan ---
-Status: approved (self-reviewed)
-Total: [X] points across [N] sprints
-Downstream releases to execute:
-  [list with name and type]
-File: .wire/releases/01-discovery/planning/sprint_plan.md
----
-```
 
 ## Step 3.5: Parse Downstream Releases
 
@@ -710,7 +522,7 @@ Use `AskUserQuestion`:
 
 ## Step 4.1: For Each Delivery Release
 
-Repeat steps 4.2–4.6 for each release in `planned_releases`.
+Repeat steps 4.2–4.5 for each release in `planned_releases`.
 
 Set `current_release` = the current release name (e.g., `02-data-foundation`).
 Set `current_type` = the current release type (e.g., `pipeline_only`).
@@ -734,7 +546,10 @@ Create the status file by reading `TEMPLATES/status-template.md` and populating:
 - `{{CLIENT_NAME}}` → client_name
 - `{{CREATED_DATE}}` → today's date
 
-Set artifact scope based on `current_type` (see Artifact Scope Reference at the end of this spec).
+The written status.md's `project_type` (or `release_type` — templates aren't
+consistent about the field name; check both) drives everything that
+follows — Step 4.3 reads it back to resolve the artifact sequence. No
+scope/sequence needs to be set here by hand.
 
 Write to `.wire/releases/{current_release}/status.md`.
 
@@ -748,63 +563,79 @@ Started: [timestamp]
 Output:
 ```
 --- Starting Release: {current_release} ({current_type}) ---
-Artifact sequence: [ordered list for this type]
+Artifact sequence: [resolved from wire/release-types/{current_type}.yaml — see Step 4.3]
 ---
 ```
 
-### Step 4.3: Run the Artifact Execution Loop
+### Step 4.3: Resolve Order and Run the Artifact Execution Loop
 
-Execute the artifact sequence for `current_type`. All artifact paths use `.wire/releases/{current_release}/` as the release root. In the Per-Artifact Execution Blocks below, `{folder_name}` means `releases/{current_release}`.
+Autopilot never hardcodes which artifacts a release type has or what order
+they run in — that lives in exactly one place,
+`wire/release-types/{current_type}.yaml`, and drifts if duplicated. Resolve
+it fresh for every release; do not cache across releases of different types.
 
-**Artifact sequences by release type**:
+#### Step 4.3a: Resolve the artifact order
 
-**full_platform**: requirements → workshops → conceptual_model → pipeline_design → data_model → mockups → pipeline → dbt → semantic_layer → dashboards → data_quality → uat → deployment → training → documentation
+1. Read `.wire/releases/{current_release}/status.md` front-matter. Take
+   `project_type` if present, else `release_type`.
+2. Read `wire/release-types/{that_value}.yaml` (this is a synced local copy
+   of the private `wire-process-registry` repo — see
+   `wire/schemas/release-type-schema.md` — never fetched live).
+3. Collect every `phases[].artifacts[]` entry across all phases into one
+   flat list, each carrying `id`, `command`, `depends_on`, and `sequence`.
+4. Topologically sort by `depends_on` (an artifact only becomes eligible
+   once every artifact it depends on has reached the required state —
+   for planning purposes at this step, "eligible" just means its
+   dependencies exist earlier in the phase graph; actual gating happens for
+   real at Step 4.3b via `precondition_gate`). Within a phase, and between
+   artifacts with no dependency relationship, break ties using `sequence`.
+5. If `current_type` doesn't resolve to any YAML file, that's a real gap —
+   stop and tell the user which release type has no process definition,
+   rather than guessing at a sequence.
 
-**pipeline_only**: requirements → pipeline_design → pipeline → data_quality → deployment
+This replaces any previously-memorized "the sequence for full_platform is
+X → Y → Z" — always re-derive it from the YAML, since the YAML is the
+thing that can change (via a `wire-process-registry` PR) without this spec
+being touched.
 
-**dbt_development**: requirements → data_model → dbt → semantic_layer → data_quality → deployment
+#### Step 4.3b: For each artifact in the resolved order
 
-**dashboard_extension**: requirements → mockups → dashboards → training
+1. **Check status**: Read `.wire/releases/{current_release}/status.md`. If
+   this artifact's generate state is already `complete` and review state is
+   `approved`, skip it.
 
-**dashboard_first**: requirements → mockups → viz_catalog → data_model → seed_data → dbt → semantic_layer → dashboards → data_refactor → data_quality → uat → deployment → training → documentation
+2. **Safety gate check**: If this artifact is in the safety-gated list
+   (`pipeline`, `data_refactor`, `data_quality`, `deployment`; and for
+   `platform_migration` releases: `target_setup`, `ingestion_migration`,
+   `orchestration_migration`, `cutover`), execute the Safety Gate protocol
+   before proceeding. This list is Autopilot policy (which steps are risky
+   enough to pause for) — it's independent of the YAML and stays as-is.
 
-**enablement**: training → documentation
+3. **Generate — run the real command**: Execute
+   `/wire:{command}-generate {current_release}` exactly as if the user had
+   typed it — not a paraphrase of its logic, the actual command. Its own
+   Auto-Delegation (including `precondition_gate` if the spec declares
+   `preconditions`) and Post-Execution Hooks (execution_log, Jira/Linear
+   sync, document store sync, commit) run unchanged and need no duplication
+   here. See "Handling a precondition-gate block" below for what happens if
+   the gate stops it.
 
-**platform_migration**: ingestion_audit → db_object_audit → security_audit → dbt_audit → orchestration_audit → migration_inventory → migration_strategy → target_setup → ingestion_migration → dbt_migration → orchestration_migration → equivalency_validation → cutover → migration_report
+4. **Validate — run the real command, if it exists**: Not every artifact
+   has a validate step (`mockups`, `uat`, `workshops` don't). If
+   `/wire:{command}-validate` exists for this artifact, run it the same
+   way. On fail, the real spec's own retry guidance applies; if still
+   failing after 3 cycles, treat as blocked and log it — do not loop
+   forever.
 
-**agentic_data_stack**: dataset_audit → metric_audit → query_audit → governance_design → semantic_layer_design → canonical_models → semantic_layer → knowledge_skill → agent_config → eval_suite → adversarial_config → launch_gate → enablement
+5. **Review — self-review mode**: See "Self-Review Mode" below. Run through
+   the real `review.md` spec's actual content, but answer its own
+   questions autonomously instead of waiting for a human. Up to 2
+   regenerate-and-re-review cycles if self-review finds issues; still
+   failing after that, set `review: changes_requested` and log as blocked.
 
-Note: `agentic_data_stack` autopilot pauses at `launch_gate` for human review of per-domain accuracy results. Only cleared domains proceed to enablement — blocked domains require a manual fix cycle before Autopilot can continue.
-
-For each artifact in the sequence, execute the Execution Loop (see Execution Loop section):
-
-1. **Check status**: Read `.wire/releases/{current_release}/status.md`. If this artifact's generate state is already `complete` and review state is `approved`, skip it.
-
-2. **Safety gate check**: If this artifact is in the safety-gated list (`pipeline`, `data_refactor`, `data_quality`, `deployment`; and for `platform_migration` releases: `target_setup`, `ingestion_migration`, `orchestration_migration`, `cutover`), execute the Safety Gate protocol before proceeding.
-
-3. **Generate**: Execute the generate logic for this artifact (see Per-Artifact Blocks below).
-   - Update status.md: set `generate: complete`, `generated_date: [today]`
-   - Log to `.wire/releases/{current_release}/execution_log.md`
-   - **Jira sync**: If Jira is configured, sync — artifact=[artifact_name], action=generate, status=complete
-   - **Linear sync**: If Linear is configured, sync — same artifact and action
-   - **Document store sync**: If `docstore_provider` is set, follow `specs/utils/docstore_sync.md` to publish the generated artifact file. Fail gracefully — do not block.
-
-4. **Validate**: Execute validation checks.
-   - Pass → Update status.md: `validate: pass`
-   - Fail → Re-generate (max 3 cycles); if still failing after 3 cycles, set `validate: fail`, log as blocked
-   - Log to execution_log.md
-   - **Jira sync**: sync validate result
-   - **Linear sync**: If Linear is configured, sync validate result
-
-5. **Self-Review**: Execute self-review criteria.
-   - Approved → Update status.md: `review: approved`, `reviewed_by: "Wire Autopilot (self-review)"`
-   - Issues found → Re-generate and re-validate (max 2 review cycles)
-   - Still failing → set `review: changes_requested`, log as blocked
-   - **Jira sync**: sync review result
-   - **Linear sync**: If Linear is configured, sync review result
-   - **Document store sync**: If approved and `docstore_provider` is set, re-sync the artifact to the store to reflect any revisions made during review cycles. Fail gracefully.
-
-6. **Update checkpoint**: Move artifact to "Completed Phases" in autopilot_checkpoint.md with brief summary and any key context discovered.
+6. **Update checkpoint**: Move artifact to "Completed Phases" in
+   `autopilot_checkpoint.md` with a brief summary and any key context
+   discovered.
 
 7. **Report progress**:
    ```
@@ -820,6 +651,80 @@ For each artifact in the sequence, execute the Execution Loop (see Execution Loo
    if [ "${WIRE_TELEMETRY:-true}" != "false" ]; then WIRE_UID=$(cat ~/.wire/telemetry_id 2>/dev/null || echo "unknown") && curl -s -X POST https://api.segment.io/v1/track -H "Content-Type: application/json" -d "{\"writeKey\":\"DxXwrT6ucDMRmouCsYDwthdChwDLsNYL\",\"userId\":\"$WIRE_UID\",\"event\":\"wire_command\",\"properties\":{\"command\":\"ARTIFACT_NAME-generate\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"git_repo\":\"$(git config --get remote.origin.url 2>/dev/null || echo unknown)\",\"git_branch\":\"$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)\",\"username\":\"$(whoami)\",\"hostname\":\"$(hostname)\",\"plugin_version\":\"3.4.0\",\"os\":\"$(uname -s)\",\"runtime\":\"claude\",\"autopilot\":\"true\",\"autopilot_release\":\"{current_release}\",\"autopilot_artifact\":\"ARTIFACT_NAME\"}}" > /dev/null 2>&1 & fi
    ```
    Replace `ARTIFACT_NAME` with the actual artifact name. Do not wait for the result.
+
+#### Self-Review Mode
+
+The real `*-review.md` spec for an artifact is written for a live human —
+it calls `AskUserQuestion` or otherwise asks the reviewer directly, and
+expects to wait for their answer. Autopilot cannot wait for a human here
+(that would defeat the point of running autonomously), but it also
+shouldn't hand-maintain its own separate copy of what "good" looks like for
+each artifact — that's exactly the kind of duplication that caused
+`autopilot.md` to silently drift from the real specs before this rewrite.
+
+Instead, self-review means running the real spec but substituting yourself
+for the human at the one or two points it asks a question:
+
+1. Read the real `wire/specs/<domain>/<artifact>/review.md` in full.
+2. Follow every step that isn't an interactive question exactly as written
+   — e.g. "Load meeting context," "Present [artifact] for review" (produce
+   the summary, just don't display-and-wait), any structural/completeness
+   checks the spec describes.
+3. Where the spec would call `AskUserQuestion` or say "ask the reviewer" /
+   "who approved this," don't wait for input. Instead, evaluate the spec's
+   own stated review criteria against the artifact yourself, right there,
+   and decide `approved` or `changes_requested` on that basis.
+4. Write status.md exactly as the spec's own "Update status" / "Record
+   review" step describes — same fields a human approval would produce —
+   except `reviewed_by: "Wire Autopilot (self-review)"` instead of a
+   person's name.
+5. If you decide `changes_requested`, treat your own findings as the
+   feedback: regenerate the artifact addressing them, then re-run this
+   procedure. Up to 2 cycles (matching the existing retry budget); if still
+   not passing after that, stop and log it as blocked rather than looping
+   indefinitely.
+
+This means a review's actual criteria — whatever they currently say in the
+real spec — govern self-review too. If a review.md's criteria change later
+(via a `wire-process-registry` PR), autopilot's self-review reflects that
+automatically; nothing in `autopilot.md` itself needs to change.
+
+#### Handling a precondition-gate block
+
+If Step 4.3a resolved the order correctly, every artifact's `precondition_gate`
+(triggered inside the real generate/validate/review command's own
+Auto-Delegation, per `wire/specs/utils/precondition_gate.md`) should pass
+silently by the time Autopilot reaches it — that's what a correct
+topological order guarantees. If it blocks anyway, that signals a real
+structural problem (a bug in the resolved order, a manually-edited status.md
+that regressed something, a genuinely missing dependency), not routine
+friction to route around.
+
+Do **not** self-override. `precondition_gate.md`'s override contract
+requires a real person's name and reason — Autopilot cannot supply that on
+someone else's behalf, and silently answering its own override prompt would
+undermine the entire point of the gate. Instead, pause with the same
+`AskUserQuestion` pattern as a Safety Gate:
+
+```json
+{
+  "questions": [{
+    "question": "[artifact]/[command] is blocked: [unmet precondition from the gate's own message]. This wasn't expected given the resolved execution order — how would you like to proceed?",
+    "header": "Precondition Gate — [artifact_name] in [current_release]",
+    "options": [
+      {"label": "I'll override it now", "description": "Prompts for your name and reason, per the gate's normal override flow, then continues"},
+      {"label": "Let me investigate first", "description": "Pause here — I'll check status.md and the release-type YAML before deciding"},
+      {"label": "Stop here", "description": "End Autopilot at this point — I will continue manually"}
+    ],
+    "multiSelect": false
+  }]
+}
+```
+
+Log the block and its resolution in `autopilot_checkpoint.md` under a new
+"Precondition Gate Blocks" note — this is useful signal that the YAML's
+`depends_on` graph and Autopilot's derived order disagree somewhere, worth
+fixing at the source rather than overriding repeatedly on future runs.
 
 ### Step 4.4: Release Resumption Protocol
 
@@ -1034,799 +939,6 @@ Log final entry to `.wire/autopilot_checkpoint.md`:
 Finished: [timestamp]
 Releases: [count] ([list])
 PR: [pr_url]
-```
-
----
-
-# Per-Artifact Execution Blocks
-
-Each block describes the generate, validate, and self-review logic for one artifact type.
-
-In all path references below, `{folder_name}` means `releases/{current_release}` — the currently executing delivery release folder.
-
----
-
-## ARTIFACT: requirements
-
-### Generate
-
-**Input**: SOW/documents in `.wire/{folder_name}/artifacts/`, `engagement/sow.md`, `engagement/context.md`
-**Output**: `.wire/{folder_name}/requirements/requirements_specification.md`
-
-**Process**:
-1. Read all documents in `engagement/` and the release's `artifacts/` folder
-2. Read the approved discovery artifacts: `releases/01-discovery/planning/release_brief.md`, `releases/01-discovery/planning/sprint_plan.md`
-3. Extract and structure into a requirements specification with these sections:
-   - **Executive Summary**: 2–3 paragraph overview
-   - **Business Context**: Client background, problem statement, strategic goals, success criteria (from problem_definition)
-   - **Stakeholders**: Table with name, role, department, involvement level
-   - **Functional Requirements**: Numbered list (FR-001, FR-002, etc.) with description and acceptance criteria
-   - **Non-Functional Requirements**: Performance, security, availability, scalability
-   - **Data Requirements**: Source systems table (name, type, owner, volume, refresh frequency)
-   - **Technical Requirements**: Platform, tools, environments, constraints
-   - **Deliverables**: Table mapping SOW deliverables to Wire artifacts with acceptance criteria
-   - **Timeline**: Milestones with dates (from sprint plan where available)
-   - **Assumptions and Dependencies**
-   - **Risks and Mitigations**: Table with risk, impact, likelihood, mitigation
-   - **Scope Management**: In-scope, out-of-scope, change process (from discovery no-gos)
-4. Write to `.wire/{folder_name}/requirements/requirements_specification.md`
-
-### Validate
-
-**Checks** (all must pass):
-- [ ] Executive summary present and non-empty
-- [ ] At least 3 functional requirements with acceptance criteria
-- [ ] Non-functional requirements defined
-- [ ] All data sources identified with owners
-- [ ] All SOW deliverables documented
-- [ ] Each deliverable has clear acceptance criteria
-- [ ] Timeline with milestones
-- [ ] Stakeholder roles defined
-- [ ] Out-of-scope items documented
-- [ ] Dependencies and assumptions documented
-
-### Self-Review
-
-**Criteria**:
-1. **SOW Traceability**: Every deliverable in the SOW maps to at least one requirement
-2. **Discovery Alignment**: Requirements are consistent with the problem_definition and pitch
-3. **No Fabrication**: All requirements are traceable to the SOW or discovery artifacts — nothing invented
-4. **Clarity**: Each functional requirement has testable acceptance criteria
-5. **Consistency**: Requirements do not contradict each other
-
----
-
-## ARTIFACT: workshops
-
-### Generate
-
-**Input**: `.wire/{folder_name}/requirements/requirements_specification.md`
-**Output**: `.wire/{folder_name}/design/workshop_agenda.md`, `.wire/{folder_name}/design/workshop_decision_matrix.md`
-
-**Process**:
-1. Parse requirements for `[NEEDS CLARIFICATION]` markers, TBD items, ambiguities
-2. Categorize by topic: requirements, data, technical, timeline, scope
-3. Generate workshop agenda with parts: requirements clarification (45 min), data source details (30 min), technical approach (30 min), wrap-up (15 min)
-4. Create decision matrix template: topic, options, decision, rationale, owner
-
-### Validate
-
-No specific validation checks.
-
-### Self-Review
-
-**Criteria**:
-1. All ambiguities from requirements are addressed in workshop topics
-2. Workshop agenda covers all TBD items
-3. Decision matrix includes all open questions
-4. **Autopilot Decision**: Since no actual workshop is conducted, auto-approve the workshop materials as reference documentation. Mark as `review: approved` with note: "Workshop materials generated as reference — no workshop conducted in Autopilot mode"
-
----
-
-## ARTIFACT: conceptual_model
-
-### Generate
-
-**Input**: `.wire/{folder_name}/requirements/requirements_specification.md`, engagement artifacts for source schemas
-**Output**: `.wire/{folder_name}/design/conceptual_model.md`
-
-**Process**:
-1. Extract business entities from requirements: nouns, deliverables, reporting subjects
-2. For each entity: name (PascalCase), description, key attributes (3–6), approximate volume
-3. Define relationships with verb phrases and cardinality
-4. Generate Mermaid erDiagram (entity-only, no column definitions)
-5. Include relationship narratives explaining business meaning
-6. Section for entities out of scope
-7. Section for open questions
-
-### Validate
-
-**Checks**:
-- [ ] Every business noun in Functional Requirements is represented or explicitly out-of-scope
-- [ ] Every relationship has valid cardinality markers at both ends
-- [ ] Every relationship has a quoted label
-- [ ] No `{}` column definitions in erDiagram (entity-only format)
-- [ ] Mermaid syntax valid
-- [ ] All entity names are singular PascalCase
-- [ ] Each entity has description and at least 2 key business attributes
-- [ ] At least one sentence per relationship narrative
-
-### Self-Review
-
-**Criteria**:
-1. **Requirements Coverage**: All business entities from functional requirements are present
-2. **Relationship Accuracy**: Cardinalities reflect real business rules
-3. **No Orphans**: Every entity participates in at least one relationship
-4. **SOW Alignment**: Model scope matches SOW scope
-5. **Domain Language**: Entity names use client terminology from the SOW
-
----
-
-## ARTIFACT: pipeline_design
-
-### Generate
-
-**Input**: `.wire/{folder_name}/requirements/requirements_specification.md`, `design/conceptual_model.md`, engagement artifacts for schemas
-**Output**: `.wire/{folder_name}/design/pipeline_architecture.md`
-
-**Process**:
-1. Analyze each source system: technology, schema, volume, availability, sensitivity
-2. Cross-reference against conceptual model entities — flag data gaps
-3. Define replication strategy per source (full refresh, incremental, CDC, API, batch)
-4. Specify pipeline architecture: landing/raw naming, staging layer (`stg_<source>__<entity>`), warehouse layer, error handling, scheduling
-5. Generate Mermaid Data Flow Diagram: sources → ingestion → staging → warehouse → BI
-6. Document design decisions with rationale
-7. Include technology stack table and security/governance section
-8. **Autonomous Decision**: Choose the most practical replication strategy based on SOW constraints and document the rationale
-
-### Validate
-
-**Checks**:
-- [ ] Every source system from requirements appears in source analysis
-- [ ] Every source has a replication method specified
-- [ ] All staging models follow `stg_<source>__<entity>` naming
-- [ ] All warehouse models follow `<entity>_fct` or `<entity>_dim` naming
-- [ ] Error handling specified
-- [ ] Scheduling defined with refresh cadences
-- [ ] Technology stack complete
-- [ ] DFD present with valid Mermaid syntax
-- [ ] Every source system appears in DFD
-- [ ] DFD uses subgraph blocks for layers
-- [ ] PII handling addressed
-
-### Self-Review
-
-**Criteria**:
-1. **Source Coverage**: All data sources from requirements are addressed
-2. **Architecture Coherence**: Pipeline flows logically from source to warehouse
-3. **Design Decisions Justified**: Each choice has a documented rationale
-4. **DFD Completeness**: Diagram matches the written architecture
-5. **Feasibility**: Chosen technologies and strategies are compatible with SOW constraints
-
----
-
-## ARTIFACT: data_model
-
-### Generate
-
-**Input**:
-- Default: `requirements/requirements_specification.md`, `design/conceptual_model.md`, `design/pipeline_architecture.md`
-- dashboard_first: `requirements/requirements_specification.md`, `design/visualization_catalog.md`
-**Output**: `.wire/{folder_name}/design/data_model_specification.md`, (dashboard_first also: `design/source_tables_ddl.sql`, `design/target_warehouse_ddl.sql`)
-
-**Process**:
-1. Define source definitions with freshness thresholds
-2. Design staging models: `stg_<source>__<entity>`, view materialization, surrogate key composition, column renames, derived columns, tests
-3. Design integration models: `int__<subject>__<description>`, ephemeral/view, for cross-system joins
-4. Design warehouse models:
-   - Fact tables: `<entity>_fct`, grain, surrogate key, foreign keys, measures
-   - Dimension tables: `<entity>_dim`, SCD Type 1 or 2
-   - Aggregates: `<subject>_<grain>`, pre-aggregated measures
-5. Specify seed files for configurable business logic
-6. Generate physical ERD as Mermaid erDiagram with all warehouse models, columns, PKs, FKs
-7. Document cross-system join keys
-8. Define dbt test coverage plan
-9. **For dashboard_first**: Additionally generate `source_tables_ddl.sql` and `target_warehouse_ddl.sql`
-
-### Validate
-
-**Checks**:
-- [ ] Staging follows `stg_<source>__<entity>` with double underscore
-- [ ] Warehouse facts use `<entity>_fct`, dimensions use `<entity>_dim`
-- [ ] Surrogate keys follow `<entity>_pk`, foreign keys follow `<entity>_fk`
-- [ ] All columns in snake_case
-- [ ] Every conceptual entity appears as a warehouse model
-- [ ] Every model has a grain statement
-- [ ] Every model has a surrogate key
-- [ ] Every FK references a defined PK in another model
-- [ ] Minimum tests: `not_null(pk)` and `unique(pk)` on all models
-- [ ] FK columns have `relationships` tests
-- [ ] ERD present with valid Mermaid erDiagram syntax
-- [ ] PKs marked `PK`, FKs marked `FK` in ERD
-
-### Self-Review
-
-**Criteria**:
-1. **Entity Coverage**: All conceptual model entities are represented
-2. **Grain Correctness**: Each fact table has a clearly defined, appropriate grain
-3. **FK/PK Consistency**: All foreign key references resolve to valid primary keys
-4. **Naming Conventions**: Consistent naming throughout
-5. **Test Coverage**: Adequate tests defined for data integrity
-6. **ERD Accuracy**: ERD matches the written specifications
-
----
-
-## ARTIFACT: mockups
-
-### Generate
-
-**Input**: `.wire/{folder_name}/requirements/requirements_specification.md`
-**Output**: `.wire/{folder_name}/design/mockups/` directory + `design/mockups/mockups_index.md`
-
-**Process** (Wireframe Mode — used in Autopilot):
-1. Identify dashboards/screens from requirements
-2. For each dashboard, generate an ASCII wireframe mockup showing layout, chart placeholders, filter bar, data labels
-3. Create `mockup_[dashboard_name].md` for each with: title, purpose, audience, wireframe, data requirements table, filters, interactions
-4. Create `mockups_index.md` linking all mockups
-
-### Validate
-
-No specific validation checks.
-
-### Self-Review
-
-**Criteria**:
-1. **Requirements Coverage**: Every functional requirement that implies a visualization is addressed
-2. **Data Traceability**: Each chart references specific measures and dimensions
-3. **Layout Clarity**: Wireframes are readable and show logical organization
-4. **Audience Appropriateness**: Executive dashboards differ from operational dashboards
-
----
-
-## ARTIFACT: viz_catalog (dashboard_first only)
-
-### Generate
-
-**Input**: `design/dashboard_visualization_catalog.csv`, `design/dashboard_spec.md`, `requirements/requirements_specification.md`
-**Output**: `.wire/{folder_name}/design/visualization_catalog.md`
-
-**Process**:
-1. Parse CSV: map dashboard page → visualization → chart type → measures/dimensions
-2. Parse dashboard_spec.md: extract purposes, layout, filters, interactions
-3. Cross-reference with requirements for coverage analysis
-4. Generate structured catalog with summary, per-dashboard breakdown, measures/dimensions indices, requirements coverage, gaps
-
-### Validate
-
-No specific validate step.
-
-### Self-Review
-
-**Criteria**:
-1. **CSV Fidelity**: All rows from the CSV are represented
-2. **Requirements Coverage**: >80% of relevant requirements addressed
-3. **Measure/Dimension Consistency**: Names consistent across visualizations
-4. **Gaps Identified**: Uncovered requirements called out
-
----
-
-## ARTIFACT: seed_data (dashboard_first only)
-
-### Generate
-
-**Input**: `design/source_tables_ddl.sql`, `design/target_warehouse_ddl.sql`, `design/visualization_catalog.md`
-**Output**: `.wire/{folder_name}/dev/seed_data/*.csv` files + `dev/seed_data/README.md`
-
-**Process**:
-1. Parse both DDL files: extract table names, columns, types, PKs, FKs
-2. Read visualization catalog to identify which measures need non-zero values
-3. Build dependency graph: dimensions before facts
-4. For each source table in dependency order, generate CSV with realistic domain-appropriate data
-5. Create README.md with overview, files table, dependency order, FK relationships, dbt seed config snippet
-
-### Validate
-
-**Checks**:
-- [ ] Every CSV parses without errors
-- [ ] Header rows match expected columns from DDL
-- [ ] No empty files (at least 1 data row)
-- [ ] No duplicate values in PK columns
-- [ ] No NULL values in PK columns
-- [ ] Every FK value exists in referenced parent table PK
-- [ ] Date columns contain valid dates (YYYY-MM-DD)
-- [ ] Numeric columns contain valid numbers
-- [ ] Fact tables have variation in measure columns
-
-### Self-Review
-
-**Criteria**:
-1. **Referential Integrity**: All FK→PK relationships hold
-2. **Realistic Data**: Values are domain-appropriate and varied
-3. **Sufficient Volume**: Enough rows for meaningful dashboard visualizations
-4. **DDL Alignment**: Column names and types match the DDL specifications
-
----
-
-## ARTIFACT: pipeline
-
-### Generate
-
-**Input**: `requirements/requirements_specification.md`, `design/pipeline_architecture.md`
-**Output**: Pipeline code and configuration in `.wire/{folder_name}/dev/pipeline/`
-
-**Process**:
-1. Read pipeline architecture for source definitions and replication strategy
-2. Generate pipeline configuration for the specified technology (Fivetran, Airbyte, custom Python)
-3. Generate orchestration config (Airflow DAGs, Cloud Composer, cron)
-4. Generate error handling and monitoring setup
-5. Create pipeline documentation
-
-### Validate
-
-**Checks**:
-- [ ] Pipeline configuration files are syntactically valid
-- [ ] All source systems from pipeline_design are addressed
-- [ ] Scheduling cadences match pipeline_design specifications
-- [ ] Error handling is configured
-
-### Self-Review
-
-**Criteria**:
-1. **Architecture Alignment**: Pipeline code matches the pipeline design
-2. **Source Coverage**: All sources from the design are implemented
-3. **Error Handling**: Failure scenarios are covered
-4. **Documentation**: Pipeline is documented for operations
-
----
-
-## ARTIFACT: dbt
-
-### Generate
-
-**Input**: `.wire/{folder_name}/design/data_model_specification.md`, dbt conventions (if found)
-**Output**: dbt models in the repository's `dbt/` directory (NOT inside `.wire/`). The only dbt-related output inside the release folder is `.wire/{folder_name}/dev/dbt_models_summary.md`.
-
-**Process**:
-1. Check for project-specific dbt conventions file
-2. Determine dbt project location: check if `dbt/` exists in the repository root. If yes, use it. If not, create it.
-3. Generate staging models in `dbt/models/staging/<source_system>/`:
-   - `stg_<source>__<entity>.sql` — source() calls, surrogate keys, renames, filters
-   - `_sources.yml` per source system with freshness
-   - `stg_<source_system>.yml` — model docs and tests
-   - Materialized as view
-4. Generate integration models in `dbt/models/integration/`:
-   - `int__<entity>.sql` — one per entity, consolidating staging inputs
-   - `int__<entity>__<description>.sql` — optional intermediate models
-   - **Always create integration models**, even if simple pass-throughs
-5. Generate warehouse models in `dbt/models/warehouse/core/`:
-   - `<entity>_dim.sql` — dimensions with SCD handling
-   - `<entity>_fct.sql` — facts with measures, FKs
-   - `<entity>_agg.sql` — pre-aggregated tables if needed
-   - Table materialization
-6. Generate schema.yml files with model descriptions, column descriptions, and tests
-7. Generate `dbt/dbt_project.yml` if new project
-8. **For dashboard_first with seed data**: Generate seed-based source definitions using `ref('seed_name')` instead of `source()` in staging models
-9. Create `.wire/{folder_name}/dev/dbt_models_summary.md` with model counts, test coverage, and directory listing
-
-**SQL Standards**:
-- 4-space indentation, max 80 char lines
-- All CTEs from refs/sources prefixed with `s_`
-- Final CTE always named `final`, ending with `select * from final`
-- Lowercase field names and functions
-- Explicit join types (inner join, left join)
-- Field ordering: keys, dates, attributes, metrics, metadata
-
-### Validate
-
-**Checks — Naming**:
-- [ ] Staging: `stg_<source>__<entity>.sql`
-- [ ] Integration: `int__<object>.sql` or `int__<object>__<action>.sql`
-- [ ] Dimensions: `<object>_dim.sql`
-- [ ] Facts: `<object>_fct.sql`
-- [ ] PKs: `<object>_pk`, FKs: `<referenced_object>_fk`
-- [ ] Timestamps: `<event>_ts`, Booleans: `is_`/`has_`
-- [ ] All snake_case, singular names
-
-**Checks — SQL Structure**:
-- [ ] All ref/source in top CTEs with `s_` prefix
-- [ ] Final CTE present with `select * from final`
-- [ ] 4-space indentation
-- [ ] Explicit join types (not bare `join`)
-- [ ] `as` keyword used for all aliases
-
-**Checks — Testing**:
-- [ ] Every model appears in schema.yml
-- [ ] Every PK has `unique` and `not_null` tests
-- [ ] FK columns have `relationships` tests
-- [ ] Enum/status fields have `accepted_values` tests
-
-**Checks — Documentation**:
-- [ ] All staging models and columns documented
-- [ ] All warehouse models and columns documented
-- [ ] Column descriptions use business terminology
-
-**Checks — Architecture Completeness**:
-- [ ] Integration layer exists: at least one `int__*.sql` file is present
-- [ ] Every warehouse model references an integration model via `ref('int__...')`
-- [ ] Every staging entity that feeds a warehouse model has a corresponding integration model
-
-**Checks — Directory Structure**:
-- [ ] All staging models in `dbt/models/staging/<source_system>/`
-- [ ] All integration models in `dbt/models/integration/`
-- [ ] All warehouse models in `dbt/models/warehouse/core/`
-- [ ] No `.sql` model files inside `.wire/` (documentation only goes there)
-- [ ] `dbt/dbt_project.yml` exists
-
-### Self-Review
-
-**Criteria**:
-1. **Model Coverage**: Every model in the data_model specification has a corresponding SQL file
-2. **SQL Quality**: Code follows conventions, CTEs are well-structured
-3. **Test Coverage**: All PKs, FKs, and critical fields have tests
-4. **Documentation**: All models and columns have business-friendly descriptions
-5. **Seed/Source Correctness**: Source definitions match the data sources
-6. **Architecture**: All three layers present (staging → integration → warehouse)
-
----
-
-## ARTIFACT: semantic_layer
-
-### Generate
-
-**Input**: `requirements/requirements_specification.md`, `design/data_model_specification.md`, dbt schema.yml files
-**Output**: LookML view files, model file updates, validation summary
-
-**Process**:
-1. Read requirements to understand business goals and measures
-2. Examine existing LookML project structure (if any) for conventions
-3. Map data types: STRING→string, INT64→number, DATE→time, TIMESTAMP→time, BOOLEAN→yesno
-4. For each warehouse model, create a LookML view:
-   - Primary key (hidden: yes)
-   - Dimensions: string, time (dimension_group), numeric, yesno, derived
-   - Measures: count, sum, average, count_distinct with value_format_name
-   - Drill fields and groups/labels
-5. Define explores with joins: relationship, join type, sql_on
-6. Validate syntax: balanced braces, `;;` after SQL, type on all dimensions
-7. Update model file with new explores
-8. Create LookML summary document
-
-### Validate
-
-**Checks**:
-- [ ] Balanced braces in all files
-- [ ] SQL blocks end with `;;`
-- [ ] Every dimension has `type:` specified
-- [ ] All use `${TABLE}.column` syntax
-- [ ] Primary keys defined with `primary_key: yes`
-- [ ] Labels are business-friendly
-- [ ] Explores have `relationship:` defined
-- [ ] Numeric measures have `value_format_name`
-- [ ] Dates use `dimension_group` with timeframes
-
-### Self-Review
-
-**Criteria**:
-1. **Model Coverage**: All warehouse models are represented as LookML views
-2. **Measure Completeness**: All measures from requirements/data model are exposed
-3. **Business Language**: Labels and descriptions use business terminology
-4. **Explore Design**: Joins correctly reflect the data model relationships
-5. **Syntax Validity**: All files would parse without errors
-
----
-
-## ARTIFACT: dashboards
-
-### Generate
-
-**Input**: `requirements/requirements_specification.md`, `design/mockups/` or `design/visualization_catalog.md`, semantic layer definitions
-**Output**: Dashboard specification files in `.wire/{folder_name}/dev/dashboards/`
-
-**Process**:
-1. Read mockups/visualization catalog to identify all dashboards and their visualizations
-2. Map each visualization to semantic layer fields (explores, dimensions, measures)
-3. Generate LookML dashboard files (or Looker dashboard specs) for each dashboard
-4. Generate dashboard documentation: purpose, audience, key metrics, navigation guide
-5. Create dashboard summary with tile counts and field references
-
-### Validate
-
-**Checks**:
-- [ ] Every mockup/catalog visualization has a corresponding dashboard element
-- [ ] All field references exist in the semantic layer
-- [ ] Dashboard filters reference valid dimensions
-- [ ] Layout is complete
-
-### Self-Review
-
-**Criteria**:
-1. **Visualization Coverage**: All mockup/catalog visualizations are implemented
-2. **Field Accuracy**: All field references resolve to semantic layer definitions
-3. **Requirements Alignment**: Dashboards address the functional requirements
-4. **Usability**: Logical dashboard organization with appropriate filters
-
----
-
-## ARTIFACT: data_refactor (dashboard_first only)
-
-### Generate
-
-**Input**: `design/source_tables_ddl.sql` (seed version), real data access or revised DDL
-**Output**: `.wire/{folder_name}/design/data_refactor_plan.md`, updated dbt files
-
-**Process**:
-1. **Autonomous Decision**: Generate the refactoring plan based on seed DDL and document what changes are needed when real data is available
-2. Compare seed-based DDL against expected real source schemas (from SOW/requirements)
-3. Generate refactoring plan: schema comparison, table-by-table analysis, dbt configuration changes, staging model updates
-4. If real data access is available, execute the refactoring immediately
-
-### Validate
-
-**Checks** (if plan only):
-- [ ] Refactoring plan covers all seed-to-source mappings
-- [ ] Column mapping differences are documented
-- [ ] Impact assessment is complete
-
-### Self-Review
-
-**Criteria**:
-1. **Mapping Completeness**: Every seed table has a corresponding real source mapping
-2. **Plan Clarity**: Steps are clear enough for manual execution if needed
-3. **No Regressions**: Warehouse models and tests would continue to work after refactoring
-4. **Seed Preservation**: Seed files are explicitly preserved as reference
-
----
-
-## ARTIFACT: data_quality
-
-### Generate
-
-**Input**: `requirements/requirements_specification.md`, dbt models, data model specification
-**Output**: Data quality test files and monitoring configuration in `.wire/{folder_name}/test/`
-
-**Process**:
-1. Read requirements for data quality expectations
-2. Analyze dbt models for testable assertions
-3. Generate data quality tests: freshness, row count, business rule, cross-table consistency, anomaly detection
-4. Generate monitoring configuration
-5. Create data quality documentation
-
-### Validate
-
-**Checks**:
-- [ ] Tests cover all critical data quality dimensions: freshness, completeness, consistency, accuracy
-- [ ] All source systems have freshness tests
-- [ ] Business rules from requirements are codified as tests
-- [ ] Test documentation is complete
-
-### Self-Review
-
-**Criteria**:
-1. **Requirements Coverage**: Data quality requirements from the SOW are addressed
-2. **Test Adequacy**: Critical business rules have corresponding tests
-3. **Monitoring**: Alert thresholds are reasonable
-4. **Documentation**: Test purposes are clearly documented
-
----
-
-## ARTIFACT: uat
-
-### Generate
-
-**Input**: `requirements/requirements_specification.md`, dashboard specs, dbt models
-**Output**: `.wire/{folder_name}/test/uat_plan.md`
-
-**Process**:
-1. Read requirements and deliverables with acceptance criteria
-2. For each deliverable, generate test scenarios with: test case ID, description, prerequisites, test steps, expected results, pass/fail criteria
-3. Create UAT plan with overview, test environment setup, test cases by deliverable, sign-off template, issue tracking process
-
-### Validate
-
-No specific validate checks.
-
-### Self-Review
-
-**Criteria**:
-1. **Deliverable Coverage**: Every SOW deliverable has at least one test case
-2. **Testability**: Each test case has clear, measurable pass/fail criteria
-3. **Completeness**: UAT covers functional, non-functional, and integration aspects
-
----
-
-## ARTIFACT: deployment
-
-### Generate
-
-**Input**: All completed development artifacts, requirements
-**Output**: `.wire/{folder_name}/deploy/deployment_runbook.md`, deployment scripts
-
-**Process**:
-1. Identify all components to deploy: dbt models, pipelines, dashboards, semantic layer
-2. Generate deployment runbook:
-   - Pre-deployment checklist
-   - Deployment steps in order (with commands)
-   - Post-deployment verification
-   - Rollback procedure
-   - Communication plan
-   - **dbt deployment section** (if dbt generated): reference actual file paths in `dbt/models/` and include commands:
-     ```
-     cd dbt && dbt deps
-     dbt run --select staging
-     dbt run --select integration
-     dbt run --select warehouse
-     dbt test
-     ```
-3. Generate deployment scripts if applicable
-4. Create production configuration files
-
-### Validate
-
-**Checks**:
-- [ ] All project components are covered
-- [ ] Rollback procedure is defined
-- [ ] Pre/post-deployment verification steps are clear
-- [ ] Deployment order handles dependencies
-- [ ] If dbt models exist: runbook references actual file paths in `dbt/models/`
-- [ ] If dbt models exist: runbook includes `dbt run` and `dbt test` with correct working directory
-
-### Self-Review
-
-**Criteria**:
-1. **Component Coverage**: All deliverables are included in the deployment plan
-2. **Rollback Safety**: Rollback procedure would restore previous state
-3. **Verification**: Post-deployment checks would confirm successful deployment
-4. **Clarity**: Steps are specific enough for someone unfamiliar to execute
-
----
-
-## ARTIFACT: training
-
-### Generate
-
-**Input**: `requirements/requirements_specification.md`, dbt models, dashboards, semantic layer
-**Output**: Training materials in `.wire/{folder_name}/enablement/`:
-- `training_[type]_session_plan.md`
-- `training_[type]_slides.md` (Marp format)
-- `training_[type]_exercises.md`
-- `training_[type]_quick_reference.md`
-- `training_delivery_checklist.md`
-
-**Process**:
-1. Determine training types from SOW deliverables (data team, BI developer, end user, admin)
-2. For each type, generate session plan, slides, exercises, and quick reference
-3. Create delivery checklist: pre-session, during session, post-session tasks
-
-### Validate
-
-**Checks**:
-- [ ] All deliverable-related training types are covered
-- [ ] Session plans have learning objectives and exercises
-- [ ] Exercises reference actual project artifacts (real model names, dashboard names)
-- [ ] Quick reference covers common tasks
-
-### Self-Review
-
-**Criteria**:
-1. **Audience Appropriateness**: Content level matches the target audience
-2. **Coverage**: All delivered features are covered in training
-3. **Practical Exercises**: Exercises use real project artifacts and scenarios
-4. **Completeness**: All required training types from SOW are included
-
----
-
-## ARTIFACT: documentation
-
-### Generate
-
-**Input**: All project artifacts (requirements, design, development, deployment)
-**Output**: Documentation in `.wire/{folder_name}/enablement/documentation/`:
-- `architecture_guide.md`
-- `operations_guide.md`
-- `user_guide.md`
-- `glossary.md`
-
-**Process**:
-1. Read all completed project artifacts
-2. Generate documentation suite:
-   - **Architecture Guide**: System overview, data flow, component descriptions, technology stack, design decisions
-   - **Operations Guide**: Monitoring, troubleshooting, common issues, runbooks, SLA management
-   - **User Guide**: Dashboard navigation, report interpretation, FAQ, getting help
-   - **Glossary**: Business terms, technical terms, metrics definitions
-3. Cross-reference against requirements to ensure completeness
-
-### Validate
-
-**Checks**:
-- [ ] Architecture guide covers all system components
-- [ ] Operations guide includes troubleshooting for common scenarios
-- [ ] User guide covers all delivered dashboards/reports
-- [ ] Glossary includes all business and technical terms used in the project
-
-### Self-Review
-
-**Criteria**:
-1. **Completeness**: All aspects of the delivered solution are documented
-2. **Accuracy**: Documentation reflects the actual implementation
-3. **Accessibility**: Written for the target audience
-4. **Cross-References**: Documents link to each other appropriately
-
----
-
-# Artifact Scope Reference
-
-## full_platform
-```yaml
-requirements: {generate: not_started, validate: not_started, review: not_started}
-workshops: {generate: not_started, review: not_started}
-conceptual_model: {generate: not_started, validate: not_started, review: not_started}
-pipeline_design: {generate: not_started, validate: not_started, review: not_started}
-data_model: {generate: not_started, validate: not_started, review: not_started}
-mockups: {generate: not_started, review: not_started}
-pipeline: {generate: not_started, validate: not_started, review: not_started}
-dbt: {generate: not_started, validate: not_started, review: not_started}
-semantic_layer: {generate: not_started, validate: not_started, review: not_started}
-dashboards: {generate: not_started, validate: not_started, review: not_started}
-data_quality: {generate: not_started, validate: not_started, review: not_started}
-uat: {generate: not_started, review: not_started}
-deployment: {generate: not_started, validate: not_started, review: not_started}
-training: {generate: not_started, validate: not_started, review: not_started}
-documentation: {generate: not_started, validate: not_started, review: not_started}
-```
-
-## pipeline_only
-```yaml
-requirements: {generate: not_started, validate: not_started, review: not_started}
-pipeline_design: {generate: not_started, validate: not_started, review: not_started}
-pipeline: {generate: not_started, validate: not_started, review: not_started}
-data_quality: {generate: not_started, validate: not_started, review: not_started}
-deployment: {generate: not_started, validate: not_started, review: not_started}
-# All others: not_applicable
-```
-
-## dbt_development
-```yaml
-requirements: {generate: not_started, validate: not_started, review: not_started}
-data_model: {generate: not_started, validate: not_started, review: not_started}
-dbt: {generate: not_started, validate: not_started, review: not_started}
-semantic_layer: {generate: not_started, validate: not_started, review: not_started}
-data_quality: {generate: not_started, validate: not_started, review: not_started}
-deployment: {generate: not_started, validate: not_started, review: not_started}
-# All others: not_applicable
-```
-
-## dashboard_extension
-```yaml
-requirements: {generate: not_started, validate: not_started, review: not_started}
-mockups: {generate: not_started, review: not_started}
-dashboards: {generate: not_started, validate: not_started, review: not_started}
-training: {generate: not_started, validate: not_started, review: not_started}
-# All others: not_applicable
-```
-
-## dashboard_first
-```yaml
-requirements: {generate: not_started, validate: not_started, review: not_started}
-mockups: {generate: not_started, review: not_started}
-viz_catalog: {generate: not_started}
-data_model: {generate: not_started, validate: not_started, review: not_started}
-seed_data: {generate: not_started, validate: not_started, review: not_started}
-dbt: {generate: not_started, validate: not_started, review: not_started}
-semantic_layer: {generate: not_started, validate: not_started, review: not_started}
-dashboards: {generate: not_started, validate: not_started, review: not_started}
-data_refactor: {generate: not_started, validate: not_started, review: not_started}
-data_quality: {generate: not_started, validate: not_started, review: not_started}
-uat: {generate: not_started, review: not_started}
-deployment: {generate: not_started, validate: not_started, review: not_started}
-training: {generate: not_started, validate: not_started, review: not_started}
-documentation: {generate: not_started, validate: not_started, review: not_started}
-# workshops, conceptual_model, pipeline_design, pipeline: not_applicable
-```
-
-## enablement
-```yaml
-training: {generate: not_started, validate: not_started, review: not_started}
-documentation: {generate: not_started, validate: not_started, review: not_started}
-# All others: not_applicable
 ```
 
 ---

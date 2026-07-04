@@ -22,8 +22,20 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: utility
+artifact: custom
+domain: custom
+release_types: []
+action_type: utility
+logs_execution: false
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: Raise a GitHub issue on the Wire repo proposing a bespoke command as a framework addition
 argument-hint: <custom-spec-name> [--description "use case description"]
+
 ---
 
 # Wire Custom Feature Request

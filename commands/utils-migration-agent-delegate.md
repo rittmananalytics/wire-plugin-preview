@@ -22,7 +22,15 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: utility
+artifact: utils
+domain: utils
+release_types: []
+action_type: utility
+logs_execution: false
 description: Auto-delegation protocol for migration generate commands — dispatch to migration-specialist subagents when available
+
 ---
 
 # Migration Agent Auto-Delegation

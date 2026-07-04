@@ -22,8 +22,22 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: droughty_introspect
+domain: droughty
+release_types:
+  - droughty
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions: []
 description: Generate a schema inventory report — tables, columns, row counts, and PK/FK coverage across all schemas in scope
 argument-hint: <release-folder>
+
 ---
 
 # Droughty Introspect Command

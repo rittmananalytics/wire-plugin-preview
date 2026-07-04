@@ -22,7 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: sprint_plan
+domain: discovery
+release_types:
+  - discovery_shape_up
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: release_brief
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
 description: Generate sprint plan with epics, stories, and point estimates from the release brief
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Sprint Plan Generate Command

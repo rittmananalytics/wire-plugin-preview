@@ -22,8 +22,33 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: review
+artifact: semantic_layer_design
+domain: agentic_data_stack
+release_types:
+  - agentic_data_stack
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: semantic_layer_design
+    action: validate
+    outcome: PASS
+delegates_to:
+  - utils/precondition_gate
 description: Stakeholder sign-off on metric definitions and dimension model before implementation
 argument-hint: <release-folder>
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Agentic Data Stack — Semantic Layer Design Review

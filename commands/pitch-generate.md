@@ -22,7 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: pitch
+domain: discovery
+release_types:
+  - discovery_shape_up
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: problem_definition
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
 description: Generate a Shape Up pitch document from the approved problem definition
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Pitch Generate Command

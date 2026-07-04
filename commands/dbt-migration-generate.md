@@ -22,8 +22,27 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: dbt_migration
+domain: migration
+release_types:
+  - platform_migration
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: ingestion_migration
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
 description: Translate dbt models batch by batch to target dialect with inline equivalency validation
 argument-hint: <release-folder> [--batch N] [--model name] [--select selector] [--exclude selector]
+
 ---
 
 ## Auto-Delegation

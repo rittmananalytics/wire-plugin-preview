@@ -22,8 +22,20 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: lifecycle
+artifact: mcp
+domain: mcp
+release_types: []
+action_type: lifecycle
+logs_execution: false
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: Manage and configure MCP server connections for the Wire Framework
 argument-hint: [list/view/check] [server-name or release-folder]
+
 ---
 
 # Wire MCP Command

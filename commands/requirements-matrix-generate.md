@@ -22,7 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: requirements_matrix
+domain: sop_discovery
+release_types:
+  - sop_discovery
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: stakeholder_interview
+    action: validate
+    outcome: PASS
+delegates_to:
+  - utils/precondition_gate
 description: Generate the Discovery Requirements Matrix from tagged interview write-ups
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Requirements Matrix — Generate

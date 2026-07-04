@@ -22,8 +22,20 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: utility
+artifact: utils
+domain: utils
+release_types: []
+action_type: utility
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: Sync a single artifact lifecycle state to Jira
 argument-hint: <project-folder> <artifact> <action>
+
 ---
 
 # Jira Status Sync Utility

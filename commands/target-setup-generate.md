@@ -22,7 +22,26 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: target_setup
+domain: migration
+release_types:
+  - platform_migration
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: migration_strategy
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
 description: Generate target warehouse DDL scripts (SAFETY GATE — writes to target platform)
+
 ---
 
 ## Auto-Delegation

@@ -22,17 +22,44 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
-description: Generate dashuoards from design and requirements
+wire_schema: "1.0"
+command: generate
+artifact: dashboards
+domain: development
+release_types:
+  - full_platform
+  - dbt_development
+  - dashboard_first
+  - pipeline_only
+  - dashboard_extension
+  - enablement
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions: dynamic
+delegates_to:
+  - utils/precondition_gate
+description: Generate dashboards from design and requirements
 argument-hint: <project-folder>
+
 ---
 
-# dashuoards Generate Command
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
+---
+
+# dashboards Generate Command
 
 Follow `specs/utils/semantic_layer_developer_delegate.md` before executing the workflow below.
 
 ## Purpose
 
-Generate dashuoards based on requirements and design specifications.
+Generate dashboards based on requirements and design specifications.
 
 ## Usage
 
@@ -42,8 +69,14 @@ Generate dashuoards based on requirements and design specifications.
 
 ## Prerequisites
 
-- Requirements must be approved
-- Relevant design artifacts should be complete
+Enforced by the precondition gate (`preconditions: dynamic` — see
+`wire/release-types/<project_type>.yaml`), release-type dependent:
+
+- **`full_platform`**: `semantic_layer`: `validate: PASS`. Dashboards here sit
+  on top of the deployed semantic layer.
+- **`dashboard_first`**: `seed_data`: `review: approved`. Dashboards here are
+  built against seed data before the real dbt project exists — see
+  `data_refactor` for the later swap to live data.
 
 ## Workflow
 
@@ -54,7 +87,7 @@ Generate dashuoards based on requirements and design specifications.
 2. Read relevant design documents
 3. Identify what needs to be generated
 
-### Step 2: Generate dashuoards
+### Step 2: Generate dashboards
 
 **Process**:
 1. Apply templates and best practices
@@ -98,13 +131,13 @@ If docstore sync fails, log the error and continue — do not block the generate
 
 **Output**:
 ```
-## dashuoards Generated Successfully
+## dashboards Generated Successfully
 
 **File(s):** [list generated files]
 
 ### Next Steps
 
-1. **Validate dashuoards**: `/wire:dashboards-validate <project>`
+1. **Validate dashboards**: `/wire:dashboards-validate <project>`
 2. After validation, review: `/wire:dashboards-review <project>`
 ```
 

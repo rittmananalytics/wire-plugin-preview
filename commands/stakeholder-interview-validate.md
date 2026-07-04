@@ -22,8 +22,33 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: validate
+artifact: stakeholder_interview
+domain: sop_discovery
+release_types:
+  - sop_discovery
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: stakeholder_interview
+    action: generate
+    outcome: complete
+delegates_to:
+  - utils/precondition_gate
 description: Validate four-tag completeness on every theme bullet of a stakeholder interview write-up
 argument-hint: "[release-folder] [--stakeholder <slug> | --all]"
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Stakeholder Interview — Validate

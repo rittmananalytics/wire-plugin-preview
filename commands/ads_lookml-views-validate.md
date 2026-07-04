@@ -22,8 +22,33 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: validate
+artifact: lookml_views
+domain: agentic_data_stack
+release_types:
+  - agentic_data_stack
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: lookml_views
+    action: generate
+    outcome: complete
+delegates_to:
+  - utils/precondition_gate
 description: Verify LookML view files are valid, every canonical model is covered, and no orphaned column references exist
 argument-hint: <release-folder>
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Agentic Data Stack — LookML Views Validate

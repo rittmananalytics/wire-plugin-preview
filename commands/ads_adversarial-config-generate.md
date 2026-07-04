@@ -22,8 +22,33 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: adversarial_config
+domain: agentic_data_stack
+release_types:
+  - agentic_data_stack
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: agent_config
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
 description: Configure and test the adversarial review sub-agent
 argument-hint: <release-folder>
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Agentic Data Stack — Adversarial Config Generate

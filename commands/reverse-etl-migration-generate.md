@@ -22,7 +22,26 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: reverse_etl_migration
+domain: migration
+release_types:
+  - platform_migration
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: reverse_etl_audit
+    action: validate
+    outcome: PASS
+delegates_to:
+  - utils/precondition_gate
 description: Generate Hightouch reverse ETL migration runbook — add target-warehouse syncs to the existing GitHub-Sync repo as PR-gated changes, reuse destinations in place, translate models drift-aware, and cut over with two client-merged PRs
+
 ---
 
 ## Auto-Delegation

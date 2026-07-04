@@ -22,8 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: review
+artifact: kickoff
+domain: kickoff
+release_types: []
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: kickoff
+    action: validate
+    outcome: PASS
+delegates_to:
+  - utils/precondition_gate
 description: Review kick-off deck internally and record approval for PDF export
 argument-hint: "[release-folder]"
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Kickoff Deck — Review

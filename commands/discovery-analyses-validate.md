@@ -22,7 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: validate
+artifact: discovery_analyses
+domain: sop_discovery
+release_types:
+  - sop_discovery
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: discovery_analyses
+    action: generate
+    outcome: complete
+delegates_to:
+  - utils/precondition_gate
 description: Validate the three analyses — completeness, chart shape, diagnosis grounding, Maturity pin evidence
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # Discovery Analyses — Validate

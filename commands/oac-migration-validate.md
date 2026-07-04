@@ -22,7 +22,32 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: validate
+artifact: oac_migration
+domain: migration
+release_types:
+  - platform_migration
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: oac_migration
+    action: generate
+    outcome: complete
+delegates_to:
+  - utils/precondition_gate
 description: Validate OAC migration runbook completeness — repo reconciliation, physical table translations, branch validation, two-stage repoint with rollback
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # OAC Migration — Validate

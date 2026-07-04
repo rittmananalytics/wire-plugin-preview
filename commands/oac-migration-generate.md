@@ -22,7 +22,29 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: oac_migration
+domain: migration
+release_types:
+  - platform_migration
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: target_setup
+    action: review
+    outcome: approved
+  - artifact: oac_audit
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
 description: Generate the OAC reporting-layer migration runbook — add the target connection pool, translate/re-validate physical joins and raw SQL constructs on a semantic-model Git branch, validate against a non-production copy of the repo, two-stage connection cutover with rollback
+
 ---
 
 ## Auto-Delegation

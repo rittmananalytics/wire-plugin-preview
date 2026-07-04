@@ -22,7 +22,19 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: utility
+artifact: session
+domain: session
+release_types: []
+action_type: lifecycle
+logs_execution: false
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: Optional session planning ritual — propose a focused 3–5 step plan before starting work
+
 ---
 
 # Wire Plan Command

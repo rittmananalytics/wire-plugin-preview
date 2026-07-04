@@ -22,8 +22,22 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: droughty_setup
+domain: droughty
+release_types:
+  - droughty
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions: []
 description: Install Droughty at the pinned version and generate profile.yaml + droughty_project.yaml from Wire context
 argument-hint: <release-folder>
+
 ---
 
 # Droughty Setup Command

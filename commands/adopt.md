@@ -22,8 +22,20 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: lifecycle
+artifact: adopt
+domain: adopt
+release_types: []
+action_type: lifecycle
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: Adopt an in-flight project into the Wire Framework — assess current state, map existing work to Wire artifacts, set up engagement structure, and generate an adoption playbook
 argument-hint: [repo-path-or-url]
+
 ---
 
 # Wire Adopt Command

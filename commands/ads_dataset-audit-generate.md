@@ -22,8 +22,22 @@ When following the workflow specification below, resolve paths as follows:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: generate
+artifact: dataset_audit
+domain: agentic_data_stack
+release_types:
+  - agentic_data_stack
+action_type: artifact
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions: []
 description: Inventory all warehouse tables, identify duplicates, and grade governance maturity per domain
 argument-hint: <release-folder>
+
 ---
 
 # Agentic Data Stack — Dataset Audit Generate
