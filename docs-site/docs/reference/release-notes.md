@@ -13,7 +13,9 @@ Recent release history for the Wire Framework. For full changelog detail from v3
 
 **Released**: July 2026
 
-A schema layer for release types and commands that enables deterministic, checklist-style execution, plus two private registries that externalise where Wire's process definitions and (optionally) canonical data models come from.
+Wire's release types are process definitions — an ordered graph of artifacts, each depending on specific ones before it. Until now that graph existed only as prose: a spec might say "requires `data_model` to be approved," but nothing shared actually checked it, and nothing stopped a step being skipped or a status file being hand-edited around a gate.
+
+This release turns that graph into data — a `wire/release-types/<type>.yaml` per release type, with real `depends_on`/`sequence` edges — and builds two things on top of it that weren't possible before: a shared gate that enforces the graph deterministically, and an Autopilot that reads the same graph instead of maintaining its own copy of it. Because the graph now has real behavioral consequences, it also moves to a private, branch-protected repo instead of living inside this one.
 
 **The precondition gate makes phase discipline enforceable instead of advisory.** Every `-generate`/`-validate`/`-review` command now auto-delegates to a shared `precondition_gate` utility before doing anything else. It resolves the command's declared preconditions — a static list, or a `dynamic` sentinel for the handful of artifacts whose correct precondition genuinely varies by release type — and **blocks by default** if they're unmet. An override is still possible, but only explicitly: it requires a real name and reason, both recorded in `status.md` and `execution_log.md`. See [Core Concepts: The precondition gate](../getting-started/core-concepts#the-precondition-gate).
 

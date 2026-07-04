@@ -4,7 +4,7 @@
 
 **Rittman Analytics**
 
-**Version**: 3.10.4 | **Date**: July 2026
+**Version**: 4.0.0 | **Date**: July 2026
 
 ---
 
@@ -4500,11 +4500,19 @@ Once bundled, nothing else in the framework needs to know the new release type e
 
 ### The Process and Data Model Registries
 
-Two private repos feed into what a Wire command does at runtime. Both get synced into this repo as pinned local mirrors, and both look structurally similar — but they exist for opposite reasons and get distributed in opposite ways.
+Wire depends on two different kinds of specialised knowledge to do its job, and as of v4.0.0 both live outside this repo, in their own private GitHub repos.
 
-**`wire-process-registry`** is the source of truth for `wire/release-types/*.yaml` and `wire/specs/**/*.md` — release-type sequencing and what each command actually does. It's branch-protected (one required approval, admin enforcement on) and never fetched live; `wire/scripts/sync-process-registry.sh` mirrors it into this repo and pins the resolved commit in `wire/process_registry/pinned_sha.txt`. Because release-type sequencing and command instructions are Wire's own public operating procedure — already visible to anyone reading the plugin's command files — this content is bundled straight into the public `wire-plugin`/`wire-extension` packages once synced.
+The first is about *how Wire works*: the exact sequence a release type follows, and what each command actually does. The second is about *what Wire knows*: canonical data models built from RA's collective experience across real client engagements, that a new engagement can optionally draw on for a head start instead of starting from a blank page.
 
-**`wire-data-model-registry`** is a different kind of registry: a library of canonical entity/schema YAML and worked-example dbt SQL for six industry verticals (education, insurance, manufacturing, marketplace, retail, subscription-commerce) plus cross-vertical patterns, generalized from real RA client engagements. This content is genuinely confidential, so it is handled oppositely — it is synced into this repo's `wire/data-model-registry/` for framework development only ("dev mode"), and is **never** bundled into the public plugin/extension packages. `data_model-generate` and `data_model-validate` check for it automatically (no opt-in flag) at that dev-mode location or at `~/.wire/data-model-registry/` ("personal mode" — an individual RA consultant's own machine, set up via `/wire:utils-data-model-registry-setup`, which clones the private repo using that person's own `gh`/git credentials). If a plausible vertical match is found in either location, `data_model-generate` proposes it as a starting baseline — never auto-adopted — and `data_model-validate` compares against an accepted match advisorily, never as a hard gate. If neither location exists, or nothing plausibly matches, both commands skip silently: the default, expected outcome for most engagements and for anyone outside RA.
+Those two can look alike from the outside — both are private repos, both get pulled into this repo as a local copy — but they exist for opposite reasons, which is exactly why they get treated so differently once they're here.
+
+**`wire-process-registry`** is the process knowledge — the source of truth for `wire/release-types/*.yaml` and `wire/specs/**/*.md`. Nothing about it is secret, but now that it can actually *enforce* a release's process rather than just describe it (see [The precondition gate](#the-precondition-gate)), a mistake in it doesn't just look wrong in a doc — it breaks a real engagement. So changing it now goes through a proper review: it's branch-protected (one required approval, admin enforcement on) and never fetched live, with `wire/scripts/sync-process-registry.sh` mirroring it into this repo and pinning the resolved commit in `wire/process_registry/pinned_sha.txt`. Because it's Wire's own public operating procedure — already visible to anyone reading the plugin's command files — this content is bundled straight into the public `wire-plugin`/`wire-extension` packages once synced.
+
+**`wire-data-model-registry`** is the data knowledge, and it's the opposite case. When RA builds a data model for a client in a familiar industry — SaaS, retail, insurance, manufacturing, education, subscription commerce — it's rarely the first time RA has solved this kind of problem: there's a good instinct for what a solid `Customer` entity looks like for a SaaS business, what a `Policy` and `Claim` model needs to capture for insurance, what grain makes sense for subscription revenue. None of that experience used to be available to Wire itself — every new engagement started from a blank page, even when the shape of the answer was already well understood.
+
+This registry is where that experience now lives: a private library, organised by industry, of the entities RA typically expects to see, the structure and grain that's worked well before, and real worked examples of how a similar model was actually built — not code to copy and paste, but a reference to learn the pattern from. The value to a consultant: when you start a data model for a client in one of these industries, Wire recognises the fit and offers this as a starting point — a genuine head start instead of reasoning up the whole thing from nothing. You can take it, adapt it, or ignore it entirely; it's always a suggestion, never applied automatically. Once the model is built, Wire can also flag if something standard for that industry looks like it's missing.
+
+Because this comes from real client work, it's genuinely confidential — part of what makes RA's delivery experience valuable, not something to publish for anyone who installs the Wire plugin. So it's kept out of the public plugin entirely, and RA consultants get to it by fetching it onto their own machine themselves (`/wire:utils-data-model-registry-setup`, using their own GitHub access), rather than it coming bundled with anything Wire ships. Most consultants just need to know Wire will offer this automatically when it's relevant, and quietly won't when it isn't — the mechanics of dev-mode vs. personal-mode mirrors are in the diagram and table below for anyone who needs them.
 
 ```mermaid
 flowchart TB
@@ -5089,7 +5097,9 @@ Recent release history for the Wire Framework. Full changelog from v3.0.0 onward
 
 ### v4.0.0 — Precondition gate, process/data-model registries, Autopilot rewrite (July 2026)
 
-A schema layer for release types and commands enabling deterministic, checklist-style execution, plus two private registries that externalise where Wire's process definitions and (optionally) canonical data models come from. See [Section 6: The precondition gate](#the-precondition-gate), [Section 26: The Process and Data Model Registries](#the-process-and-data-model-registries), and [Section 21: Wire Autopilot](#21-wire-autopilot-autonomous-execution) for the full detail.
+Wire's release types are process definitions — an ordered graph of artifacts, each depending on specific ones before it — that until this release existed only as prose an agent had to notice and honor on its own. Nothing shared actually checked it, and nothing stopped a step being skipped or a status file being hand-edited around a gate.
+
+This release turns that graph into structured YAML per release type, then builds two things on top of it that weren't possible before: a shared precondition gate that enforces the graph deterministically (block by default, override only with a recorded name and reason), and an Autopilot that reads the same graph at runtime instead of maintaining its own hand-copied, driftable notion of execution order. Because the graph now has real behavioral consequences, it also moves out of this repo into a private, branch-protected registry. See [Section 6: The precondition gate](#the-precondition-gate), [Section 26: The Process and Data Model Registries](#the-process-and-data-model-registries), and [Section 21: Wire Autopilot](#21-wire-autopilot-autonomous-execution) for the full detail.
 
 - **Precondition gate** — every `-generate`/`-validate`/`-review` command now auto-delegates to a shared `precondition_gate` utility that blocks by default on unmet preconditions and requires a recorded name + reason to override.
 - **`wire-process-registry`** — release-type YAML and command specs externalised to a private, branch-protected repo, synced via a pinned-SHA mirror, never fetched live.

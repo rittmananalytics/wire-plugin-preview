@@ -7,7 +7,13 @@ title: The Process and Data Model Registries
 
 **Introduced**: v4.0.0
 
-Two things that look similar from the outside — both are private GitHub repos, both get synced into this repo as pinned local mirrors, both feed into what a Wire command does at runtime — but exist for opposite reasons and get distributed in opposite ways. This page explains both and how they relate.
+Wire depends on two different kinds of specialised knowledge to do its job, and as of v4.0.0 both live outside this repo, in their own private GitHub repos.
+
+The first is about *how Wire works*: the exact sequence a release type follows, and what each command actually does. The second is about *what Wire knows*: canonical data models built from RA's collective experience across real client engagements, that a new engagement can optionally draw on for a head start instead of starting from a blank page.
+
+Those two can look alike from the outside — both are private repos, both get pulled into this repo as a local copy — but they exist for opposite reasons, which is exactly why they get treated so differently once they're here. The process knowledge is Wire's own operating procedure. Nothing about it is secret, but now that it can actually *enforce* a release's process rather than just describe it (see the [precondition gate](../getting-started/core-concepts#the-precondition-gate)), a mistake in it doesn't just look wrong in a doc — it breaks a real engagement. So changing it now goes through a proper review, in a repo dedicated to exactly that. The data model knowledge is the opposite case: it's built from real client work, so it's genuinely confidential, and handing it to anyone who installs the public Wire plugin would be a real leak, not a rounding error. So it never ships inside the plugin at all — only RA staff can pull it, and only onto their own machine, using their own GitHub access.
+
+The rest of this page covers both in detail.
 
 ## wire-process-registry: how Wire defines itself
 
@@ -52,11 +58,15 @@ flowchart TB
 
 See [`wire/schemas/release-type-schema.md`](https://github.com/rittmananalytics/wire/blob/main/wire/schemas/release-type-schema.md) and [`wire/schemas/command-schema.md`](https://github.com/rittmananalytics/wire/blob/main/wire/schemas/command-schema.md) for the exact contract each file follows.
 
-## wire-data-model-registry: optional canonical data models
+## wire-data-model-registry: what RA has learned, made available to every engagement
 
-`rittmananalytics/wire-data-model-registry` is a different kind of private repo — not process definitions, but a library of canonical entity/schema YAML and worked-example dbt SQL for six industry verticals (`education`, `insurance`, `manufacturing`, `marketplace`, `retail`, `subscription-commerce`) plus cross-vertical patterns (web event tracking, GA4 ecommerce, marketing attribution, CRM identity resolution, revenue recognition). Its content is generalized from real RA client engagements — genuinely confidential business IP, not something to hand to just anyone who installs the plugin.
+When RA builds a data model for a client in a familiar industry — SaaS, retail, insurance, manufacturing, education, subscription commerce — it's rarely the first time RA has solved this kind of problem. There's a good instinct for what a solid `Customer` entity looks like for a SaaS business, what a `Policy` and `Claim` model needs to capture for insurance, what grain makes sense for subscription revenue. None of that experience has been available to Wire itself, though — every new engagement started from a blank page, even when the shape of the answer was already well understood.
 
-`data_model-generate` and `data_model-validate` check for it automatically — no opt-in flag — and if a mirror is present and the engagement's requirements plausibly match a vertical, `data_model-generate` proposes the canonical entity list as a starting baseline (never auto-adopted; always a yes/adapt/no decision) and `data_model-validate` diffs the result against it advisorily (never a hard gate). If neither location exists, or nothing plausibly matches, both commands skip silently — the default, expected outcome for most engagements and for anyone outside RA.
+`wire-data-model-registry` is where that experience now lives: a private library, organised by industry, of the entities RA typically expects to see, the kind of structure and grain that's worked well before, and real worked examples of how a similar model was actually built — not code to copy and paste, but a reference to learn the pattern from.
+
+**The value to a consultant**: when you start a data model for a client in one of these industries, Wire recognises the fit and offers this as a starting point — a genuine head start instead of reasoning up the whole thing from nothing. You can take it, adapt it, or ignore it entirely; it's always a suggestion, never something applied automatically. And once the model is built, Wire can also flag if something standard for that industry looks like it's missing — the way a colleague glancing over your shoulder might say "don't you normally need something for that in this kind of business?"
+
+Because this comes from real client work, it's genuinely confidential — it's part of what makes RA's delivery experience valuable, not something to publish for anyone who installs the Wire plugin. So it's kept out of the public plugin entirely; only RA consultants can get to it, and only by fetching it onto their own machine themselves. The mechanics of exactly how that works are below, for anyone who needs them — most consultants just need to know that Wire will offer this automatically when it's relevant, and quietly won't when it isn't.
 
 ```mermaid
 flowchart TB
