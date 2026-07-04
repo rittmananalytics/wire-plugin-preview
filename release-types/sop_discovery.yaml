@@ -1,0 +1,112 @@
+wire_schema: "1.0"
+id: sop_discovery
+name: "SOP / Canonical Discovery"
+description: "Full Rittman Analytics discovery methodology — structured stakeholder interviews, requirements matrix, three-analysis synthesis (Hierarchy of Needs, People–Process–Technology, Maturity Curve), and a findings playback that gates the delivery roadmap."
+applicable_when:
+  - "Client needs a full structured discovery before delivery planning"
+  - "Multiple stakeholders whose requirements must be reconciled"
+  - "RA is producing a Findings Playback deck for sponsor sign-off"
+  - "Discovery will feed into a multi-release delivery roadmap"
+
+phases:
+  - id: engagement_brief
+    name: "Engagement Brief"
+    description: "Establish the engagement context, objectives, and stakeholder list from the SoW and deal context"
+    required: true
+    requires_phase: null
+    artifacts:
+      - id: engagement_brief
+        command: engagement-brief
+        required: true
+        sequence: 1
+        depends_on: []
+
+  - id: stakeholder_map
+    name: "Stakeholder Map"
+    description: "Map all stakeholders with roles, priorities, and interview booking owners"
+    required: true
+    requires_phase: engagement_brief
+    artifacts:
+      - id: stakeholder_map
+        command: stakeholder-map
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: engagement_brief
+            action: review
+            outcome: approved
+
+  - id: stakeholder_interviews
+    name: "Stakeholder Interviews"
+    description: "Conduct and document stakeholder interviews using the mandatory four-tag template (PAIN / GOAL / CONSTRAINT / OPPORTUNITY)"
+    required: true
+    requires_phase: stakeholder_map
+    artifacts:
+      - id: stakeholder_interview
+        command: stakeholder-interview
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: stakeholder_map
+            action: review
+            outcome: approved
+
+  - id: requirements_matrix
+    name: "Requirements Matrix"
+    description: "Synthesise tagged interview findings into a cross-stakeholder requirements matrix"
+    required: true
+    requires_phase: stakeholder_interviews
+    artifacts:
+      - id: requirements_matrix
+        command: requirements-matrix
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: stakeholder_interview
+            action: validate
+            outcome: PASS
+
+  - id: discovery_analyses
+    name: "Discovery Analyses"
+    description: "Generate the three diagnostic analyses: Hierarchy of Needs, People–Process–Technology, and Maturity Curve"
+    required: true
+    requires_phase: requirements_matrix
+    artifacts:
+      - id: discovery_analyses
+        command: discovery-analyses
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: requirements_matrix
+            action: review
+            outcome: approved
+
+  - id: findings_playback
+    name: "Findings Playback"
+    description: "Generate and present the Findings Playback deck — the canonical sponsor sign-off gate"
+    required: true
+    requires_phase: discovery_analyses
+    artifacts:
+      - id: findings_playback
+        command: findings-playback
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: discovery_analyses
+            action: review
+            outcome: approved
+
+  - id: delivery_roadmap
+    name: "Delivery Roadmap"
+    description: "Generate the delivery roadmap with Build / Pair / Coach options and Release 1 scope for sponsor sign-off"
+    required: true
+    requires_phase: findings_playback
+    artifacts:
+      - id: delivery_roadmap
+        command: delivery-roadmap
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: findings_playback
+            action: review
+            outcome: approved

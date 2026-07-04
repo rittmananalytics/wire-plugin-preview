@@ -1,0 +1,155 @@
+wire_schema: "1.0"
+id: dashboard_first
+name: "Dashboard First"
+description: "Prototype-driven delivery — build dashboards on seed data first, then refactor to live client data — useful when requirements are unclear or when showing stakeholders a working prototype accelerates sign-off."
+applicable_when:
+  - "Client requirements are unclear and a visual prototype will accelerate alignment"
+  - "Team wants to validate the data model through the BI layer before committing to ingestion"
+  - "Stakeholder buy-in depends on seeing working dashboards before full build approval"
+
+phases:
+  - id: requirements
+    name: "Requirements"
+    description: "Capture requirements with emphasis on dashboard KPIs and target audience"
+    required: true
+    requires_phase: null
+    artifacts:
+      - id: requirements
+        command: requirements
+        required: true
+        sequence: 1
+        depends_on: []
+
+  - id: design
+    name: "Design"
+    description: "Design the conceptual model, data model, dashboard mockups, and visualization catalog"
+    required: true
+    requires_phase: requirements
+    artifacts:
+      - id: conceptual_model
+        command: conceptual_model
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: requirements
+            action: review
+            outcome: approved
+      - id: mockups
+        command: mockups
+        required: true
+        sequence: 2
+        depends_on:
+          - artifact: requirements
+            action: review
+            outcome: approved
+      - id: viz_catalog
+        command: viz_catalog
+        required: true
+        sequence: 3
+        depends_on:
+          - artifact: mockups
+            action: review
+            outcome: approved
+      - id: data_model
+        command: data_model
+        required: true
+        sequence: 4
+        depends_on:
+          - artifact: viz_catalog
+            action: generate
+            outcome: complete
+
+  - id: seed_development
+    name: "Seed Development"
+    description: "Build dashboards on seed data to validate the design before connecting to live data"
+    required: true
+    requires_phase: design
+    artifacts:
+      - id: seed_data
+        command: seed_data
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: viz_catalog
+            action: generate
+            outcome: complete
+      - id: dashboards
+        command: dashboards
+        required: true
+        sequence: 2
+        depends_on:
+          - artifact: seed_data
+            action: review
+            outcome: approved
+
+  - id: data_refactor
+    name: "Data Refactor"
+    description: "Replace seed data with live client data — refactor dbt project, rebuild semantic layer"
+    required: true
+    requires_phase: seed_development
+    artifacts:
+      - id: data_refactor
+        command: data_refactor
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: dashboards
+            action: review
+            outcome: approved
+      - id: dbt
+        command: dbt
+        required: true
+        sequence: 2
+        depends_on:
+          - artifact: seed_data
+            action: review
+            outcome: approved
+      - id: semantic_layer
+        command: semantic_layer
+        required: true
+        sequence: 3
+        depends_on:
+          - artifact: dbt
+            action: validate
+            outcome: PASS
+
+  - id: testing
+    name: "Testing"
+    description: "Data quality tests and UAT on live data"
+    required: true
+    requires_phase: data_refactor
+    artifacts:
+      - id: data_quality
+        command: data_quality
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: dbt
+            action: review
+            outcome: approved
+      - id: uat
+        command: uat
+        required: true
+        sequence: 2
+        depends_on:
+          - artifact: dashboards
+            action: review
+            outcome: approved
+
+  - id: deployment
+    name: "Deployment"
+    description: "Deploy to production and sign off"
+    required: true
+    requires_phase: testing
+    artifacts:
+      - id: deployment
+        command: deployment
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: data_quality
+            action: validate
+            outcome: PASS
+          - artifact: uat
+            action: review
+            outcome: approved

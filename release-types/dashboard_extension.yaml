@@ -1,0 +1,65 @@
+wire_schema: "1.0"
+id: dashboard_extension
+name: "Dashboard Extension"
+description: "New dashboards on an existing platform — requirements, mockups, dashboards, and training, without a pipeline or data-model build."
+applicable_when:
+  - "Client already has a working data platform and needs new dashboards built on it"
+  - "Scope is limited to the BI/reporting layer — no new ingestion or dbt work"
+
+phases:
+  - id: requirements
+    name: "Requirements"
+    description: "Capture and sign off the requirements specification from the SoW and stakeholder input"
+    required: true
+    requires_phase: null
+    artifacts:
+      - id: requirements
+        command: requirements
+        required: true
+        sequence: 1
+        depends_on: []
+
+  - id: design
+    name: "Design"
+    description: "Mock up the new dashboards"
+    required: true
+    requires_phase: requirements
+    artifacts:
+      - id: mockups
+        command: mockups
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: requirements
+            action: review
+            outcome: approved
+
+  - id: development
+    name: "Development"
+    description: "Build the dashboards against the existing platform"
+    required: true
+    requires_phase: design
+    artifacts:
+      - id: dashboards
+        command: dashboards
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: mockups
+            action: review
+            outcome: approved
+
+  - id: enablement
+    name: "Enablement"
+    description: "Train stakeholders on the new dashboards"
+    required: true
+    requires_phase: development
+    artifacts:
+      - id: training
+        command: training
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: dashboards
+            action: review
+            outcome: approved
