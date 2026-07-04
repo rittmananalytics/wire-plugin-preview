@@ -243,6 +243,8 @@ This enters Plan Mode, reads the current release state, and proposes a 3–5 ste
 
 The framework encodes delivery methodology as twelve release types, each defining a different ordered set of in-scope artifacts and the commands that apply to them. When you run `/wire:new` and select a release type, the framework instantiates that process definition into the release's `status.md` file — writing the in-scope artifacts and their gate states as YAML frontmatter. Artifacts that are out of scope for the selected type are marked `not_applicable` and skipped.
 
+**As of v4.0.0**, every release type is backed by a machine-readable `wire/release-types/<type>.yaml` (phases, artifacts, `depends_on`, `sequence`) — not just documentation. This is what the [precondition gate](#the-precondition-gate) and [Autopilot](#21-wire-autopilot-autonomous-execution) both read at runtime to know what depends on what and in which order to run. `pipeline_only`, `dashboard_extension`, and `enablement` — previously conceptual-only in this guide — now have one too, closing a gap where those three release types were documented but not actually schema-backed. See [The Process and Data Model Registries](#the-process-and-data-model-registries) for where these files come from.
+
 | Type | `release_type` | Scope | Typical Duration | Artifacts in Scope |
 |------|----------------|-------|------------------|--------------------|
 | **Discovery (Shape Up)** | `discovery` | Shape Up planning: problem definition → pitch → release brief → sprint plan | 1–2 weeks | problem_definition, pitch, release_brief, sprint_plan |
@@ -275,8 +277,6 @@ The framework encodes delivery methodology as twelve release types, each definin
 - **Engagement with bespoke deliverables — architecture blueprints, advisory reports, decision logs, PoC productionisation plans — that don't fit any standard type**: **Custom**
 
 **Discovery (Shape Up) vs Discovery (SOP / Canonical)**: Use Shape Up when the scope is fuzzy but the problem domain is understood and you can shape a solution in a week or two. Use SOP / Canonical when you genuinely do not yet know what to build, stakeholder alignment is low, or this is the first analytics engagement at the client — it runs a formal structured discovery and culminates in a sponsor-facing Findings Playback slide deck that must be signed off before any delivery work begins.
-
-**Full Platform vs Dashboard-First**: Both produce the same end result (production dashboards with a dbt warehouse). The difference is the *order of operations*. Full Platform follows the traditional flow: requirements → conceptual model → pipeline design → data model → dbt → dashboards. Dashboard-First inverts this: requirements → interactive dashboard mocks → visualization catalog → data model → seed data → dbt → dashboards → data refactor. Choose Dashboard-First when getting visual feedback early is more valuable than following the traditional top-down design sequence — typically when the SOW is well-defined enough to mock dashboards immediately but client data access may take time.
 
 **Full Platform vs Dashboard-First**: Both produce the same end result (production dashboards with a dbt warehouse). The difference is the *order of operations*. Full Platform follows the traditional flow: requirements → conceptual model → pipeline design → data model → dbt → dashboards. Dashboard-First inverts this: requirements → interactive dashboard mocks → visualization catalog → data model → seed data → dbt → dashboards → data refactor. Choose Dashboard-First when getting visual feedback early is more valuable than following the traditional top-down design sequence — typically when the SOW is well-defined enough to mock dashboards immediately but client data access may take time.
 
@@ -423,7 +423,30 @@ stateDiagram-v2
     READY --> [*]
 ```
 
-An artifact should not progress until all three gates are passed. Downstream artifacts check upstream readiness before they generate. This enforces phase discipline automatically although you can over-ride if you need to.
+An artifact should not progress until all three gates are passed. Downstream artifacts check upstream readiness before they generate.
+
+### The precondition gate
+
+**As of v4.0.0**, phase discipline isn't a soft convention baked separately into each command's prose — every `-generate`/`-validate`/`-review` command auto-delegates to a shared utility, `specs/utils/precondition_gate.md`, before doing anything else.
+
+The gate reads the command's declared `preconditions` from its own front-matter: a static list (e.g. "`data_model.review` must be `approved`"), or the literal `dynamic` sentinel for the handful of artifacts (`mockups`, `pipeline_design`, `data_model`, `data_quality`, `dashboards`, `deployment`, `training`, `documentation`) whose correct precondition genuinely differs by release type. A `dynamic` precondition resolves at runtime from the current release's `wire/release-types/<type>.yaml` — the same file Autopilot reads to resolve execution order (see [Section 21](#21-wire-autopilot-autonomous-execution)).
+
+If the precondition isn't met, the command **blocks by default**:
+
+```mermaid
+flowchart LR
+    CMD["/wire:dbt-generate"] --> GATE{"precondition_gate\nmet?"}
+    GATE -->|Yes| RUN["Run the workflow"]
+    GATE -->|No| ASK["Block:\noverride, or stop?"]
+    ASK -->|"Override\n(name + reason)"| LOG["Record in status.md +\nexecution_log.md"]
+    LOG --> RUN
+    ASK -->|Stop| END(("Command exits"))
+
+    style GATE fill:#fce4ec,stroke:#c62828
+    style LOG fill:#fff3e0,stroke:#e65100
+```
+
+You can still override it, but only explicitly — the gate asks for your name and a reason, and records both in `status.md`'s `precondition_overrides` and as an `override` result in `execution_log.md`. This makes "I skipped a step on purpose" a visible, attributable decision instead of something that silently happened. Autopilot never answers this prompt on its own behalf — see "Handling a precondition-gate block" in [Section 21](#21-wire-autopilot-autonomous-execution).
 
 ### Git branching
 
@@ -3731,22 +3754,30 @@ For each planned delivery release, Autopilot:
 
 1. Creates the release folder structure (equivalent to `/wire:release:spawn`)
 2. Creates the release `status.md` with the correct artifact scope for the release type
-3. Runs the full artifact sequence for that release type
+3. Resolves the artifact order and runs it
 4. Commits all artifacts after the release is complete before moving to the next
 
-**Artifact sequences by release type:**
+**As of v4.0.0, this order is not hardcoded anywhere in Autopilot's own spec.** It reads `status.md`'s `project_type`, loads `wire/release-types/<type>.yaml`, flattens every phase's artifacts into one list, and topologically sorts by `depends_on` (tie-broken by `sequence`) — the same file the [precondition gate](#the-precondition-gate) reads for every artifact regardless of whether Autopilot or a person is driving. The previous version hardcoded a per-release-type sequence directly in `autopilot.md`, which had silently drifted from reality — most notably, `full_platform`'s hardcoded list omitted the `orchestration` artifact entirely, so a run through Autopilot never generated it even though the release type's own definition required it. That class of bug is now structurally impossible: there is exactly one place execution order comes from, and both the gate and Autopilot read it.
 
-| Type | Artifacts |
+**Illustrative resolved order** for the release types currently defined — treat this as a snapshot of what the YAML currently resolves to, not a contract Autopilot maintains separately:
+
+| Type | Resolved order |
 |------|-----------|
-| `full_platform` | requirements → workshops → conceptual_model → pipeline_design → data_model → mockups → pipeline → dbt → semantic_layer → dashboards → data_quality → uat → deployment → training → documentation |
+| `full_platform` | requirements → conceptual_model → pipeline_design → data_model → mockups → pipeline → dbt → semantic_layer → dashboards → **orchestration** → data_quality → uat → deployment → training → documentation |
 | `pipeline_only` | requirements → pipeline_design → pipeline → data_quality → deployment |
 | `dbt_development` | requirements → data_model → dbt → semantic_layer → data_quality → deployment |
 | `dashboard_extension` | requirements → mockups → dashboards → training |
-| `dashboard_first` | requirements → mockups → viz_catalog → data_model → seed_data → dbt → semantic_layer → dashboards → data_refactor → data_quality → uat → deployment → training → documentation |
+| `dashboard_first` | requirements → conceptual_model → mockups → viz_catalog → data_model → seed_data → dashboards → data_refactor → dbt → semantic_layer → data_quality → uat → deployment |
 | `enablement` | training → documentation |
-| `platform_migration` | ingestion_audit → db_object_audit → security_audit → dbt_audit → orchestration_audit → migration_inventory → lineage_view → migration_strategy → target_setup → ingestion_migration → dbt_migration → orchestration_migration → equivalency_validation → cutover → migration_report |
+| `platform_migration` | ingestion_audit → db_object_audit → security_audit → dbt_audit → orchestration_audit → migration_inventory → migration_strategy → target_setup → ingestion_migration → dbt_migration → orchestration_migration → equivalency_validation → cutover → migration_report |
 
-Each artifact follows the same generate → validate (up to 3 retries) → self-review (up to 2 retries) cycle. After each artifact is generated and again after it is approved, Autopilot syncs to Jira, Linear, and the document store (whichever are configured).
+(`workshops` is an optional, ungated artifact on `full_platform` — it has no `depends_on` edges, so it never blocks or is blocked by anything else in the sequence, and can be run whenever, or never.)
+
+Each artifact follows the same generate → validate (up to 3 retries) → self-review (up to 2 retries) cycle, running the real `/wire:{command}-generate/-validate/-review` commands rather than a paraphrase of their logic. After each artifact is generated and again after it is approved, Autopilot syncs to Jira, Linear, and the document store (whichever are configured).
+
+#### Handling a precondition-gate block
+
+If order resolution worked correctly, every artifact's precondition gate should pass silently by the time Autopilot reaches it — that's what a correct topological sort guarantees. If one blocks anyway, that signals a real structural problem (a resolution bug, a manually-edited `status.md` that regressed something), not routine friction to route around. Autopilot does **not** self-override — the gate's override contract requires a real person's name and reason, which Autopilot cannot supply on someone else's behalf. It pauses with the same three-option pattern as a safety gate below (override now / investigate first / stop here) and logs the block in `autopilot_checkpoint.md` for later diagnosis.
 
 ### Safety gates
 
@@ -4451,14 +4482,98 @@ Section 4.1 was edited: "Python 3.11" changed to "Python 3.12"
 
 The framework is designed to be extended. All delivery intelligence lives in plain markdown files. Adding a new capability means writing a new markdown file.
 
+**As of v4.0.0**, `wire/release-types/*.yaml` and `wire/specs/**/*.md` are not edited directly in this repo — they're a synced, pinned mirror of a private, branch-protected `wire-process-registry` repo. See [The Process and Data Model Registries](#the-process-and-data-model-registries) below for why, and for how the (separate, optionally-used) `wire-data-model-registry` fits in.
+
+### Adding a new release type
+
+A release type is a YAML file conforming to `wire/schemas/release-type-schema.md`: a set of phases, each with an ordered list of artifacts (`id`, `command`, `depends_on`, `sequence`, `required`), plus the spec files those commands point to. Both the [precondition gate](#the-precondition-gate) and [Autopilot](#21-wire-autopilot-autonomous-execution) read this file at runtime, so it's not a documentation exercise — getting the `depends_on` graph wrong breaks a real engagement.
+
+To add one for real:
+
+1. **Open a PR against `wire-process-registry`** (not this repo). Add `release-types/<name>.yaml` there, following the schema.
+2. **Write a spec file per artifact** in the same registry repo, at `specs/<domain>/<artifact>/generate.md` (plus `validate.md`/`review.md` where applicable), with `wire_schema` front-matter conforming to `wire/schemas/command-schema.md`.
+3. **Get it reviewed and merged** — one approving review is required; branch protection enforces this even for admins.
+4. **Sync it into this repo**: `wire/scripts/sync-process-registry.sh` mirrors both directories and records the resolved commit in `wire/process_registry/pinned_sha.txt`.
+5. **Rebuild**: `bash wire/scripts/build-packages.sh` bundles the newly-synced YAML and inlines the specs into `commands/*.md`/`.toml`.
+
+Once bundled, nothing else in the framework needs to know the new release type exists — the precondition gate and Autopilot both resolve it automatically from the YAML.
+
+### The Process and Data Model Registries
+
+Two private repos feed into what a Wire command does at runtime. Both get synced into this repo as pinned local mirrors, and both look structurally similar — but they exist for opposite reasons and get distributed in opposite ways.
+
+**`wire-process-registry`** is the source of truth for `wire/release-types/*.yaml` and `wire/specs/**/*.md` — release-type sequencing and what each command actually does. It's branch-protected (one required approval, admin enforcement on) and never fetched live; `wire/scripts/sync-process-registry.sh` mirrors it into this repo and pins the resolved commit in `wire/process_registry/pinned_sha.txt`. Because release-type sequencing and command instructions are Wire's own public operating procedure — already visible to anyone reading the plugin's command files — this content is bundled straight into the public `wire-plugin`/`wire-extension` packages once synced.
+
+**`wire-data-model-registry`** is a different kind of registry: a library of canonical entity/schema YAML and worked-example dbt SQL for six industry verticals (education, insurance, manufacturing, marketplace, retail, subscription-commerce) plus cross-vertical patterns, generalized from real RA client engagements. This content is genuinely confidential, so it is handled oppositely — it is synced into this repo's `wire/data-model-registry/` for framework development only ("dev mode"), and is **never** bundled into the public plugin/extension packages. `data_model-generate` and `data_model-validate` check for it automatically (no opt-in flag) at that dev-mode location or at `~/.wire/data-model-registry/` ("personal mode" — an individual RA consultant's own machine, set up via `/wire:utils-data-model-registry-setup`, which clones the private repo using that person's own `gh`/git credentials). If a plausible vertical match is found in either location, `data_model-generate` proposes it as a starting baseline — never auto-adopted — and `data_model-validate` compares against an accepted match advisorily, never as a hard gate. If neither location exists, or nothing plausibly matches, both commands skip silently: the default, expected outcome for most engagements and for anyone outside RA.
+
+```mermaid
+flowchart TB
+    subgraph priv1["Private: wire-process-registry"]
+        RT["release-types/*.yaml"]
+        SP["specs/**/*.md"]
+    end
+    subgraph wirerepo["This repo"]
+        SYNC1["sync-process-registry.sh<br/>(pinned SHA)"]
+        LOCAL1["wire/release-types/, wire/specs/"]
+    end
+    subgraph pub["Public: wire-plugin / wire-extension"]
+        CMDS["commands/*.md (bundled)"]
+    end
+    RT --> SYNC1 --> LOCAL1 --> CMDS
+    SP --> SYNC1
+
+    subgraph priv2["Private: wire-data-model-registry"]
+        DMR["verticals/*, cross-vertical/*<br/>+ reference dbt SQL"]
+    end
+    subgraph devmode["Dev mode (this repo only)"]
+        SYNC2["sync-data-model-registry.sh<br/>(pinned SHA)"]
+        LOCAL2["wire/data-model-registry/"]
+    end
+    subgraph personal["Personal mode (RA consultant's machine)"]
+        HOME["~/.wire/data-model-registry/<br/>(via /wire:utils-data-model-registry-setup,<br/>own git credentials, live git pull)"]
+    end
+    DMR --> SYNC2 --> LOCAL2
+    DMR --> HOME
+    LOCAL2 -.->|"NOT bundled — confidential"| CMDS
+    LOCAL2 --> GEN["data_model-generate/validate<br/>Step 1.5: check + propose"]
+    HOME --> GEN
+
+    style priv1 fill:#fce4ec,stroke:#c62828
+    style priv2 fill:#fce4ec,stroke:#c62828
+    style pub fill:#e8f5e9,stroke:#2e7d32
+    style personal fill:#e8f5e9,stroke:#2e7d32
+```
+
+| | wire-process-registry | wire-data-model-registry |
+|---|---|---|
+| Content | Release-type YAML, command specs | Canonical entity/schema YAML, reference dbt SQL |
+| Confidentiality | Public (Wire's own operating procedure) | Proprietary (real client engagement content) |
+| Bundled into public plugin? | **Yes** | **No — never** |
+| How an end user gets it | Comes with the plugin | `/wire:utils-data-model-registry-setup` — an individual, live `gh repo clone` gated by the consultant's own GitHub access |
+| Update discipline | Pinned SHA, explicit re-sync — never fetched live | Dev mirror: pinned SHA. Personal copy: live `git pull`, whenever the consultant wants — a deliberate exception, since it's a one-person operation, not a framework-wide sync |
+
+See `wire/schemas/release-type-schema.md`, `wire/schemas/command-schema.md`, and `wire/schemas/data-model-registry.md` for the exact contracts, and `wire/specs/design/data_model/generate.md` Step 1.5 for the automatic-detection logic.
+
 ### Adding a new command
 
 **Step 1: Write the workflow spec**
 
-Create a file at `wire/specs/<phase>/<artifact>/<action>.md`. Use the standard frontmatter and structure:
+Create a file at `wire/specs/<phase>/<artifact>/<action>.md`. Use the `wire_schema` frontmatter contract (`wire/schemas/command-schema.md`):
 
 ```markdown
 ---
+wire_schema: "1.0"
+command: generate               # generate | validate | review | utility | lifecycle
+artifact: my_artifact
+domain: my_domain
+release_types:                  # which release types use this — [] for cross-cutting utilities
+  - full_platform
+action_type: artifact
+logs_execution: true
+preconditions:                  # static list, or the literal string "dynamic" if the correct
+  - artifact: upstream_artifact  # precondition genuinely varies by release type
+    action: review
+    outcome: approved
 description: Brief description of what this command does
 argument-hint: <project-folder>
 ---
@@ -4585,14 +4700,6 @@ The current framework targets BigQuery + dbt + LookML. Adapting for another stac
 3. **Update the pipeline design spec** (`specs/design/pipeline_design/generate.md`): update the replication tool and architecture descriptions
 
 The non-technology artifacts (requirements, data_model, training, documentation) require no changes.
-
-### Adding a new release type
-
-Each release type is a process definition — an ordered set of in-scope artifacts that defines a specific delivery workflow. If you have a recurring engagement pattern not covered by the seven standard types (discovery, full_platform, pipeline_only, dbt_development, dashboard_extension, dashboard_first, enablement):
-
-1. Edit `specs/new.md` to add the new type to the release creation prompts and define which artifacts are in scope (the rest will be set to `not_applicable` when `status.md` is instantiated)
-2. Add a case to the status template in `TEMPLATES/status-template.md` showing the artifact scope for the new type
-3. Document the new type in this handbook
 
 ### Adjusting naming conventions
 
@@ -4977,6 +5084,19 @@ The detailed content — command sequences, scenario background, deliverable tab
 ## 31. Release Notes
 
 Recent release history for the Wire Framework. Full changelog from v3.0.0 onwards is in [CHANGELOG.md](CHANGELOG.md). Detailed per-release notes are in [RELEASE_NOTES.md](RELEASE_NOTES.md).
+
+---
+
+### v4.0.0 — Precondition gate, process/data-model registries, Autopilot rewrite (July 2026)
+
+A schema layer for release types and commands enabling deterministic, checklist-style execution, plus two private registries that externalise where Wire's process definitions and (optionally) canonical data models come from. See [Section 6: The precondition gate](#the-precondition-gate), [Section 26: The Process and Data Model Registries](#the-process-and-data-model-registries), and [Section 21: Wire Autopilot](#21-wire-autopilot-autonomous-execution) for the full detail.
+
+- **Precondition gate** — every `-generate`/`-validate`/`-review` command now auto-delegates to a shared `precondition_gate` utility that blocks by default on unmet preconditions and requires a recorded name + reason to override.
+- **`wire-process-registry`** — release-type YAML and command specs externalised to a private, branch-protected repo, synced via a pinned-SHA mirror, never fetched live.
+- **`wire-data-model-registry`** (optional, automatic) — canonical entity/schema library for 6 industry verticals; `data_model-generate` detects and proposes a match automatically, with no opt-in flag. Kept out of the public plugin/extension entirely (proprietary content) — RA staff get it via the new `/wire:utils-data-model-registry-setup`.
+- **Autopilot rewrite** — resolves execution order dynamically from each release type's YAML instead of ~700 lines of hardcoded sequences (which had silently omitted `orchestration` from `full_platform`), and now runs the real `/wire:*` commands instead of a parallel copy of their logic.
+- **`pipeline_only`, `dashboard_extension`, `enablement`** gain formal `wire/release-types/*.yaml` definitions, closing a gap where they were documented but not actually schema-backed.
+- **Packaging fix** — `wire/release-types/*.yaml` is now bundled into the distributable plugin/extension; previously it wasn't, so the precondition gate and Autopilot's order resolution only worked inside the Wire source repo.
 
 ---
 

@@ -55,6 +55,25 @@ stateDiagram-v2
 
 An artifact should not progress until all three gates are passed. Downstream artifacts check upstream readiness before they generate.
 
+## The precondition gate
+
+**Since v4.0.0.** Every `-generate`/`-validate`/`-review` command auto-delegates to a shared utility, [`precondition_gate.md`](https://github.com/rittmananalytics/wire/blob/main/wire/specs/utils/precondition_gate.md), before doing anything else. It reads the command's declared `preconditions` from its own front-matter — a static list (e.g. "`data_model.review` must be `approved`"), or the `dynamic` sentinel for the handful of artifacts (`mockups`, `pipeline_design`, `data_model`, `data_quality`, `dashboards`, `deployment`, `training`, `documentation`) whose correct precondition genuinely differs by release type. A `dynamic` precondition resolves at runtime from the current release's `wire/release-types/<type>.yaml` — the same file [Autopilot](../advanced/autopilot) reads to resolve execution order.
+
+If the precondition isn't met, the command **blocks by default**. You can override it, but only explicitly — the gate asks for your name and a reason, and records both in `status.md`'s `precondition_overrides` and in `execution_log.md` as an `override` result. This makes "I skipped a step on purpose" a visible, attributable decision rather than something that just silently happened.
+
+```mermaid
+flowchart LR
+    CMD["/wire:dbt-generate"] --> GATE{"precondition_gate\nmet?"}
+    GATE -->|Yes| RUN["Run the workflow"]
+    GATE -->|No| ASK["Block:\noverride, or stop?"]
+    ASK -->|"Override\n(name + reason)"| LOG["Record in status.md +\nexecution_log.md"]
+    LOG --> RUN
+    ASK -->|Stop| END(("Command exits"))
+
+    style GATE fill:#fce4ec,stroke:#c62828
+    style LOG fill:#fff3e0,stroke:#e65100
+```
+
 ## Git branching
 
 `/wire:new` enforces a mandatory branch check. If you run it while on `main` or `master`, the framework will stop and ask you to create a feature branch before any project files are created. It suggests `feature/{folder_name}` but you can choose your own name.

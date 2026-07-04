@@ -44,6 +44,7 @@ const sidebars = {
         'advanced/issue-tracking',
         'advanced/document-store',
         'advanced/extending',
+        'advanced/registries',
       ],
     },
     {

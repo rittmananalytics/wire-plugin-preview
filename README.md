@@ -1,6 +1,6 @@
 <img src="docs/images/wire_logo_transparent.png" alt="Wire Framework" width="220">
 
-# Wire Framework v3.10.4
+# Wire Framework v4.0.0
 
 Wire is a structured delivery system for data platform engagements, built on top of Claude Code and Gemini CLI. It encodes analytics engineering methodology as workflow specifications that the AI reads before generating anything so that output follows consistent patterns, traces back to requirements and can be validated automatically rather than having to be manually eyeballed.
 
@@ -22,10 +22,12 @@ Wire does not replace consultants or developers. It gives them an AI that works 
 
 ## Key Features
 
-- **265 slash commands** covering the full delivery lifecycle: Discovery (Shape Up + RA Canonical SOP), Requirements, Design, Development, Testing, Deployment, Enablement, Platform Migration, Agentic Data Stack
-- **12 release types** matching common engagement shapes: Shape Up discovery, SOP / Canonical discovery (sponsor-facing Findings Playback), full platform builds, pipeline-only, dbt development, dashboard extensions, dashboard-first rapid dev, enablement, platform migration (BigQuery ↔ Snowflake), agentic data stack (governed self-service analytics with eval suite), droughty (schema introspection and base-layer generation from live warehouses), and custom (bespoke deliverables defined from SoW documents)
+- **261 slash commands** covering the full delivery lifecycle: Discovery (Shape Up + RA Canonical SOP), Requirements, Design, Development, Testing, Deployment, Enablement, Platform Migration, Agentic Data Stack
+- **12 release types** matching common engagement shapes: Shape Up discovery, SOP / Canonical discovery (sponsor-facing Findings Playback), full platform builds, pipeline-only, dbt development, dashboard extensions, dashboard-first rapid dev, enablement, platform migration (BigQuery ↔ Snowflake), agentic data stack (governed self-service analytics with eval suite), droughty (schema introspection and base-layer generation from live warehouses), and custom (bespoke deliverables defined from SoW documents) — every release type is now backed by a machine-readable process definition (see Precondition Gate below), not just documentation
 - **Two-tier engagement structure** separating long-running client context from individual scoped releases
 - **Generate / validate / review lifecycle** for every artifact: structured generation, automated checks, stakeholder sign-off
+- **Precondition gate** (v4.0.0) — every command blocks by default on an unmet prerequisite; overriding requires a recorded name and reason, so skipping a step on purpose is always a visible, attributable decision rather than something that silently happened
+- **Process and data model registries** (v4.0.0) — release-type sequencing and command specs are sourced from a private, branch-protected `wire-process-registry`; an optional, automatically-detected canonical data model registry (`wire-data-model-registry`) proposes industry-standard entity structures without ever bundling proprietary content into this public plugin — see [docs.rittmananalytics.com/advanced/registries](https://docs.rittmananalytics.com/advanced/registries)
 - **27 ad-hoc development skills** that activate automatically during coding work (dbt, LookML, Dagster, Python, Fivetran, Airbyte, Coupler.io, RudderStack, Segment, Looker, Snowflake, Hightouch, BigQuery, Cloud Run, gcloud) without any explicit invocation, plus **26 Amplitude product-analytics skills** for working with an Amplitude instance
 - **Wire Agents** — 13 specialist subagents (dbt developer, semantic layer developer, pipeline engineer, migration specialist, and 9 others) dispatched automatically on every generate and validate command. `/wire:delegate` computes a full parallel/sequential execution plan across all pending work, with fan-out parallelism for large model sets (layers stay sequential; agents within each layer run in parallel)
 - **Autopilot mode** for autonomous end-to-end delivery
@@ -40,7 +42,7 @@ Wire does not replace consultants or developers. It gives them an AI that works 
 
 Wire is distributed as a Claude Code plugin and a Gemini CLI extension. Installing the plugin embeds every Wire command inline — no framework files need to exist in your project repository.
 
-**Plugins** provide the 265 `/wire:*` commands. Each command file contains its full workflow specification, so the AI receives complete instructions as context at invocation time.
+**Plugins** provide the 261 `/wire:*` commands. Each command file contains its full workflow specification, so the AI receives complete instructions as context at invocation time.
 
 **Skills** sit alongside commands but work differently. They activate automatically during ad-hoc coding work without any explicit invocation. When you start writing a dbt model, the dbt development skill provides naming conventions, SQL style rules, and testing patterns as background context. The following skills are included:
 
@@ -283,7 +285,7 @@ Autopilot runs the full delivery lifecycle without step-by-step prompting.
 /wire:autopilot
 ```
 
-Wire starts with a complete discovery sprint (problem definition, pitch, release brief, sprint plan). From the approved sprint plan it determines which downstream release types are needed, creates them, and executes each in sequence. Every artifact goes through generate, validate, and review before the next begins. Autopilot pauses at review gates for human sign-off, then continues.
+Wire starts with a complete discovery sprint (problem definition, pitch, release brief, sprint plan). From the approved sprint plan it determines which downstream release types are needed, creates them, and executes each in sequence, resolving each release type's artifact order dynamically from its `wire/release-types/*.yaml` rather than a hardcoded sequence. Every artifact goes through generate, validate, and **self-review** — Autopilot doesn't pause for human sign-off at review gates, it reads the artifact's real review criteria and decides itself, recording `reviewed_by: "Wire Autopilot (self-review)"`. It still pauses at safety gates (activating pipelines, running SQL against real databases, deploying) for explicit confirmation, and at any precondition-gate block, since overriding that always requires a real person's name and reason.
 
 It works best on well-scoped engagements where the SOW is clear and the release types are predictable.
 
@@ -299,7 +301,7 @@ A VS Code extension (`wire-vscode/`) is in early development. The intention is t
 
 - [Documentation site](https://docs.rittmananalytics.com) — full documentation with search, covering all release types, commands, skills, and MCP servers
 - [User Guide](USER_GUIDE.md) — full operational guide covering all release types, worked examples, Autopilot, and troubleshooting
-- [Command Registry](wire/COMMANDS.md) — command catalog and conventions (run `/wire:help` for the full, current list of all 265 commands)
+- [Command Registry](wire/COMMANDS.md) — command catalog and conventions (run `/wire:help` for the full, current list of all 261 commands)
 - [Changelog](CHANGELOG.md)
 - [Release Notes](RELEASE_NOTES.md)
 - [Framework Source README](wire/README.md) — internals, build process, package structure

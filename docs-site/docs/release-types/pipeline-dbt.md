@@ -27,7 +27,7 @@ The chosen tool is recorded as `pipeline_tool` in `status.md`. All downstream `/
 ## Workflow
 
 ```
-/wire:new                                   # release_type: pipeline_dbt
+/wire:new                                   # release_type: pipeline_only
 
 /wire:requirements-generate <release-folder>
 /wire:requirements-validate <release-folder>

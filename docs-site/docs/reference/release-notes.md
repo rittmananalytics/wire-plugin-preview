@@ -9,6 +9,26 @@ Recent release history for the Wire Framework. For full changelog detail from v3
 
 ---
 
+## v4.0.0 — Precondition gate, process/data-model registries, Autopilot rewrite
+
+**Released**: July 2026
+
+A schema layer for release types and commands that enables deterministic, checklist-style execution, plus two private registries that externalise where Wire's process definitions and (optionally) canonical data models come from.
+
+**The precondition gate makes phase discipline enforceable instead of advisory.** Every `-generate`/`-validate`/`-review` command now auto-delegates to a shared `precondition_gate` utility before doing anything else. It resolves the command's declared preconditions — a static list, or a `dynamic` sentinel for the handful of artifacts whose correct precondition genuinely varies by release type — and **blocks by default** if they're unmet. An override is still possible, but only explicitly: it requires a real name and reason, both recorded in `status.md` and `execution_log.md`. See [Core Concepts: The precondition gate](../getting-started/core-concepts#the-precondition-gate).
+
+**Release-type sequencing and command specs move to a private, branch-protected `wire-process-registry`.** `wire/release-types/*.yaml` and `wire/specs/**/*.md` are now a synced, pinned mirror rather than edited in place — one required approval, admin enforcement on, never fetched live. This is the same content the precondition gate and Autopilot both read at runtime, so getting it wrong now breaks an actual engagement rather than a doc. See [The Process and Data Model Registries](../advanced/registries).
+
+**Autopilot no longer maintains a shadow copy of Wire's process.** It resolves artifact execution order dynamically from each release type's YAML instead of ~700 lines of hardcoded sequences (which, among other things, had silently omitted the `orchestration` artifact from `full_platform` entirely), and now runs the real `/wire:*` commands rather than a parallel implementation of their logic. Self-Review Mode reads each artifact's real review spec and decides from its own stated criteria. See [Wire Autopilot](../advanced/autopilot) — substantially rewritten for this release.
+
+**An optional, automatic canonical data model registry.** `wire-data-model-registry` is a private library of canonical entity/schema definitions and worked-example dbt SQL for six industry verticals plus cross-vertical patterns. `data_model-generate` detects it automatically — no opt-in flag — infers a plausible vertical match from the requirements already gathered, and proposes it as a starting baseline (never auto-adopted); `data_model-validate` compares against an accepted match advisorily. Because `wire-plugin`/`wire-extension` are public repos, this content is deliberately never bundled into either package — RA staff get personal-machine access via new `/wire:utils-data-model-registry-setup`, gated by their own GitHub access rather than anything Wire ships.
+
+**`pipeline_only`, `dashboard_extension`, and `enablement` gain formal process definitions.** These release types were previously documented conceptually without a machine-readable `wire/release-types/*.yaml` backing them — the precondition gate and Autopilot's order resolution now work correctly for all twelve release types.
+
+**Packaging fix**: `wire/release-types/*.yaml` is now actually bundled into the distributable plugin and extension — it previously wasn't, so the precondition gate and Autopilot's order resolution silently only worked inside the Wire source repo, never for a real installed-plugin engagement.
+
+---
+
 ## v3.10.4 — Cube, Omni, and OAC semantic-layer options; Wire Studio and agentic_commerce removed
 
 **Released**: July 2026

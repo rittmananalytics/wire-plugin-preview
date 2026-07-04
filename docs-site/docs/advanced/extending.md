@@ -9,47 +9,23 @@ Wire is designed to be extended — new release types, new artifact types, new u
 
 ## Adding a new release type
 
-A release type is a named configuration in `wire/packaging/wire-plugin/WIRE_COMMANDS.md` (or its Gemini equivalent), with:
-- A set of phases
-- An ordered list of artifacts per phase
-- Command mappings (`-generate`, `-validate`, `-review` per artifact)
-- Corresponding spec files in `wire/specs/`
+**Since v4.0.0**, a release type is a YAML file conforming to [`wire/schemas/release-type-schema.md`](https://github.com/rittmananalytics/wire/blob/main/wire/schemas/release-type-schema.md) — phases, an ordered list of artifacts per phase (each with `id`, `command`, `depends_on`, `sequence`, `required`), plus the corresponding spec files. This isn't something you edit directly in this repo: `wire/release-types/*.yaml` and `wire/specs/**/*.md` are a synced, pinned mirror of the private `rittmananalytics/wire-process-registry` repo, branch-protected with mandatory review. See [The Process and Data Model Registries](./registries) for why it's externalized this way and how the sync works.
 
-To add a release type:
+If you're an RA maintainer adding a release type for real:
 
-1. **Define the phases and artifacts** in a new section of `WIRE_COMMANDS.md`:
-
-```markdown
-## Release type: my_release_type
-
-### Phase 1 — Requirements
-- my_first_artifact: generate, validate, review
-
-### Phase 2 — Delivery
-- my_second_artifact: generate, validate, review
-```
-
-2. **Write a spec file** for each artifact at `wire/specs/my_release_type/my_first_artifact.md`. The spec must define:
-   - What upstream inputs this artifact reads
-   - What the artifact produces (format, required sections)
-   - Validation criteria (what PASS/FAIL looks like)
-   - Review prompts (what questions to ask the reviewer)
-
-3. **Register the artifact commands** — add entries to the commands section of `WIRE_COMMANDS.md`:
-
-```markdown
-/wire:my_first_artifact-generate
-/wire:my_first_artifact-validate
-/wire:my_first_artifact-review
-```
-
-4. **Build the packages**:
+1. **Open a PR against `wire-process-registry`**, not this repo. Add the new `release-types/<name>.yaml` there, following the schema — phases, artifacts, `depends_on` edges, `sequence` for tie-breaking within a phase.
+2. **Write a spec file per artifact** at `specs/<domain>/<artifact>/generate.md` (and `validate.md`/`review.md` where applicable) in the same registry repo, with `wire_schema` front-matter conforming to [`wire/schemas/command-schema.md`](https://github.com/rittmananalytics/wire/blob/main/wire/schemas/command-schema.md) — `command`, `artifact`, `domain`, `release_types`, `action_type`, `preconditions` (a static list, or the `dynamic` sentinel if the correct precondition genuinely varies by release type), and so on.
+3. **Get it reviewed and merged** — one approving review is required.
+4. **Sync it into this repo**: `wire/scripts/sync-process-registry.sh` mirrors both directories and pins the resolved commit SHA.
+5. **Build the packages**:
 
 ```bash
 ./wire/scripts/build-packages.sh
 ```
 
-This regenerates the Claude Code plugin and Gemini extension from the source files.
+This bundles the newly-synced `wire/release-types/*.yaml` and inlines the specs into `commands/*.md`/`.toml`, regenerating the Claude Code plugin and Gemini extension.
+
+Once bundled, the [precondition gate](../getting-started/core-concepts#the-precondition-gate) and [Autopilot](./autopilot) both read the new YAML's `depends_on`/`sequence` graph automatically at runtime — nothing else in the framework needs to know a new release type exists.
 
 ## Writing a spec file
 
@@ -129,9 +105,8 @@ When `/wire:new` creates a new engagement, it populates a `CLAUDE.md` file from 
 ## Distributing your extensions
 
 Extensions to Wire can be distributed as separate plugins. A Wire extension plugin follows the same structure as the core Wire plugin, with:
-- A `WIRE_COMMANDS.md` listing the new commands
-- Spec files in `specs/`
-- A `build-packages.sh` entry point
+- Spec files in `specs/` (or your own equivalent directory)
+- A `build-packages.sh`-style entry point that inlines specs into `commands/*.md`
 
 Users install an extension plugin alongside the core Wire plugin:
 

@@ -69,7 +69,7 @@ flowchart TD
     style DBT fill:#e8f4f8,stroke:#2196F3,stroke-width:2px
 ```
 
-`dbt-generate` will not run if `data_model.review` is not `approved` in `status.md`. This prerequisite gate is checked in Step 1 of the command file — not enforced by any framework code, just a conditional check written into the prose.
+`dbt-generate` will not run if `data_model.review` is not `approved` in `status.md`. As of v4.0.0, this isn't a bespoke conditional check hand-written into each command's prose — every generate/validate/review command auto-delegates to a shared utility spec, [`precondition_gate.md`](https://github.com/rittmananalytics/wire/blob/main/wire/specs/utils/precondition_gate.md), which reads the command's declared preconditions and blocks by default if they're not met. There's still no compiled binary enforcing it — it's Markdown prose the model follows, same as everything else in Wire — but it's now one shared mechanism instead of N separately-maintained copies, and a block can be overridden only with a recorded name and reason. See [Core Concepts: The precondition gate](./core-concepts#the-precondition-gate) for the full mechanism.
 
 ---
 
@@ -244,7 +244,7 @@ flowchart LR
 
 The command file specifies the workflow. The skill specifies the craft. Both are Markdown files loaded into the model's context — they combine at runtime to constrain what gets generated.
 
-Skills are listed in `/wire:help` and documented in the [Skills reference](/reference/skills).
+Skills are listed in `/wire:help` and documented in the [Skills reference](../reference/skills).
 
 ### The embedded checklist
 
@@ -395,4 +395,4 @@ Wire's approach has a few concrete implications:
 
 **You can contribute.** The plugin is open source. If you find a rule that doesn't apply to your context, or a step that should be there but isn't, a PR to the command file is all it takes.
 
-Next: [Worked Example →](/advanced/worked-example)
+Next: [Worked Example →](../advanced/worked-example)
