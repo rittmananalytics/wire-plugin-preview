@@ -4506,7 +4506,7 @@ The first is about *how Wire works*: the exact sequence a release type follows, 
 
 Those two can look alike from the outside — both are private repos, both get pulled into this repo as a local copy — but they exist for opposite reasons, which is exactly why they get treated so differently once they're here.
 
-**`wire-process-registry`** is the process knowledge — the source of truth for `wire/release-types/*.yaml` and `wire/specs/**/*.md`. Nothing about it is secret, but now that it can actually *enforce* a release's process rather than just describe it (see [The precondition gate](#the-precondition-gate)), a mistake in it doesn't just look wrong in a doc — it breaks a real engagement. So changing it now goes through a proper review: it's branch-protected (one required approval, admin enforcement on) and never fetched live, with `wire/scripts/sync-process-registry.sh` mirroring it into this repo and pinning the resolved commit in `wire/process_registry/pinned_sha.txt`. Because it's Wire's own public operating procedure — already visible to anyone reading the plugin's command files — this content is bundled straight into the public `wire-plugin`/`wire-extension` packages once synced.
+**[`wire-process-registry`](https://github.com/rittmananalytics/wire-process-registry)** (private repo — RA staff with GitHub org access) is the process knowledge — the source of truth for `wire/release-types/*.yaml` and `wire/specs/**/*.md`. Nothing about it is secret, but now that it can actually *enforce* a release's process rather than just describe it (see [The precondition gate](#the-precondition-gate)), a mistake in it doesn't just look wrong in a doc — it breaks a real engagement. So changing it now goes through a proper review: it's branch-protected (one required approval, admin enforcement on) and never fetched live, with `wire/scripts/sync-process-registry.sh` mirroring it into this repo and pinning the resolved commit in `wire/process_registry/pinned_sha.txt`. Because it's Wire's own public operating procedure — already visible to anyone reading the plugin's command files — this content is bundled straight into the public `wire-plugin`/`wire-extension` packages once synced.
 
 ```mermaid
 flowchart TB
@@ -4520,7 +4520,104 @@ flowchart TB
     style CMDS fill:#e8f5e9,stroke:#2e7d32
 ```
 
-**`wire-data-model-registry`** is the data knowledge, and it's the opposite case. When RA builds a data model for a client in a familiar industry — SaaS, retail, insurance, manufacturing, education, subscription commerce — it's rarely the first time RA has solved this kind of problem: there's a good instinct for what a solid `Customer` entity looks like for a SaaS business, what a `Policy` and `Claim` model needs to capture for insurance, what grain makes sense for subscription revenue. None of that experience used to be available to Wire itself — every new engagement started from a blank page, even when the shape of the answer was already well understood.
+**What a release-type definition actually looks like** — `pipeline_only.yaml` in full, one of the smaller release types and real content from `wire-process-registry`, not illustrative:
+
+```yaml
+wire_schema: "1.0"
+id: pipeline_only
+name: "Pipeline Only"
+description: "Data pipeline development only — ingestion architecture, pipeline implementation, and data quality testing, without a dbt/semantic-layer/BI build."
+applicable_when:
+  - "Client needs a data pipeline built but transformation/BI is out of scope or handled separately"
+  - "Scope is limited to getting data reliably into the warehouse"
+
+phases:
+  - id: requirements
+    name: "Requirements"
+    required: true
+    requires_phase: null
+    artifacts:
+      - id: requirements
+        command: requirements
+        required: true
+        sequence: 1
+        depends_on: []
+
+  - id: design
+    name: "Design"
+    required: true
+    requires_phase: requirements
+    artifacts:
+      - id: pipeline_design
+        command: pipeline_design
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: requirements
+            action: review
+            outcome: approved
+
+  - id: development
+    name: "Development"
+    required: true
+    requires_phase: design
+    artifacts:
+      - id: pipeline
+        command: pipeline
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: pipeline_design
+            action: review
+            outcome: approved
+
+  - id: testing
+    name: "Testing"
+    required: true
+    requires_phase: development
+    artifacts:
+      - id: data_quality
+        command: data_quality
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: pipeline
+            action: review
+            outcome: approved
+
+  - id: deployment
+    name: "Deployment"
+    required: true
+    requires_phase: testing
+    artifacts:
+      - id: deployment
+        command: deployment
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: data_quality
+            action: validate
+            outcome: PASS
+```
+
+| Element | Meaning |
+|---|---|
+| `wire_schema` | Which version of the schema this file conforms to — lets the contract evolve without breaking every existing release type at once. |
+| `id` | The identifier used everywhere else — `status.md`'s `project_type`, `/wire:new`'s selector, and the lookup key both the precondition gate and Autopilot use (`wire/release-types/<id>.yaml`). |
+| `name` / `description` | Human-readable label and summary, shown when choosing a release type. |
+| `applicable_when` | Plain-language guidance on when this release type fits — documentation, not machine-enforced. |
+| `phases[]` | The ordered top-level stages. Coarser than artifacts; mainly organisational. |
+| `phases[].requires_phase` | Which phase must fully complete before this one starts — phase-level ordering. |
+| `phases[].artifacts[]` | The actual deliverables in that phase — this is the part with real teeth. |
+| `artifacts[].id` | The artifact's identifier, matching what appears in `status.md`. |
+| `artifacts[].command` | Which command family handles it — resolves to `/wire:{command}-generate/-validate/-review`. |
+| `artifacts[].required` | Whether this artifact must be completed for the release type to be considered done. Some artifacts elsewhere (e.g. `mockups` in `full_platform`) are `false` — optional. |
+| `artifacts[].sequence` | Tie-breaker: when two artifacts in the same phase have no dependency between them, `sequence` decides order. |
+| `artifacts[].depends_on[]` | **The actual dependency graph.** Each entry names an upstream artifact, the gate it must have passed (`action`), and the required state (`outcome`). `pipeline_design` can't start until `requirements`' review is `approved`; `deployment` can't start until `data_quality`'s validate is `PASS`. |
+
+This `depends_on` graph is exactly what the precondition gate checks before letting a command run, and what Autopilot sorts to decide execution order.
+
+**[`wire-data-model-registry`](https://github.com/rittmananalytics/wire-data-model-registry)** (private repo — RA staff with GitHub org access) is the data knowledge, and it's the opposite case. When RA builds a data model for a client in a familiar industry — SaaS, retail, insurance, manufacturing, education, subscription commerce — it's rarely the first time RA has solved this kind of problem: there's a good instinct for what a solid `Customer` entity looks like for a SaaS business, what a `Policy` and `Claim` model needs to capture for insurance, what grain makes sense for subscription revenue. None of that experience used to be available to Wire itself — every new engagement started from a blank page, even when the shape of the answer was already well understood.
 
 This registry is where that experience now lives: a private library, organised by industry, of the entities RA typically expects to see, the structure and grain that's worked well before, and real worked examples of how a similar model was actually built — not code to copy and paste, but a reference to learn the pattern from. The value to a consultant: when you start a data model for a client in one of these industries, Wire recognises the fit and offers this as a starting point — a genuine head start instead of reasoning up the whole thing from nothing. You can take it, adapt it, or ignore it entirely; it's always a suggestion, never applied automatically. Once the model is built, Wire can also flag if something standard for that industry looks like it's missing.
 
