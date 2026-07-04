@@ -72,20 +72,23 @@ Because this comes from real client work, it's genuinely confidential — it's p
 
 ```mermaid
 flowchart TB
-    DMR["Private: wire-data-model-registry<br/>industry entities + worked examples"]
-    SETUP["/wire:utils-data-model-registry-setup<br/>(run once, your own GitHub access)"]
-    HOME["Your machine<br/>~/.wire/data-model-registry/"]
-    PLUGIN["Wire plugin<br/>(never contains this content)"]
-    GEN["data_model-generate<br/>on any future engagement"]
-    RESULT["Proposes a matching industry model<br/>as a starting point — never auto-applied"]
+    START["Anyone installs the Wire plugin"]
+    CMD["Runs /wire:utils-data-model-registry-setup"]
+    CHECK{"RA staff with<br/>registry access?"}
+    YES["Clone succeeds →<br/>saved to your machine"]
+    NO["Clone fails —<br/>reported plainly, not an error"]
+    GEN["Any future engagement:<br/>data_model-generate runs"]
+    PROPOSE["Proposes a matching<br/>industry model — never auto-applied"]
+    SKIP["Skips the proposal —<br/>Wire behaves exactly the same otherwise"]
 
-    DMR --> SETUP --> HOME
-    PLUGIN -.->|"content never bundled here"| DMR
-    HOME --> GEN --> RESULT
+    START --> CMD --> CHECK
+    CHECK -->|Yes| YES --> GEN --> PROPOSE
+    CHECK -->|No| NO --> GEN --> SKIP
 
-    style DMR fill:#fce4ec,stroke:#c62828
-    style PLUGIN fill:#ffebee,stroke:#c62828,stroke-dasharray: 5 5
-    style HOME fill:#e8f5e9,stroke:#2e7d32
+    style YES fill:#e8f5e9,stroke:#2e7d32
+    style NO fill:#ffebee,stroke:#c62828
+    style PROPOSE fill:#e8f5e9,stroke:#2e7d32
+    style SKIP fill:#f5f5f5,stroke:#999
 ```
 
 ### Why it isn't just part of the plugin

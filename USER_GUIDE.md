@@ -4508,6 +4508,18 @@ Those two can look alike from the outside — both are private repos, both get p
 
 **`wire-process-registry`** is the process knowledge — the source of truth for `wire/release-types/*.yaml` and `wire/specs/**/*.md`. Nothing about it is secret, but now that it can actually *enforce* a release's process rather than just describe it (see [The precondition gate](#the-precondition-gate)), a mistake in it doesn't just look wrong in a doc — it breaks a real engagement. So changing it now goes through a proper review: it's branch-protected (one required approval, admin enforcement on) and never fetched live, with `wire/scripts/sync-process-registry.sh` mirroring it into this repo and pinning the resolved commit in `wire/process_registry/pinned_sha.txt`. Because it's Wire's own public operating procedure — already visible to anyone reading the plugin's command files — this content is bundled straight into the public `wire-plugin`/`wire-extension` packages once synced.
 
+```mermaid
+flowchart TB
+    RT["Private: wire-process-registry<br/>release-types/*.yaml, specs/**/*.md"]
+    SYNC["Reviewed, pinned sync"]
+    CMDS["Public: wire-plugin / wire-extension<br/>commands/*.md (bundled)"]
+
+    RT --> SYNC --> CMDS
+
+    style RT fill:#fce4ec,stroke:#c62828
+    style CMDS fill:#e8f5e9,stroke:#2e7d32
+```
+
 **`wire-data-model-registry`** is the data knowledge, and it's the opposite case. When RA builds a data model for a client in a familiar industry — SaaS, retail, insurance, manufacturing, education, subscription commerce — it's rarely the first time RA has solved this kind of problem: there's a good instinct for what a solid `Customer` entity looks like for a SaaS business, what a `Policy` and `Claim` model needs to capture for insurance, what grain makes sense for subscription revenue. None of that experience used to be available to Wire itself — every new engagement started from a blank page, even when the shape of the answer was already well understood.
 
 This registry is where that experience now lives: a private library, organised by industry, of the entities RA typically expects to see, the structure and grain that's worked well before, and real worked examples of how a similar model was actually built — not code to copy and paste, but a reference to learn the pattern from. The value to a consultant: when you start a data model for a client in one of these industries, Wire recognises the fit and offers this as a starting point — a genuine head start instead of reasoning up the whole thing from nothing. You can take it, adapt it, or ignore it entirely; it's always a suggestion, never applied automatically. Once the model is built, Wire can also flag if something standard for that industry looks like it's missing.
@@ -4516,31 +4528,23 @@ Because this comes from real client work, it's genuinely confidential — part o
 
 ```mermaid
 flowchart TB
-    subgraph priv1["Private: wire-process-registry"]
-        RT["release-types/*.yaml"]
-        SP["specs/**/*.md"]
-    end
-    subgraph pub["Public: wire-plugin / wire-extension"]
-        CMDS["commands/*.md (bundled)"]
-    end
-    RT --> CMDS
-    SP --> CMDS
+    START["Anyone installs the Wire plugin"]
+    CMD["Runs /wire:utils-data-model-registry-setup"]
+    CHECK{"RA staff with<br/>registry access?"}
+    YES["Clone succeeds →<br/>saved to your machine"]
+    NO["Clone fails —<br/>reported plainly, not an error"]
+    GEN["Any future engagement:<br/>data_model-generate runs"]
+    PROPOSE["Proposes a matching<br/>industry model — never auto-applied"]
+    SKIP["Skips the proposal —<br/>Wire behaves exactly the same otherwise"]
 
-    subgraph priv2["Private: wire-data-model-registry"]
-        DMR["industry entities +<br/>worked examples"]
-    end
-    subgraph personal["Your machine"]
-        HOME["~/.wire/data-model-registry/<br/>(via /wire:utils-data-model-registry-setup,<br/>run once, your own GitHub access)"]
-    end
-    DMR --> HOME
-    CMDS -.->|"this content never<br/>bundled here"| DMR
-    HOME --> GEN["data_model-generate<br/>on any future engagement"]
-    GEN --> RESULT["Proposes a matching industry model —<br/>never auto-applied"]
+    START --> CMD --> CHECK
+    CHECK -->|Yes| YES --> GEN --> PROPOSE
+    CHECK -->|No| NO --> GEN --> SKIP
 
-    style priv1 fill:#fce4ec,stroke:#c62828
-    style priv2 fill:#fce4ec,stroke:#c62828
-    style pub fill:#e8f5e9,stroke:#2e7d32
-    style personal fill:#e8f5e9,stroke:#2e7d32
+    style YES fill:#e8f5e9,stroke:#2e7d32
+    style NO fill:#ffebee,stroke:#c62828
+    style PROPOSE fill:#e8f5e9,stroke:#2e7d32
+    style SKIP fill:#f5f5f5,stroke:#999
 ```
 
 | | wire-process-registry | wire-data-model-registry |
@@ -4549,8 +4553,6 @@ flowchart TB
 | Confidentiality | Public (Wire's own operating procedure) | Proprietary (real client engagement content) |
 | Bundled into public plugin? | **Yes** | **No — never** |
 | How you get it | Comes with the plugin | `/wire:utils-data-model-registry-setup`, once, using your own GitHub access |
-
-If the setup command fails, that's normal, not a bug — it just means you don't have access to the private repo, and Wire continues to work exactly as it does for anyone else without it.
 
 ### Adding a new command
 
