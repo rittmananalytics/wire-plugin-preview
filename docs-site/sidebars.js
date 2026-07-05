@@ -70,6 +70,7 @@ const sidebars = {
         'tutorials/installing-and-upgrading',
         'tutorials/joining-mid-release',
         'tutorials/upgrading-your-release',
+        'tutorials/data-model-registry',
       ],
     },
     {

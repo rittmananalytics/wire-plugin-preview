@@ -28,6 +28,7 @@ The supplementary tutorials at the bottom of the table cover the operational mec
 | [Installing and Upgrading](./installing-and-upgrading) | — | Claude Code and Gemini CLI installation from scratch | Three-step Claude Code install; Gemini CLI extension install; MCP server configuration; verification commands; keeping the plugin current |
 | [Joining Mid-Release](./joining-mid-release) | — | Aldgate Financial Services — consultant handover at Phase 3 | `/wire:start` state recovery; `decisions.md` history; Fathom transcript surfacing; first-session planning on an engagement you did not start |
 | [Upgrading Your Release](./upgrading-your-release) | — | Pennant Capital Management — dormant release resuming after a six-week pause | What `/wire:upgrade` changes and preserves; spec version delta; post-upgrade verification; re-entrancy with in-progress artifacts |
+| [Using the Data Model Registry](./data-model-registry) | — | Core Dynamics, Inc. — B2B SaaS MRR/NRR model inside a `full_platform` release | Registry check as an inline step of `data_model-generate`; confident vertical match with `adapt`; cross-vertical pattern matched on technique rather than stated origin; what gets recorded in `context.md` and carried into the generated model |
 
 :::note
 

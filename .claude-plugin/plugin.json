@@ -1,7 +1,7 @@
 {
   "name": "wire-preview",
   "description": "The Wire Framework \u2014 AI-accelerated data platform delivery for the full lifecycle: requirements, design, development, testing, deployment, enablement",
-  "version": "4.0.0-preview+8d13415e",
+  "version": "4.0.0-preview+f0f7baf8",
   "author": {
     "name": "Rittman Analytics",
     "email": "hello@rittmananalytics.com"
