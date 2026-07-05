@@ -6,7 +6,7 @@ Wire is a structured delivery system for data platform engagements, built on top
 
 Instead of prompting an AI to write a dbt model and hoping it follows your conventions, you run `/wire:dbt-generate` and the AI receives a specification that tells it exactly which upstream design decisions to read, which naming patterns to apply, which tests to include, and how to update the project status tracker when it's done.
 
-**[Full documentation at docs.rittmananalytics.com](https://docs.rittmananalytics.com)**
+**[Full documentation at wire-plugin-preview.readthedocs.io](https://wire-plugin-preview.readthedocs.io/)**
 
 ---
 
@@ -27,7 +27,7 @@ Wire does not replace consultants or developers. It gives them an AI that works 
 - **Two-tier engagement structure** separating long-running client context from individual scoped releases
 - **Generate / validate / review lifecycle** for every artifact: structured generation, automated checks, stakeholder sign-off
 - **Precondition gate** (v4.0.0) — every command blocks by default on an unmet prerequisite; overriding requires a recorded name and reason, so skipping a step on purpose is always a visible, attributable decision rather than something that silently happened
-- **Process and data model registries** (v4.0.0) — release-type sequencing and command specs are sourced from a private, branch-protected `wire-process-registry`; an optional, automatically-detected canonical data model registry (`wire-data-model-registry`) proposes industry-standard entity structures without ever bundling proprietary content into this public plugin — see [docs.rittmananalytics.com/advanced/registries](https://docs.rittmananalytics.com/advanced/registries)
+- **Process and data model registries** (v4.0.0) — release-type sequencing and command specs are sourced from a private, branch-protected `wire-process-registry`; an optional, automatically-detected canonical data model registry (`wire-data-model-registry`) proposes industry-standard entity structures without ever bundling proprietary content into this public plugin — see [wire-plugin-preview.readthedocs.io/advanced/registries](https://wire-plugin-preview.readthedocs.io/advanced/registries)
 - **27 ad-hoc development skills** that activate automatically during coding work (dbt, LookML, Dagster, Python, Fivetran, Airbyte, Coupler.io, RudderStack, Segment, Looker, Snowflake, Hightouch, BigQuery, Cloud Run, gcloud) without any explicit invocation, plus **26 Amplitude product-analytics skills** for working with an Amplitude instance
 - **Wire Agents** — 13 specialist subagents (dbt developer, semantic layer developer, pipeline engineer, migration specialist, and 9 others) dispatched automatically on every generate and validate command. `/wire:delegate` computes a full parallel/sequential execution plan across all pending work, with fan-out parallelism for large model sets (layers stay sequential; agents within each layer run in parallel)
 - **Autopilot mode** for autonomous end-to-end delivery
@@ -299,7 +299,7 @@ A VS Code extension (`wire-vscode/`) is in early development. The intention is t
 
 ## Documentation
 
-- [Documentation site](https://docs.rittmananalytics.com) — full documentation with search, covering all release types, commands, skills, and MCP servers
+- [Documentation site](https://wire-plugin-preview.readthedocs.io/) — full documentation with search, covering all release types, commands, skills, and MCP servers
 - [User Guide](USER_GUIDE.md) — full operational guide covering all release types, worked examples, Autopilot, and troubleshooting
 - [Command Registry](wire/COMMANDS.md) — command catalog and conventions (run `/wire:help` for the full, current list of all 261 commands)
 - [Changelog](CHANGELOG.md)
