@@ -115,15 +115,19 @@ This step runs automatically on every engagement — there's no opt-in flag to s
    - If not found, check `~/.wire/data-model-registry/` (present only if this consultant has personally run `/wire:utils-data-model-registry-setup` and has access to the private `wire-data-model-registry` repo).
    - If neither exists, **skip silently to Step 2** — no message, no note in the output spec. Most engagements and most consultants will land here; this is expected, not a degraded path.
 
-2. **Resolve the vertical:**
-   - Read `.wire/engagement/context.md`. If `data_model_registry.vertical` is already set to a non-null value (a consultant can set this by hand at any time), use it directly and skip to step 3 below — an explicit manual value always wins over inference.
-   - Otherwise, infer a candidate from the requirements and conceptual model already read in Step 1: match the client's stated industry/domain language against the vertical index in the registry root (`education`, `insurance`, `manufacturing`, `marketplace`, `retail`, `subscription-commerce`). This is a judgment call, not a keyword lookup — read the vertical's own schema descriptions to judge fit, don't just string-match the industry name.
-   - If no vertical is a plausible fit, **skip silently to Step 2** — do not ask the practitioner to pick one from a list just to confirm "none apply." A non-match is exactly as valid an outcome as a match, and is the majority case for most industries (there is, for instance, no `saas` vertical yet — flagged as a gap in the registry's own README).
+2. **Resolve the vertical, in two tiers — don't stop at "no exact match":**
+   - Read `.wire/engagement/context.md`. If `data_model_registry.vertical` is already set to a non-null value (a consultant can set this by hand at any time), use it directly as a **confident match** and skip to Step 3.
+   - Otherwise, infer from the requirements and conceptual model already read in Step 1, reading each vertical's own schema descriptions to judge fit rather than string-matching the industry name:
+     - **Confident match**: the client's actual business is recognizably an instance of one of the six named verticals (`education`, `insurance`, `manufacturing`, `marketplace`, `retail`, `subscription-commerce`) — e.g. a retail e-commerce client against `retail`.
+     - **Adjacent match**: no vertical is a confident fit, but one vertical's entity *shape* is still structurally close to what this client needs, even though that vertical was built from a different kind of business. There is no `saas` vertical yet (flagged as a gap in the registry's own README) — that is not a reason to propose nothing. A B2B SaaS client's MRR/NRR model, for instance, is structurally closer to `subscription-commerce`'s subscriber/subscription/subscription_event/monthly_retention/subscription_revenue entities (even though that vertical's content was built from non-software subscription businesses) than to any other vertical in the registry. Propose an adjacent match explicitly labeled as approximate — don't silently withhold it just because it isn't a clean industry match.
+   - If neither a confident nor an adjacent vertical exists, proceed to Step 3 with no vertical candidate at all — this remains a normal, common outcome, not a failure.
 
-3. **If a vertical is resolved (manual or inferred), propose it — never auto-adopt:**
-   - Read every file in `<registry_root>/verticals/<vertical>/schemas/*.yml` and the entity files each one references in `<registry_root>/verticals/<vertical>/entities/*.yml`.
-   - Check `<registry_root>/cross-vertical/schemas/*.yml` for anything thematically relevant to this client's actual sources — e.g. propose layering `ga4_ecommerce` on top of a `retail` match if the client uses GA4, or `multi_touch_attribution` if they run paid media across multiple channels. Respect each schema's `depends_on_schemas` field for sequencing (e.g. `ga4_ecommerce` depends on `event_tracking_and_sessionization`).
-   - Present the matched schema(s) — entities, `standard_marts`, grain, relationships — as a **proposed starting structure**:
+3. **Independently check cross-vertical patterns — this runs regardless of what Step 2 found.** Cross-vertical relevance is not conditional on having a vertical match; a client can need `crm_identity_resolution` (reconciling contacts/accounts across a CRM and marketing automation tool — a routine problem for any B2B business, `saas` vertical or not) whether or not any vertical matched at all.
+   - Read `<registry_root>/cross-vertical/schemas/*.yml` and check each one against this client's actual sources, entities, and requirements — e.g. `crm_identity_resolution` for multi-system contact/account reconciliation, `ga4_ecommerce` if the client uses GA4, `multi_touch_attribution` for paid media across channels, `revenue_recognition` if ASC 606-style deferred revenue is in scope. Respect each schema's `depends_on_schemas` field for sequencing (e.g. `ga4_ecommerce` depends on `event_tracking_and_sessionization`).
+   - If Step 2 found nothing and this step finds nothing either, **skip silently to Step 2 of the main workflow** (Define Source Definitions) — no message, no note. This remains the majority-case, expected outcome for most engagements.
+
+4. **Propose whatever was found, tiered by confidence — never auto-adopt:**
+   - **Confident vertical match**: present as a strong proposal:
      ```
      Wire found a canonical data model that may fit this engagement: [vertical] — [schema_name].
      Standard marts: [list from standard_marts]
@@ -131,10 +135,27 @@ This step runs automatically on every engagement — there's no opt-in flag to s
 
      Use this as the starting structure for the data model? (yes / adapt / no)
      ```
-     - **yes** — use the canonical entity list, grain, and naming as the baseline for Steps 2–7, adjusted only for this client's actual source systems and column names. Record `data_model_registry.vertical: <vertical>` in `.wire/engagement/context.md` if it wasn't already set, so `data_model-validate` can find it later.
-     - **adapt** — ask which specific entities/marts to keep, drop, or rename; use the rest as-is. Record the vertical as above.
-     - **no** — proceed with Step 2 onward exactly as if no match were found. Do not write `data_model_registry.vertical` to context.md — an explicit decline should not get treated as a manual override on the next run. Worth a one-line note in the spec that a canonical match existed but wasn't used (useful signal for the registry's own maintainers), but no other effect.
-4. For every model in the final data model that maps to a canonical entity (whether adopted as-is or adapted), carry that entity's `generation_constraints` and `reference_implementation` pointer(s) forward into that model's spec entry in Step 5 (or Step 3 for staging). This is the only place the registry's worked-example SQL becomes reachable — `dbt-generate` reads `data_model_specification.md` as its primary input either way, so it inherits these pointers automatically; no changes to `dbt-generate` itself are needed. Treat `reference_implementation` strictly as a worked example to read and adapt, never to copy verbatim — the registry's own README is explicit that a specific `.sql` file is not reusable across clients, only the pattern it demonstrates is.
+   - **Adjacent vertical match only**: present with the mismatch stated plainly, not hidden:
+     ```
+     No vertical in the registry is an exact industry match for [client's actual industry] — there's no
+     [inferred missing vertical, e.g. "saas"] vertical yet. The closest available entity shape is
+     [vertical] — built from [what that vertical's content actually covers], not [client's industry].
+     Entities: [list]
+
+     This may still be a reasonable starting point for [specific reason, e.g. "the MRR/NRR model"].
+     Worth using loosely, or skip entirely? (yes / adapt / no)
+     ```
+   - **Cross-vertical pattern(s)** found in Step 3 — present alongside whichever vertical proposal exists above, or on their own if no vertical proposal exists at all:
+     ```
+     Also relevant regardless of industry fit: [cross-vertical schema name] — [one-line reason
+     specific to this client's actual requirements/sources].
+     Include this pattern too? (yes / adapt / no)
+     ```
+   - **yes** (any of the above) — use the proposed entity list, grain, and naming as a baseline for Steps 2–7, adjusted for this client's actual source systems and column names. For a vertical match (confident or adjacent), record `data_model_registry.vertical: <vertical>` in `.wire/engagement/context.md` if not already set. For accepted cross-vertical patterns, record them in `data_model_registry.cross_vertical_schemas: [<schema_name>, ...]` (append, don't overwrite).
+   - **adapt** — ask which specific entities/marts to keep, drop, or rename; use the rest as-is. Record as above.
+   - **no** — proceed with Step 2 onward exactly as if that specific match were never proposed. Do not write it to context.md — an explicit decline should not get treated as a manual override on the next run. Worth a one-line note in the spec that a match existed but wasn't used (useful signal for the registry's own maintainers), but no other effect. Each proposal (vertical, cross-vertical) is decided independently — declining one doesn't decline the other.
+
+5. For every model in the final data model that maps to a canonical entity (whether from a confident match, an adjacent match, or an accepted cross-vertical pattern, adopted as-is or adapted), carry that entity's `generation_constraints` and `reference_implementation` pointer(s) forward into that model's spec entry in Step 5 (or Step 3 for staging). This is the only place the registry's worked-example SQL becomes reachable — `dbt-generate` reads `data_model_specification.md` as its primary input either way, so it inherits these pointers automatically; no changes to `dbt-generate` itself are needed. Treat `reference_implementation` strictly as a worked example to read and adapt, never to copy verbatim — the registry's own README is explicit that a specific `.sql` file is not reusable across clients, only the pattern it demonstrates is.
 
 ### Step 2: Define Source Definitions
 

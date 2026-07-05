@@ -408,7 +408,18 @@ Store `notion_parent_page_id` (extract ID from URL if a full URL was given).
 
 If any document store is selected, follow the workflow in `specs/utils/docstore_setup.md`. Pass the engagement name, release folder, provider choice, `confluence_space_key` (if set), and `notion_parent_page_id` (if set) — the utility should skip re-asking for these when they are already supplied.
 
-If skipped, continue to Step 10.
+If skipped, continue to Step 9.6.
+
+### Step 9.6: Data Model Registry — Automatic Setup Attempt (Conditional, Silent)
+
+This step exists to close a gap: `data_model-generate`'s canonical-vertical matching (see `wire/schemas/data-model-registry.md`) only ever *checks* for a local registry copy, it never *fetches* one — so even an RA consultant with real access to `wire-data-model-registry` would get the feature silently skipped forever unless they happened to know about and manually run `/wire:utils-data-model-registry-setup` first, unprompted. The actual gate should be GitHub repo access, not "did you separately remember to run a setup command." This step makes that true, without adding noise or unnecessary network calls for engagements that will never use the registry.
+
+1. **Check relevance first.** Read `wire/release-types/<release_type>.yaml` for the `release_type` selected in Step 5 (skip this check entirely for `custom` — its scope isn't known yet). If no `phases[].artifacts[]` entry has `id: data_model`, this release type will never call `data_model-generate` — **skip this whole step silently**, nothing to set up. (`pipeline_only`, `dashboard_extension`, `enablement`, `platform_migration`, `agentic_data_stack`, `droughty`, and both discovery types never need this; `full_platform`, `dbt_development`, and `dashboard_first` do.)
+2. **Check whether setup was already attempted.** `ls ~/.wire/data_model_registry_setup_attempted 2>/dev/null`. If it exists, skip this step silently — already handled on a prior engagement on this machine, don't re-attempt every time a new engagement is created.
+3. **Attempt it.** If the release type needs it and no attempted-marker exists, follow `specs/utils/data_model_registry_setup.md` as an automated (non-interactive) caller — see that spec's Step 1.5 for what changes in that mode. It writes the attempted marker itself; nothing further to do here.
+4. **Report minimally.** On success, the setup spec's own automated-mode output (one unobtrusive line) is enough — don't add anything else. On failure, say nothing at all; continue to Step 10 exactly as if this step didn't exist.
+
+If skipped for any reason above, continue to Step 10.
 
 ### Step 10: Create Engagement Folder Structure
 

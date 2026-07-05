@@ -68,6 +68,17 @@ Pull the latest? (yes / no)
 
 If absent, continue to Step 2.
 
+### Step 1.5: The attempted marker (for other commands calling this non-interactively)
+
+Some Wire commands (`/wire:new`, `/wire:autopilot`) attempt this setup automatically and silently when they're about to work on an artifact that could use the registry, rather than requiring a consultant to have run this command manually first. When invoked that way (no interactive session, not run directly by a person), skip Step 1's interactive prompt — if a local copy already exists, just proceed as normal; don't ask about pulling. After Step 3 completes (success or failure), always write:
+
+```bash
+mkdir -p ~/.wire
+date -u +%Y-%m-%dT%H:%M:%SZ > ~/.wire/data_model_registry_setup_attempted
+```
+
+This marker means: "a clone was attempted on this machine, at this time — don't automatically re-attempt from an automated caller." It does not mean the clone succeeded. Automated callers check for this marker's existence before invoking this workflow at all, so they only ever attempt once per machine, not once per engagement or release. A person running this command directly and interactively should feel free to re-run it any time regardless of the marker — the marker only gates *automatic* invocation, never a consultant's own deliberate one.
+
 ### Step 2: Clone
 
 Prefer the `gh` CLI — it uses whatever `gh auth login` token is already active, which works non-interactively and fails cleanly on an auth error. Plain `git clone` over HTTPS depends on a credential helper being separately configured (keychain, Git Credential Manager, a PAT) and, run non-interactively via this command, either hangs prompting for a username/password or fails outright if that isn't set up — so it's a fallback only.
@@ -104,6 +115,8 @@ manages RA's GitHub org.
 The one exception worth a distinct message: if `gh` isn't installed and the fallback `git clone` fails with a credential/authentication error specifically (not a 404), it may just mean git isn't authenticated yet rather than lacking access — mention that installing `gh` and running `gh auth login` is the fastest fix, then re-running this command.
 
 Do not retry automatically beyond that one distinction, and do not treat a plain access-denied outcome as a bug — a failed clone here is a normal, expected outcome for the majority of people who might run this command.
+
+**When invoked automatically** (not directly by a person — see Step 1.5), skip the messages above entirely. Write the attempted marker (Step 1.5) and, on success only, note it briefly and unobtrusively in the calling command's own output (e.g. one line: "Data model registry found — canonical-vertical matching available for this engagement"). On failure, say nothing at all — an automated attempt failing is not news to surface, since it's the default outcome for most people.
 
 ## Notes
 

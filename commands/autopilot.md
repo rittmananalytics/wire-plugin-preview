@@ -567,6 +567,17 @@ Artifact sequence: [resolved from wire/release-types/{current_type}.yaml — see
 ---
 ```
 
+### Step 4.2.5: Data Model Registry — Automatic Setup Attempt (Conditional, Silent)
+
+Same gap this closes as `specs/new.md`'s equivalent step: `data_model-generate`'s canonical-vertical matching only ever checks for a local registry copy, never fetches one, so an RA consultant running Autopilot on a machine that never had `/wire:utils-data-model-registry-setup` run manually would get the feature silently and permanently skipped despite having real GitHub access. The gate should be repo access, not "did anyone remember to run the setup command first."
+
+1. **Check relevance.** Read `wire/release-types/{current_type}.yaml`. If no `phases[].artifacts[]` entry has `id: data_model`, skip this step silently — this release will never call `data_model-generate`.
+2. **Check the attempted marker.** `ls ~/.wire/data_model_registry_setup_attempted 2>/dev/null`. If present, skip silently — already handled, on this machine, possibly by an earlier release in this same run or an earlier engagement entirely.
+3. **Attempt it.** Follow `specs/utils/data_model_registry_setup.md` as an automated caller (its Step 1.5). It writes the marker itself.
+4. **Report minimally**, exactly as `specs/new.md`'s equivalent step does — one unobtrusive line on success, nothing at all on failure. Do not treat a failure here as a blocker or log it as an error; continue straight to Step 4.3.
+
+This runs at most once per Autopilot invocation, on whichever release first needs it (typically the first `full_platform`/`dbt_development`/`dashboard_first` release in the plan) — not once per release.
+
 ### Step 4.3: Resolve Order and Run the Artifact Execution Loop
 
 Autopilot never hardcodes which artifacts a release type has or what order

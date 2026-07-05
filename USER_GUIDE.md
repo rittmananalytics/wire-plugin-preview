@@ -4619,22 +4619,24 @@ This `depends_on` graph is exactly what the precondition gate checks before lett
 
 **[`wire-data-model-registry`](https://github.com/rittmananalytics/wire-data-model-registry)** (private repo — RA staff with GitHub org access) is the data knowledge, and it's the opposite case. When RA builds a data model for a client in a familiar industry — SaaS, retail, insurance, manufacturing, education, subscription commerce — it's rarely the first time RA has solved this kind of problem: there's a good instinct for what a solid `Customer` entity looks like for a SaaS business, what a `Policy` and `Claim` model needs to capture for insurance, what grain makes sense for subscription revenue. None of that experience used to be available to Wire itself — every new engagement started from a blank page, even when the shape of the answer was already well understood.
 
-This registry is where that experience now lives: a private library, organised by industry, of the entities RA typically expects to see, the structure and grain that's worked well before, and real worked examples of how a similar model was actually built — not code to copy and paste, but a reference to learn the pattern from. The value to a consultant: when you start a data model for a client in one of these industries, Wire recognises the fit and offers this as a starting point — a genuine head start instead of reasoning up the whole thing from nothing. You can take it, adapt it, or ignore it entirely; it's always a suggestion, never applied automatically. Once the model is built, Wire can also flag if something standard for that industry looks like it's missing.
+This registry is where that experience now lives: a private library, organised by industry, of the entities RA typically expects to see, the structure and grain that's worked well before, and real worked examples of how a similar model was actually built — not code to copy and paste, but a reference to learn the pattern from. The value to a consultant: when you start a data model for a client in one of these industries, Wire recognises the fit and offers this as a starting point — a genuine head start instead of reasoning up the whole thing from nothing. You can take it, adapt it, or ignore it entirely; it's always a suggestion, never applied automatically. This isn't limited to an exact industry match, either — if nothing in the registry is a confident fit (there's no dedicated `saas` vertical yet, for instance), Wire proposes the closest available analogue, explicitly labelled as approximate, and separately checks for relevant cross-industry patterns (contact reconciliation across systems, revenue recognition, and so on) regardless of whether any industry matched at all. Once the model is built, Wire can also flag if something standard for that industry looks like it's missing.
 
-Because this comes from real client work, it's genuinely confidential — part of what makes RA's delivery experience valuable, not something to publish for anyone who installs the Wire plugin. So it's kept out of the public plugin entirely and never bundled in. Instead, run `/wire:utils-data-model-registry-setup` once — it clones the private registry to your machine using your own GitHub access. If you're not an RA staff member with access, this command simply isn't for you, and Wire behaves exactly the same either way. After that one-time setup, Wire finds it automatically on every future engagement.
+Because this comes from real client work, it's genuinely confidential — part of what makes RA's delivery experience valuable, not something to publish for anyone who installs the Wire plugin. So it's kept out of the public plugin entirely and never bundled in.
+
+**Setup is automatic — you shouldn't need to think about it.** `/wire:new` and Autopilot both attempt this on your behalf, silently, the first time you start an engagement whose release type would actually use it (`full_platform`, `dbt_development`, `dashboard_first`) — at most once per machine. If you have GitHub access, it just works from then on; if you don't, nothing happens and nothing changes about how Wire behaves for you. You can also run `/wire:utils-data-model-registry-setup` yourself any time.
 
 ```mermaid
 flowchart TB
-    START["Anyone installs the Wire plugin"]
-    CMD["Runs /wire:utils-data-model-registry-setup"]
+    START["/wire:new or Autopilot starts an engagement\n(release type that uses data_model)"]
+    AUTO["Attempts setup automatically\n(once per machine) — or run\n/wire:utils-data-model-registry-setup yourself, any time"]
     CHECK{"RA staff with<br/>registry access?"}
     YES["Clone succeeds →<br/>saved to your machine"]
     NO["Clone fails —<br/>reported plainly, not an error"]
     GEN["Any future engagement:<br/>data_model-generate runs"]
-    PROPOSE["Proposes a matching<br/>industry model — never auto-applied"]
+    PROPOSE["Proposes a matching or closest-adjacent<br/>industry model, and/or cross-vertical<br/>patterns — never auto-applied"]
     SKIP["Skips the proposal —<br/>Wire behaves exactly the same otherwise"]
 
-    START --> CMD --> CHECK
+    START --> AUTO --> CHECK
     CHECK -->|Yes| YES --> GEN --> PROPOSE
     CHECK -->|No| NO --> GEN --> SKIP
 
@@ -4649,7 +4651,7 @@ flowchart TB
 | Content | Release-type YAML, command specs | Canonical entity/schema YAML, reference dbt SQL |
 | Confidentiality | Public (Wire's own operating procedure) | Proprietary (real client engagement content) |
 | Bundled into public plugin? | **Yes** | **No — never** |
-| How you get it | Comes with the plugin | `/wire:utils-data-model-registry-setup`, once, using your own GitHub access |
+| How you get it | Comes with the plugin | Automatic (via `/wire:new`/Autopilot) or `/wire:utils-data-model-registry-setup` yourself, using your own GitHub access |
 
 ### Adding a new command
 

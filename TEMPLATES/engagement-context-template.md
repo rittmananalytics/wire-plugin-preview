@@ -21,8 +21,12 @@ docstore:
 
 data_model_registry:
   vertical: null  # education | insurance | manufacturing | marketplace | retail | subscription-commerce | null
+                  # May be a confident match, or the closest adjacent match when no vertical is an
+                  # exact industry fit (e.g. subscription-commerce for a SaaS client's MRR/NRR model).
                   # Advisory only — see wire/schemas/data-model-registry.md. null (the default)
                   # means data_model-generate/validate behave exactly as if this didn't exist.
+  cross_vertical_schemas: []  # e.g. [crm_identity_resolution, revenue_recognition] — accepted independently
+                  # of any vertical match; a client can need these whether or not `vertical` above is set.
 ---
 
 # Engagement Context: {{ENGAGEMENT_NAME}}
