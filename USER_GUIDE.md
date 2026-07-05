@@ -483,6 +483,23 @@ In addition to `status.md`, each project maintains an `execution_log.md` file th
 
 The log is useful for handovers (a new team member can see the full history of what was done), for auditing (confirming when artifacts were generated and who approved them), and for debugging (identifying when a failure occurred and what preceded it).
 
+### Detailed execution tracing (opt-in)
+
+**As of v4.0.0.** `execution_log.md`'s one-row-per-command summary can't answer "what actually happened *inside* that command" — which files it read, what it inferred, what it proposed, what you decided and why. For that depth, set:
+
+```bash
+export WIRE_TRACE=true
+```
+
+Every command checks this on every invocation — on by an environment variable, off by default, zero overhead when unset. Once on, each command writes a step-by-step trace to `.wire/releases/<release_folder>/trace.jsonl` (JSON Lines, one event per line: `command_start`, one `step` event per meaningful step, `command_end`) — local only, never sent anywhere, unlike the anonymous Segment telemetry event. Each event's `detail` field has no length limit, unlike `execution_log.md`'s 120-character cap:
+
+```json
+{"ts":"2026-07-05T14:20:11Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"step","step":"1.5.1","step_name":"Resolve the registry location","result":null,"detail":"Checked wire/data-model-registry/ (not found). Checked ~/.wire/data-model-registry/ (found)."}
+{"ts":"2026-07-05T14:20:19Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"step","step":"1.5.2","step_name":"Resolve the vertical","result":null,"detail":"No confident vertical match — no dedicated saas vertical exists. Adjacent match found: subscription-commerce, proposed as an analogue for the MRR/NRR model."}
+```
+
+That's exactly the level of detail that would have made the [data model registry's](#the-process-and-data-model-registries) automatic-detection behavior visible without reconstructing it by hand — was the registry reachable, what did it search, what matched, how was it used downstream. This is additive to `execution_log.md` and Telemetry, not a replacement for either, and applies uniformly across every command — it's injected once at build time (`wire/specs/utils/tracing.md`, via `build-packages.sh`), so no individual command spec needed to change.
+
 ### The chain of derivation
 
 Each artifact constrains the next. By the time the AI generates LookML, the dimension names, measure definitions, and join paths are fully determined by upstream artifacts — there is no room for improvisation.
@@ -5198,6 +5215,8 @@ This release turns that graph into structured YAML per release type, then builds
 - **Autopilot rewrite** — resolves execution order dynamically from each release type's YAML instead of ~700 lines of hardcoded sequences (which had silently omitted `orchestration` from `full_platform`), and now runs the real `/wire:*` commands instead of a parallel copy of their logic.
 - **`pipeline_only`, `dashboard_extension`, `enablement`** gain formal `wire/release-types/*.yaml` definitions, closing a gap where they were documented but not actually schema-backed.
 - **Packaging fix** — `wire/release-types/*.yaml` is now bundled into the distributable plugin/extension; previously it wasn't, so the precondition gate and Autopilot's order resolution only worked inside the Wire source repo.
+- **Data model registry fixes** (found via an Autopilot dry run on an RA staff member's own machine) — `/wire:new`/Autopilot now attempt the registry clone automatically (previously only ever checked for, never fetched, so even genuine GitHub access got silently skipped); `data_model-generate` now proposes an adjacent vertical match and independent cross-vertical patterns instead of giving up when no vertical is a confident industry fit (e.g. no dedicated `saas` vertical existed, so a SaaS client got nothing at all).
+- **Detailed execution tracing (opt-in)** — `WIRE_TRACE=true` makes every command write a step-by-step, unlimited-detail trace to `.wire/releases/<release>/trace.jsonl`; off by default, local-only, applies uniformly across all ~260 commands via the same build-time injection mechanism Telemetry uses. See [Detailed execution tracing](#detailed-execution-tracing-opt-in).
 
 ---
 

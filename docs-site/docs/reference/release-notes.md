@@ -29,6 +29,10 @@ This release turns that graph into data — a `wire/release-types/<type>.yaml` p
 
 **Packaging fix**: `wire/release-types/*.yaml` is now actually bundled into the distributable plugin and extension — it previously wasn't, so the precondition gate and Autopilot's order resolution silently only worked inside the Wire source repo, never for a real installed-plugin engagement.
 
+**Two fixes to the data model registry, found via an Autopilot dry run on an RA staff member's own machine.** First: the registry was only ever checked for, never fetched — so even a consultant with genuine GitHub access got it silently skipped forever unless they'd separately run `/wire:utils-data-model-registry-setup` manually first. `/wire:new` and Autopilot now attempt the clone automatically and silently, once per machine, only for release types that actually use `data_model`. Second: with no dedicated `saas` vertical in the registry, a SaaS client previously got no proposal at all. `data_model-generate` now proposes an explicitly-labeled **adjacent** vertical match when no confident one exists, and checks cross-vertical patterns independently of any vertical match.
+
+**Detailed execution tracing, opt-in.** `execution_log.md`'s one-row-per-command, 120-character-capped summary can't show what happened *inside* a command. Setting `WIRE_TRACE=true` now makes every command write a step-by-step trace with unlimited-length detail to `.wire/releases/<release>/trace.jsonl` — off by default, local-only, injected once at build time into all ~260 commands via the same mechanism Telemetry already used. See [Detailed Execution Tracing](../advanced/tracing).
+
 ---
 
 ## v3.10.4 — Cube, Omni, and OAC semantic-layer options; Wire Studio and agentic_commerce removed
