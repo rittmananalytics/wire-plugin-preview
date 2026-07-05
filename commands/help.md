@@ -291,6 +291,7 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 | `/wire:utils-docstore-sync` | `<project-folder> <artifact>` | Sync a generated artifact to the document store |
 | `/wire:utils-docstore-fetch` | `<project-folder> <artifact>` | Fetch document store content and comments for review |
 | `/wire:utils-data-model-registry-setup` | `(no arguments - interactive)` | Clone the private wire-data-model-registry repo to this machine, for RA staff with access |
+| `/wire:utils-fathom-sync` | `[--after YYYY-MM-DD] [--before YYYY-MM-DD] [--limit N] [--dry-run] [--no-findings]` | Pull new Fathom call transcripts for this engagement's client into .wire/engagement/calls/, then extract findings |
 | `/wire:utils-migration-agent-delegate` | `(internal — called by migration generate commands)` | Auto-delegation protocol for migration generate commands — dispatch to migration-specialist subagent when available |
 | `/wire:utils-delivery-forecast` | `<client-name> [--release <folder>]` | Calculate % delivered and ETA per release using checklist, Jira, Harvest and Fathom velocity, compared against contractual dates |
 | `/wire:utils-doc-analyze` | `<file-path-or-url> [<file-path-2> ...]` | Extract deliverables, acceptance criteria, and timeline from SoW or project documents |

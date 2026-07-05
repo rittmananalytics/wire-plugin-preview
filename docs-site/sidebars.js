@@ -46,6 +46,7 @@ const sidebars = {
         'advanced/extending',
         'advanced/registries',
         'advanced/tracing',
+        'advanced/fathom-sync',
       ],
     },
     {

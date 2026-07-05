@@ -227,10 +227,36 @@ What is your name (engagement lead)?
 
 Wait for user response.
 
+```
+What is the client's email domain? (e.g. "acme.com")
+Used to automatically sync Fathom call transcripts for this engagement into
+.wire/engagement/calls/, matched against calendar invitees on each call — so
+only calls this client actually attended get pulled in, not unrelated meetings.
+Leave blank to skip automatic Fathom sync for this engagement.
+```
+
+Wait for user response — this may be blank.
+
 **Derive**:
 - `client_name`: Display name as provided
 - `engagement_name`: Lowercase, underscores for spaces, no special chars
 - `engagement_lead`: As provided
+- `client_domain_input`: the domain as provided, or blank
+
+**Resolve `fathom_sync` — enabled by default whenever it's safe to be:**
+
+1. If `client_domain_input` is blank, set `fathom_sync.enabled: false` and `fathom_sync.client_domain: null`. There's nothing safe to filter on without a domain — do **not** fall back to matching on `client_name` as free text; a text search has no way to distinguish "this specific client" from any other meeting that happens to mention the same words.
+2. If `client_domain_input` is RA's own domain (`rittmananalytics.com`, case-insensitive, or a subdomain of it) — **or** `client_name` is self-referential (matches "Rittman Analytics", "RA", or similar close variants) — this is an internal engagement, not a client one. Refuse automatic sync regardless of what was typed:
+   ```
+   This looks like an internal Rittman Analytics engagement, not a client one.
+   Fathom Sync matches by calendar-invitee domain — and your own domain is on
+   every meeting your team has, internal or client-facing, so it can't safely
+   narrow anything here. Skipping automatic Fathom sync for this engagement;
+   you can still pull specific calls manually with /wire:utils-meeting-context
+   if needed.
+   ```
+   Set `fathom_sync.enabled: false`, `fathom_sync.client_domain: null` (don't store the RA domain — it should never end up as an active filter, even accidentally, if this field gets read elsewhere later).
+3. Otherwise, a real, external, non-RA domain was given: set `fathom_sync.enabled: true`, `fathom_sync.client_domain: <client_domain_input>`. This is the default outcome for a normal client engagement — no separate opt-in question, no extra step; giving a client domain is already part of setting up the engagement.
 
 ### Step 3: Repo Mode
 
@@ -505,6 +531,8 @@ This step exists to close a gap: `data_model-generate`'s canonical-vertical matc
 
 If skipped for any reason above, continue to Step 10.
 
+`fathom_sync.enabled`/`client_domain` were already resolved in Step 2 — nothing further to ask here. (Requires the Fathom MCP server to be configured to actually do anything; if it isn't set up yet, `fathom_sync.enabled: true` just means nothing happens until it's reachable — see `skills/fathom-sync/SKILL.md`.)
+
 ### Step 10: Create Engagement Folder Structure
 
 ```bash
@@ -536,6 +564,8 @@ Read `TEMPLATES/engagement-context-template.md` and populate:
 - `{{CREATED_DATE}}` → today's date (YYYY-MM-DD)
 - `{{ENGAGEMENT_LEAD}}` → engagement_lead
 - `{{REPO_MODE}}` → `combined` or `dedicated_delivery`
+- `{{FATHOM_SYNC_ENABLED}}` → `true` or `false`, resolved in Step 2
+- `{{FATHOM_SYNC_CLIENT_DOMAIN}}` → the client domain as a quoted string, or `null` (literal, unquoted) if not set — resolved in Step 2
 
 If repo mode is `dedicated_delivery`, populate the `client_repo` section with the provided URL, local path, and branch.
 

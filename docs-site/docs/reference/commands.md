@@ -187,4 +187,6 @@ Utility commands are prefixed `utils-` and handle integrations and supporting op
 | `/wire:utils-docstore-sync <release>` | Publish generated artifacts to the configured document store |
 | `/wire:utils-docstore-fetch <release>` | Retrieve reviewer comments from the document store as review context |
 | `/wire:utils-meeting-context <release>` | Search Fathom for recent meetings and surface relevant context — used internally by review commands |
+| `/wire:utils-fathom-sync [--after date] [--before date] [--limit N] [--dry-run] [--no-findings]` | Pull new Fathom call transcripts for the engagement's client into `.wire/engagement/calls/`, with an analytical findings write-up per call. Runs automatically once per session if `fathom_sync.enabled` — see [Fathom Call Sync](../advanced/fathom-sync) |
+| `/wire:utils-data-model-registry-setup` | Clone the private `wire-data-model-registry` repo to your machine, for RA staff with access — see [The Process and Data Model Registries](../advanced/registries) |
 | `/wire:utils-run-dbt <release>` | Run dbt commands (compile, test, run) in the context of the release |

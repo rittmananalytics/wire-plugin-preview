@@ -4495,6 +4495,46 @@ Section 4.1 was edited: "Python 3.11" changed to "Python 3.12"
 
 ---
 
+## 25.5. Fathom Call Sync (Automatic by Default, Safeguarded)
+
+**As of v4.0.0.** Wire pulls new Fathom call transcripts for the engagement's client into `.wire/engagement/calls/` automatically, once per session, with a genuine analytical findings write-up per call — no need to remember to run anything, and no separate opt-in question. This is different from `/wire:utils-meeting-context`, which review commands already call for a live, ad-hoc Fathom search scoped to one artifact under review: this persists every new call as a durable, committed file, once, so the whole team has it later (and `utils-meeting-context`'s own searches can find it locally too) without re-querying Fathom.
+
+### On by default, once it's safe to be
+
+`/wire:new` asks for the client's email domain as a normal part of setting up the engagement (right alongside client name). Giving one turns Fathom Sync on automatically:
+
+```yaml
+# .wire/engagement/context.md
+fathom_sync:
+  enabled: true
+  client_domain: "acme.com"   # required — matches calendar invitees on each call
+  last_synced: null           # updated automatically after each sync
+```
+
+Leave the domain blank and it stays off — there's no free-text fallback to a search on the client's name, deliberately: a text search on a company name can't reliably tell "this specific client" apart from any other meeting that happens to mention the same words, and this feature only earns being on by default because the domain filter is narrow enough to trust.
+
+**Safeguard against internal RA engagements.** If the domain given resolves to Rittman Analytics' own domain (`rittmananalytics.com`), or the client name looks self-referential ("Rittman Analytics", "RA"), Wire refuses to enable Fathom Sync — explaining why — regardless of what was typed. The reasoning: RA's own domain is on *every* meeting RA has, internal or client-facing, so it can't narrow anything, and blindly enabling it would pull unrelated internal meetings — potentially confidential ones — into a repo, including a client-facing one under `repo_mode: combined`. This check runs both at `/wire:new` and again every time `/wire:utils-fathom-sync` or the automatic skill actually runs, so a later hand-edit to `context.md` that reintroduces an RA domain gets caught too, not just the initial setup.
+
+### What happens each session
+
+Once enabled, the **Fathom Sync skill** activates once per new conversation (right after the Engagement Context skill loads, using the same "once per session" mechanism) and silently checks for new calls since the last sync — filtered to meetings with at least one calendar invitee actually matching `client_domain`, discarding anything that doesn't. If it finds none — the common case most sessions — nothing happens, no message. If it finds new ones, it writes a call file (transcript, summary, action items) plus a findings file per call to `.wire/engagement/calls/`, updates the sync marker, and reports one brief line before continuing with whatever you actually asked.
+
+**Claude Code only.** Skills are a Claude Code plugin mechanism with no Gemini CLI equivalent — Gemini users get this via the manual command below instead of the automatic per-session pull.
+
+### Running it manually
+
+```bash
+/wire:utils-fathom-sync [--after YYYY-MM-DD] [--before YYYY-MM-DD] [--limit N] [--dry-run] [--no-findings]
+```
+
+Always runs when explicitly invoked, regardless of whether `fathom_sync.enabled` is set — running the command is itself the consent. Useful for a wider backfill than the automatic per-session pull's incremental window, or for Gemini CLI users who have no automatic path. `--dry-run` lists what would be fetched without writing anything; `--no-findings` skips the analytical write-up and just pulls the raw call files.
+
+### Findings quality
+
+The findings step is a genuine analytical pass, not a mechanical extraction — it reads 2–3 of the most recent existing findings files first to match voice, depth, and structure, then synthesises what changed, what was decided, and what it means downstream, rather than restating the Fathom summary. See `wire/specs/utils/fathom_sync.md` for the exact structure and guidelines.
+
+---
+
 ## 26. Extending and Customising the Framework
 
 The framework is designed to be extended. All delivery intelligence lives in plain markdown files. Adding a new capability means writing a new markdown file.
@@ -5217,6 +5257,7 @@ This release turns that graph into structured YAML per release type, then builds
 - **Packaging fix** — `wire/release-types/*.yaml` is now bundled into the distributable plugin/extension; previously it wasn't, so the precondition gate and Autopilot's order resolution only worked inside the Wire source repo.
 - **Data model registry fixes** (found via an Autopilot dry run on an RA staff member's own machine) — `/wire:new`/Autopilot now attempt the registry clone automatically (previously only ever checked for, never fetched, so even genuine GitHub access got silently skipped); `data_model-generate` now proposes an adjacent vertical match and independent cross-vertical patterns instead of giving up when no vertical is a confident industry fit (e.g. no dedicated `saas` vertical existed, so a SaaS client got nothing at all).
 - **Detailed execution tracing (opt-in)** — `WIRE_TRACE=true` makes every command write a step-by-step, unlimited-detail trace to `.wire/releases/<release>/trace.jsonl`; off by default, local-only, applies uniformly across all ~260 commands via the same build-time injection mechanism Telemetry uses. See [Detailed execution tracing](#detailed-execution-tracing-opt-in).
+- **Fathom Call Sync** (automatic by default, once a client domain is given) — generalises a previously per-client, hand-maintained script into a proper Wire feature: a new `fathom-sync` skill (Claude Code only) pulls new Fathom call transcripts for the engagement's client into `.wire/engagement/calls/` once per session, with an analytical findings write-up per call, using the Fathom MCP server and a client domain `/wire:new` now captures directly. Refuses to enable itself for internal RA engagements (own-domain or self-referential client name), checked both at setup and on every run. `/wire:utils-fathom-sync` provides the same logic manually. See [Section 25.5: Fathom Call Sync](#255-fathom-call-sync-automatic-by-default-safeguarded).
 
 ---
 

@@ -215,6 +215,14 @@ Reads `.wire/releases/` to identify active releases, loads `status.md` for the m
 
 ---
 
+### `fathom-sync`
+
+**Activates automatically** once per new conversation, right after `engagement-context` loads, when `.wire/engagement/context.md` has `fathom_sync.enabled: true` and the Fathom MCP server is reachable.
+
+Pulls any new Fathom call transcripts for the engagement's client into `.wire/engagement/calls/` since the last sync, with a genuine analytical findings write-up per call — silent if nothing's new, one brief line if something was found. Kept as a separate skill from `engagement-context` deliberately, since it can be genuinely slow (MCP calls, multiple file writes, a real analytical pass) and shouldn't make the fast context-load feel sluggish. Claude Code only — no Gemini CLI equivalent; see [Fathom Call Sync](../advanced/fathom-sync).
+
+---
+
 ### `wire-release`
 
 **Activates when**: creating a new Wire Framework release, bumping the version number, or saying "release this as vX.Y".
