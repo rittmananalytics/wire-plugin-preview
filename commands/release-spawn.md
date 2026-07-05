@@ -202,6 +202,15 @@ For each planned delivery release, in priority order:
 mkdir -p .wire/releases/[folder]/{artifacts,planning,requirements,design,dev,test,deploy,enablement}
 ```
 
+### Step 4.5: Data Model Registry — Automatic Setup Attempt (Conditional, Silent)
+
+Same gap this closes as `specs/new.md`'s and `specs/autopilot.md`'s equivalent steps — and the one place this had been missed until a dry run caught it: `data_model-generate`'s canonical-vertical matching only ever *checks* for a local registry copy, it never *fetches* one. `/wire:new` only attempts the clone for the very first release created with an engagement, and Autopilot only attempts it inside its own end-to-end run — neither covers the everyday discovery-to-delivery path, where a `discovery`/`sop_discovery` release (which never uses `data_model` itself) spawns downstream delivery releases via this command that might. Without this step, a consultant who went discovery → `/wire:release-spawn` → manual delivery commands (a very common path, not just an Autopilot corner case) would get the registry silently skipped forever despite having real GitHub access, exactly like the original bug.
+
+1. **Check relevance.** For each release type just spawned in Step 4, read `wire/release-types/<type>.yaml`. If **none** of them has a `phases[].artifacts[]` entry with `id: data_model`, skip this step silently — nothing spawned here will ever call `data_model-generate`. (Only relevant if at least one spawned release is `full_platform`, `dbt_development`, or `dashboard_first`.)
+2. **Check whether setup was already attempted.** `ls ~/.wire/data_model_registry_setup_attempted 2>/dev/null`. If it exists, skip silently — already handled, on this machine, by a prior engagement or an earlier release in this same engagement.
+3. **Attempt it.** If relevant and no attempted-marker exists, follow `specs/utils/data_model_registry_setup.md` as an automated (non-interactive) caller — see that spec's Step 1.5 for what changes in that mode. It writes the attempted marker itself; nothing further to do here. This runs once regardless of how many spawned releases actually need `data_model` — the first one to need it is enough to trigger it for all of them.
+4. **Report minimally.** On success, the setup spec's own automated-mode output (one unobtrusive line) is enough. On failure, say nothing at all; continue to Step 5 exactly as if this step didn't exist.
+
 ### Step 5: Add .gitkeep Files
 
 ```bash
