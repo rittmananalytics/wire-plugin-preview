@@ -4710,6 +4710,46 @@ flowchart TB
 | Bundled into public plugin? | **Yes** | **No — never** |
 | How you get it | Comes with the plugin | Automatic (via `/wire:new`/Autopilot) or `/wire:utils-data-model-registry-setup` yourself, using your own GitHub access |
 
+### Walkthrough: what this actually looks like on a real engagement
+
+Worked example, start to finish — a `full_platform` engagement for **Core Dynamics, Inc.**, a B2B SaaS company selling facility/asset management software. Deliberately chosen because the registry has no dedicated `saas` vertical — this is the case that most needs the adjacent-match and cross-vertical behavior, not the easy case where a confident match exists.
+
+**1. Enabled, without anyone asking for it.** The consultant running this engagement is RA staff with GitHub access to `wire-data-model-registry`. Nothing about setting up this engagement mentions the registry — no question at `/wire:new`, no flag to remember. The first time a `data_model`-using release (this one, `full_platform`) is reached, Wire quietly attempts the clone in the background; since this consultant already ran `/wire:utils-data-model-registry-setup` on a previous engagement, `~/.wire/data-model-registry/` is already there and nothing needs to happen at all.
+
+**2. The proposal.** Once `conceptual_model` is approved, the consultant runs `/wire:data_model-generate`. Step 1.5 fires automatically and reads the approved requirements: "B2B SaaS," "MRR," "NRR," a subscription-based revenue model. It checks the six named verticals — none is a confident match, since there's no dedicated `saas` vertical — but judges `subscription-commerce` a plausible **adjacent** match: its entities (`subscriber`, `subscription`, `subscription_event`, `monthly_retention`, `subscription_revenue`) are structurally close to what an MRR/NRR model needs, even though that vertical's own content was built from a pet-product box and a meal-kit business, not software. Separately — and regardless of that vertical match — it also notices the requirements describe a 12% Salesforce/HubSpot contact-mismatch problem from discovery, and flags the cross-vertical `crm_identity_resolution` pattern as relevant. Two proposals appear, not one:
+
+```
+No vertical in the registry is an exact industry match for B2B SaaS — there's no
+saas vertical yet. The closest available entity shape is subscription-commerce —
+built from a pet-product box and a meal-kit subscription business, not software.
+Entities: subscriber, subscription, subscription_event, monthly_retention, subscription_revenue
+
+This may still be a reasonable starting point for Core Dynamics' MRR/NRR model.
+Worth using loosely, or skip entirely? (yes / adapt / no)
+```
+```
+Also relevant regardless of industry fit: crm_identity_resolution — Core Dynamics'
+Salesforce/HubSpot contact records show a 12% mismatch rate per discovery findings.
+Include this pattern too? (yes / adapt / no)
+```
+
+**3. The decision.** The consultant answers each independently:
+- `subscription-commerce` → **adapt**: keeps the shape but renames to match Core Dynamics' own terminology (`subscriber` → `account`, `subscription_event` → `billing_event`), drops `monthly_retention` as out of scope for this phase, keeps `subscription` and `subscription_revenue` as-is.
+- `crm_identity_resolution` → **yes**: adopted unmodified, since it maps directly onto the actual reconciliation problem.
+
+Wire records both decisions in `.wire/engagement/context.md`:
+```yaml
+data_model_registry:
+  vertical: subscription-commerce
+  cross_vertical_schemas: [crm_identity_resolution]
+```
+
+**4. What it contributes to the release.** The accepted entities become the starting structure for the rest of `data_model-generate`: `account_dim`, `subscription_fct`, `billing_event_fct`, and `subscription_revenue_fct` get modeled with the registry's suggested grain and columns, adjusted to Core Dynamics' real source systems (Salesforce, HubSpot, Stripe). The accepted cross-vertical pattern contributes something requirements alone wouldn't have produced: a `contact_identity_map` integration model, resolving Salesforce/HubSpot contact IDs to one canonical identity — the registry's proposal is what put this model on the plan at all.
+
+For each of these, the entity's `generation_constraints` (rules the model must satisfy — e.g. "`subscription_revenue_fct` must reconcile to the sum of `billing_event_fct` amounts for any given period") and `reference_implementation` pointer (a path into the registry's own worked-example dbt code demonstrating the pattern) carry forward into `data_model_specification.md`. `dbt-generate` needs no changes at all to pick this up — it already reads that file as its primary input, so the constraints and reference pointers are just there when it runs, available to read and adapt, never to copy verbatim.
+
+**5. What it contributes to validation.** Later, `/wire:data_model-validate` reads `data_model_registry.vertical`/`cross_vertical_schemas` back out of `context.md` and diffs the generated model list against what was proposed — in this case, noting that `subscription-commerce`'s canonical schema also usually expects a `churn_event_fct` model that Core Dynamics' actual data model doesn't have yet. This appears in a clearly-labeled, advisory-only "Canonical Vertical Comparison" section of the validation report: worth a look, never a blocker, and never affecting whether `data_model-review` can proceed.
+
 ### Adding a new command
 
 **Step 1: Write the workflow spec**
