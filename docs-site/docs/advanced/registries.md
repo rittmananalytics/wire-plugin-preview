@@ -221,10 +221,14 @@ This may still be a reasonable starting point for Core Dynamics' MRR/NRR model.
 Worth using loosely, or skip entirely? (yes / adapt / no)
 ```
 ```
-Also relevant regardless of industry fit: crm_identity_resolution — Core Dynamics'
-Salesforce/HubSpot contact records show a 12% mismatch rate per discovery findings.
-Include this pattern too? (yes / adapt / no)
+Also potentially relevant: crm_identity_resolution — built for an agency's own CRM
+reconciliation, but the same technique (union multiple CRM sources, resolve identity
+by email/domain matching) applies to Core Dynamics' own Salesforce/HubSpot contact
+records, which show a 12% mismatch rate per discovery findings.
+Worth using loosely, or skip entirely? (yes / adapt / no)
 ```
+
+Note what didn't happen here: Wire didn't reject `crm_identity_resolution` just because its own description talks about "an agency's own CRM operations" — Core Dynamics isn't an agency. It looked past that framing and asked whether the underlying entities and technique were still the same problem. They were, so it proposed it anyway, labeled honestly as a reframe rather than an exact fit — the same principle behind the adjacent vertical match above, applied to cross-vertical patterns too.
 
 **3. The decision.** The consultant answers each independently:
 - `subscription-commerce` → **adapt**: keeps the shape but renames to match Core Dynamics' own terminology (`subscriber` → `account`, `subscription_event` → `billing_event`), drops `monthly_retention` as out of scope for this phase, keeps `subscription` and `subscription_revenue` as-is.

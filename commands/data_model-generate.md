@@ -206,9 +206,13 @@ This step runs automatically on every engagement — there's no opt-in flag to s
      - **Adjacent match**: no vertical currently in the registry is a confident fit, but one vertical's entity *shape* is still structurally close to what this client needs, even though that vertical was built from a different kind of business. A gap like "no vertical for this specific industry yet" is not a reason to propose nothing — e.g. if no vertical matches a B2B SaaS client confidently, `subscription-commerce`'s subscriber/subscription/subscription_event/monthly_retention/subscription_revenue entities may still be a structurally close analogue for an MRR/NRR model, even though that vertical's content was built from a different kind of subscription business. Propose an adjacent match explicitly labeled as approximate — don't silently withhold it just because it isn't a clean industry match.
    - If neither a confident nor an adjacent vertical exists, proceed to Step 3 with no vertical candidate at all — this remains a normal, common outcome, not a failure.
 
-3. **Independently check cross-vertical patterns — this runs regardless of what Step 2 found.** Cross-vertical relevance is not conditional on having a vertical match; a client can need `crm_identity_resolution` (reconciling contacts/accounts across a CRM and marketing automation tool — a routine problem for any B2B business, `saas` vertical or not) whether or not any vertical matched at all.
+3. **Independently check cross-vertical patterns — this runs regardless of what Step 2 found, and gets the same confident/adjacent tiering Step 2 uses.** Cross-vertical relevance is not conditional on having a vertical match; a client can need `crm_identity_resolution` (reconciling contacts/accounts across two or more CRM/marketing tools — a routine problem for any B2B business, `saas` vertical or not) whether or not any vertical matched at all.
    - Read `<registry_root>/cross-vertical/schemas/*.yml` and check each one against this client's actual sources, entities, and requirements — e.g. `crm_identity_resolution` for multi-system contact/account reconciliation, `ga4_ecommerce` if the client uses GA4, `multi_touch_attribution` for paid media across channels, `revenue_recognition` if ASC 606-style deferred revenue is in scope. Respect each schema's `depends_on_schemas` field for sequencing (e.g. `ga4_ecommerce` depends on `event_tracking_and_sessionization`).
-   - If Step 2 found nothing and this step finds nothing either, **skip silently to Step 2 of the main workflow** (Define Source Definitions) — no message, no note. This remains the majority-case, expected outcome for most engagements.
+   - **A schema's own description names a specific originating context (e.g. "for a consultancy's or agency's own CRM operations"). Treat that as who it happened to be built for, not as a boundary on who can use it.** Look past the described origin and ask the same question Step 2 asks for verticals: is the underlying entity shape and technique still structurally the same problem this client actually has? `crm_identity_resolution`'s stated framing is an agency reconciling contacts across its own CRM tools — but the technique (union multiple CRM sources, resolve identity by email/domain matching, produce one canonical `contact_pk`/`company_pk`) is the same technique a client needs for its own multi-CRM contact-mismatch problem, regardless of what kind of business that client runs. Reject a cross-vertical schema for being a poor structural fit — different entities, different join shape, a problem this client doesn't actually have — never merely for being described for a different kind of organization than this client.
+   - Distinguish, the same way Step 2 does:
+     - **Confident**: the schema's own description already matches this client's situation in substance, regardless of the specific words used to frame it.
+     - **Adjacent**: the description frames it around a different kind of organization, but the entities and technique are still the same underlying problem — propose it, explicitly noting the reframe (e.g. "built for an agency's own CRM reconciliation, but the same technique applies to your client's own CRM systems").
+   - If Step 2 found nothing and this step finds nothing either (confident or adjacent), **skip silently to Step 2 of the main workflow** (Define Source Definitions) — no message, no note. This remains the majority-case, expected outcome for most engagements.
 
 4. **Propose whatever was found, tiered by confidence — never auto-adopt:**
    - **Confident vertical match**: present as a strong proposal:
@@ -229,11 +233,18 @@ This step runs automatically on every engagement — there's no opt-in flag to s
      This may still be a reasonable starting point for [specific reason, e.g. "the MRR/NRR model"].
      Worth using loosely, or skip entirely? (yes / adapt / no)
      ```
-   - **Cross-vertical pattern(s)** found in Step 3 — present alongside whichever vertical proposal exists above, or on their own if no vertical proposal exists at all:
+   - **Cross-vertical pattern(s)** found in Step 3 — present alongside whichever vertical proposal exists above, or on their own if no vertical proposal exists at all. If confident:
      ```
      Also relevant regardless of industry fit: [cross-vertical schema name] — [one-line reason
      specific to this client's actual requirements/sources].
      Include this pattern too? (yes / adapt / no)
+     ```
+     If adjacent — say so plainly rather than silently reframing it:
+     ```
+     Also potentially relevant: [cross-vertical schema name] — built for [the schema's stated
+     originating context, e.g. "an agency's own CRM operations"], but the same technique
+     ([one line on the actual mechanism]) applies to [this client's actual situation].
+     Worth using loosely, or skip entirely? (yes / adapt / no)
      ```
    - **yes** (any of the above) — use the proposed entity list, grain, and naming as a baseline for Steps 2–7, adjusted for this client's actual source systems and column names. For a vertical match (confident or adjacent), record `data_model_registry.vertical: <vertical>` in `.wire/engagement/context.md` if not already set. For accepted cross-vertical patterns, record them in `data_model_registry.cross_vertical_schemas: [<schema_name>, ...]` (append, don't overwrite).
    - **adapt** — ask which specific entities/marts to keep, drop, or rename; use the rest as-is. Record as above.

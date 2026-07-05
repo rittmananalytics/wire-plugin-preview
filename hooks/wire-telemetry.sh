@@ -7,7 +7,7 @@
 # prints nothing to stdout/stderr, and always exits 0. It must never block,
 # delay, or fail the command it is reporting on.
 #
-# DxXwrT6ucDMRmouCsYDwthdChwDLsNYL and 4.0.0-preview+08da21cb are substituted at build time by
+# DxXwrT6ucDMRmouCsYDwthdChwDLsNYL and 4.0.0-preview+8d13415e are substituted at build time by
 # wire/scripts/build-packages.sh.
 
 # Opt-out: WIRE_TELEMETRY=false disables all tracking.
@@ -27,7 +27,7 @@ COMMAND="$(printf '%s' "$PAYLOAD" | grep -oE 'wire:[A-Za-z0-9_-]+' | head -n1 | 
 [ -z "$COMMAND" ] && exit 0
 
 WRITE_KEY="DxXwrT6ucDMRmouCsYDwthdChwDLsNYL"
-WIRE_VERSION="4.0.0-preview+08da21cb"
+WIRE_VERSION="4.0.0-preview+8d13415e"
 
 # Fire-and-forget in a detached subshell with all fds redirected, so the hook
 # returns instantly and the prompt is never delayed.
