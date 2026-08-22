@@ -11,6 +11,42 @@ Wire Agents replaces the single-agent pattern with thirteen named specialist age
 
 The core insight: a single Claude Code agent doing requirements, dbt development, LookML authoring, data quality, and migration audits across a full engagement dilutes context and produces generic output. A specialist with a narrow brief — "your job is dbt models and nothing else" — operates with a much cleaner context and makes better decisions within its domain.
 
+Two delegation patterns cover everything Wire does: a sequential chain when each step's specialist needs the previous one's output, and a parallel fan-out when a batch of work splits into independent items with no relationship to each other.
+
+```mermaid
+flowchart TD
+    MAIN[Main session<br/>/wire:delegate computes the plan]:::main
+    MAIN --> PLAN{Independent items,<br/>no dependency between them?}
+
+    PLAN -->|No — each depends<br/>on the last| SEQ1[data-designer<br/>subagent]:::sub
+    SEQ1 --> SEQ2[dbt-developer<br/>subagent]:::sub
+    SEQ2 --> SEQ3[semantic-layer-developer<br/>subagent]:::sub
+
+    PLAN -->|Yes — parallelisable| SPAWN[Spawn one Migration<br/>Sub-agent per independent item]:::main
+
+    subgraph FANOUT["Parallel Migration Sub-agents"]
+        direction LR
+        S1[Migration Sub-agent 1]:::sub
+        S2[Migration Sub-agent 2]:::sub
+        S3[Migration Sub-agent 3]:::sub
+        SN[Migration Sub-agent N]:::sub
+    end
+
+    SPAWN --> S1 & S2 & S3 & SN
+    S1 & S2 & S3 & SN --> COLLECT[Main session<br/>collects all results]:::main
+    SEQ3 --> COLLECT
+
+    COLLECT --> NEXT{More work,<br/>dependent on this batch?}
+    NEXT -->|Yes| MAIN
+    NEXT -->|No| DONE([All work complete]):::event
+
+    classDef main fill:#1a3a5c,stroke:#4a90d9,color:#fff
+    classDef sub fill:#2d4a1e,stroke:#6abf4b,color:#fff
+    classDef event fill:#1a1a1a,stroke:#888,color:#fff
+```
+
+The sequential branch is the ordinary case across a release: `data-designer` produces the data model before `dbt-developer` can generate anything against it, and `dbt-developer`'s models have to exist before `semantic-layer-developer` can build LookML on top of them — each a different specialist, run in strict order. The parallel branch is `migration-specialist` fanning out across a batch of independently-migratable items (see [Platform Migration](../release-types/platform-migration)) — every sub-agent in the batch runs at once, and the main session only moves on once all of them have returned. The same fan-out shape governs large dbt model sets too, covered next.
+
 ## The thirteen agents
 
 | Agent | Domain |

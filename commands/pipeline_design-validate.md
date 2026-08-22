@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -190,10 +195,11 @@ Run: /wire:pipeline_design-generate <project_id>
 | Source system coverage | Every source system named in requirements appears in Section 1 | Critical |
 | Replication strategy defined | Every source system has a replication method specified (no blanks) | Critical |
 | Staging model names | All staging models follow `stg_<source>__<entity>` naming convention | Critical |
-| Warehouse model names | All warehouse models follow `<entity>_fct` or `<entity>_dim` convention | Major |
+| Warehouse model names | All warehouse models follow `wh_<group>__<entity>_fact` or `wh_<group>__<entity>_dim` convention | Major |
 | Error handling specified | Section 3.4 (Error Handling) is non-empty and covers failure detection and alerting | Major |
 | Scheduling defined | Section 3.5 (Scheduling) specifies refresh cadences for all sources | Major |
 | Design decisions documented | All trade-off decisions are listed as PD-N items, not silently resolved | Major |
+| Reference legibility | Every PD code has a bold-title minting site (`**PD-N: Title**`), and every code cited from other artifacts (e.g. FR-n) is expanded at first mention or resolved in a Reference key table — run the `reference_legibility` check per `specs/utils/reference_legibility.md` | Major |
 | Technology stack complete | Section 6 lists all layers with technology choices | Info |
 | Security/governance addressed | Section 7 covers PII handling and access controls | Info |
 
@@ -299,6 +305,10 @@ Execute the complete workflow as specified above.
 
 After completing the workflow, append a log entry to the project's execution_log.md:
 
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
+
 # Execution Log — Command and Skill Logging
 
 ## Purpose
@@ -382,6 +392,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

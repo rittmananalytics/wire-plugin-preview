@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -103,6 +108,80 @@ with open('.wire/releases/<release_folder>/trace.jsonl', 'a') as f:
 {"ts":"2026-07-05T14:41:15Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"command_end","step":null,"step_name":null,"result":"complete","detail":"Generated data_model_specification.md — 14 models (5 staging, 4 integration, 5 warehouse), including 2 informed by the accepted registry proposals above."}
 ```
 
+## Automatic Validation (on by default)
+
+---
+description: Internal utility — injected auto-validate section so generate commands run their matching validate step automatically and fold the result into their output
+---
+
+Every `generate` command that has a matching `validate` command for the
+same artifact runs that validate step automatically as part of generate —
+by default, with no separate command to remember. This section only appears
+on commands where that applies; artifacts with no separate validate step at
+all (e.g. mockups, workshops, UAT) never carry this section.
+
+## Step: Check `auto_validate`
+
+Read this command's own `auto_validate` front-matter field, in the Workflow
+Specification below. Two states:
+
+- **Absent, or `true`** (the default — most artifacts): auto-validate runs.
+- **`false`**: this artifact's validate step is expensive — it runs real
+  code, queries a live warehouse or BI tool, or otherwise does IO beyond
+  re-reading local files — so it does not run automatically. Skip to
+  "If `auto_validate: false`" below.
+
+## If `auto_validate` is absent or `true`: run validate automatically
+
+Once this command finishes writing its artifact, before ending:
+
+1. Run this artifact's own `/wire:<artifact-with-dashes>-validate` workflow
+   in full, exactly as if the consultant had typed it themselves — same
+   inputs, same `status.md` write to `artifacts.<artifact>.validate`, same
+   report. This is not optional or an extra step layered on top; it is the
+   default behavior for this artifact.
+2. Fold the result into this command's own closing output rather than
+   presenting it as a separate command run:
+   - **PASS** — add a single closing line: `✅ Auto-validated — PASS`. The
+     full report already went to `status.md`/`execution_log.md`, exactly as
+     it would from a standalone validate run — no need to repeat it here.
+   - **FAIL** — surface the validate command's own failure report in full,
+     exactly as running validate standalone would show it, so the
+     consultant sees what's wrong immediately without running anything
+     else themselves.
+3. This never blocks or undoes generate itself — the artifact is written
+   either way, and its content is never rolled back because validate
+   failed. Auto-validation only means validate has already run and its
+   result is already on record by the time generate finishes, instead of
+   waiting for the consultant to remember to run it separately.
+
+## If `auto_validate` is `false`: state this plainly, don't run it
+
+Do not run validate. End with a line naming why, as specifically as this
+spec's own context makes possible (e.g. "runs `dbt run`/`dbt test`",
+"queries the live target warehouse", "calls the Looker API directly") —
+fall back to "performs live checks against an external system" only if no
+more specific reason is evident from context:
+
+```
+⚠ This artifact's validate step [reason] and does not run automatically.
+Run /wire:<artifact-with-dashes>-validate <release_folder> before
+requesting review — review is blocked until it passes.
+```
+
+## Why this is always safe either way
+
+`review` already requires `validate: PASS` for this same artifact as one of
+its own declared preconditions (see `specs/utils/precondition_gate.md`) —
+this is existing, independent enforcement, not something added by this
+section. So an `auto_validate: false` opt-out never lets an artifact reach
+review unvalidated; it only decides *when* the consultant pays validate's
+cost — automatically on every draft (the default), or once, on their own
+schedule, before requesting review (the opt-out). Auto-validation is a
+convenience that closes the "forgot to run it" gap for the common case; the
+gate that actually prevents unvalidated work from being reviewed was already
+there.
+
 ## Workflow Specification
 
 ---
@@ -147,6 +226,9 @@ Follow `specs/utils/stale_artifact_check.md` with `artifact_id: migration_invent
 
 Synthesises all approved audits into a single unified migration inventory. The five core audits (ingestion, db_object, security, dbt, orchestration) are always required. The reverse ETL audit is required when `migration.reverse_etl_tool` is set in `status.md`. The inventory is the canonical scope document — every object that will be migrated, its complexity, its migration approach, and its dependencies. It is the primary input to migration strategy and the reference point for all subsequent generate commands.
 
+
+The `migration_approach` vocabulary is the closed set in `specs/utils/reverse_etl_approach.md` (normative): `repoint`, `rewrite_model`, `rebuild`, `decommission`. There is no `retire` value.
+
 ## Prerequisites
 
 The following five audits must always have `review: approved`:
@@ -171,6 +253,7 @@ Run all audits in parallel: /wire:migration-audit-all $ARGUMENTS
 
 - All required audit files under `.wire/releases/$ARGUMENTS/audit/`
 - `.wire/releases/$ARGUMENTS/status.md`
+- **Optional** `migration.connector_alias_patterns` in `status.md` — a list of regex or affix patterns to strip from connector/object identifiers and model `source()` references before matching them in Step 2 (see the alias-normalization note there). Examples: per-market prefixes such as `uk_`/`de_`/`es_`, or connector-suffix short-codes such as `__eu1`. These are documented examples, not a fixed list — set whatever patterns match the engagement's actual naming convention. If unset, Step 2 matches identifiers literally, as before.
 
 ## Workflow
 
@@ -180,25 +263,29 @@ Read each approved audit file. Extract:
 - Ingestion audit: connector list with complexity and migration approach
 - DB object audit: object catalog with type, volume tier, migration approach, feature tags
 - Security audit: role and policy inventory
-- dbt audit: model catalog with complexity, batch number, feature tags (from CSV)
+- dbt audit: model catalog with complexity, batch number, feature tags (from `dbt_audit.csv`); **snapshot catalog** (from `dbt_snapshots.csv` if present) — each snapshot's strategy, `unique_key`, `updated_at`/`check_cols`, `invalidate_hard_deletes`, `target_schema`, upstream ref/source, downstream dependents, and `batch_number`. A snapshot is its own object type — a built SCD-2 history table — not a model; carry it through as such so it is inventoried, scoped, and ordered rather than falling through the model-only scan.
 - Orchestration audit: job inventory
 - Reverse ETL audit (if present): sync catalog with migration approach, warehouse object dependencies, Lightning engine flags
 
 ### Step 2: Cross-reference and deduplicate
 
 Identify objects that appear in multiple audits and link them:
-- Each Fivetran connector writes to one or more schemas → link to db objects in those schemas
+- Each ingestion connector/source writes to one or more schemas → link to db objects in those schemas
 - dbt models reference source tables → link dbt models to db objects
+- Snapshots read an upstream ref/source and are read by downstream models → link each snapshot to its upstream db object / dbt model and to each downstream dependent model, and link its `target_schema` to the built history relation in the db objects
 - Orchestration jobs run dbt commands → link jobs to dbt models
-- Service accounts in security audit → link to Fivetran connectors and orchestration jobs
+- Service accounts in security audit → link to ingestion connectors/sources and orchestration jobs
 - Hightouch syncs reference warehouse objects → link each sync to the db objects and dbt models it reads from (using the `warehouse_objects` field from the reverse ETL audit)
 - Hightouch `dbtModel`-type syncs → link to the specific dbt models in the dbt audit
+
+**Alias normalization before matching.** A regionalized or multi-tenant connector often carries an alias its consuming model's `source()` call doesn't literally repeat — a UK-market connector suffixed `_uk`, a German instance prefixed `de_`, a connector-suffix short-code like `__eu1`. Matched as bare strings, that alias makes a connector with a real downstream consumer look orphaned, which is exactly the kind of false orphan Fix W-7 (`migration_batching`'s `NO-DEP` bucket) exists to catch honestly rather than paper over. Before linking a connector or db-object identifier to a model's `source()` reference, strip any pattern listed in `migration.connector_alias_patterns` (see Inputs) from both sides, then match on the normalized form. If no patterns are configured, match literally as today — this normalization is additive and engagement-specific, never a fixed list of one client's naming scheme.
 
 ### Step 3: Build the dependency graph
 
 Construct a directed dependency graph where:
 - Edges point from dependency to dependent (data flows downstream)
-- Node types: `connector`, `table`, `view`, `dbt_model`, `job`, `role`, `reverse_etl_sync`, `reverse_etl_destination`
+- Node types: `connector`, `table`, `view`, `dbt_model`, `snapshot`, `job`, `role`, `reverse_etl_sync`, `reverse_etl_destination` — plus, when a `metabase_audit` is approved, `metabase_card` and `metabase_dashboard` (#184), with a **model→card** edge for every warehouse object a card reads (from the audit's dependency map) and a **card→dashboard** edge from the reverse index. These edges are what let batching schedule a card after the models it reads and `migration-status` derive dashboard state from card state.
+- For every snapshot, add an **upstream→snapshot** edge (from its ref/source parent) and a **snapshot→dependent** edge to each downstream model. This is what lets migration batching order the snapshot after the model it reads and before its dependents — without these edges a downstream model looks like it has no snapshot prerequisite and can be scheduled ahead of it.
 
 The graph now spans the full data flow: ingestion sources → warehouse objects → dbt models → reverse ETL syncs → SaaS destinations.
 
@@ -217,12 +304,14 @@ For each object type, apply effort weights:
 
 | Object type | Complexity | Est. hours |
 |------------|-----------|-----------|
-| Fivetran connector | Low | 0.5 |
-| Fivetran connector | Medium | 2 |
-| Fivetran connector | High | 4 |
+| Ingestion connector/source | Low | 0.5 |
+| Ingestion connector/source | Medium | 2 |
+| Ingestion connector/source | High | 4 |
 | dbt model | Simple | 0.25 |
 | dbt model | Moderate | 1 |
 | dbt model | Complex | 3 |
+| Snapshot | copy_and_continue | 1.5 |
+| Snapshot | rebuild_from_T | 0.5 |
 | View (translate) | Low feature count | 0.5 |
 | View (translate) | High feature count | 2 |
 | Security object | recreate | 0.1 |
@@ -243,8 +332,8 @@ Sum the estimates by phase and produce a total effort estimate.
 Use the template at `TEMPLATES/migration/migration_inventory.md`. Include:
 - Executive summary: total objects, total effort estimate, migration duration estimate (assuming 6 hours/day productive migration work)
 - Phase breakdown: audit → strategy → ingestion → dbt batches → orchestration → reverse ETL → equivalency → cutover
-- Unified object catalog (linked across audits)
-- Dependency graph
+- Unified object catalog (linked across audits) — snapshots appear as their own `snapshot` object type, each with its strategy, `unique_key`, `target_schema`, upstream ref/source, and downstream dependents
+- Dependency graph (including upstream→snapshot and snapshot→dependent edges)
 - Risk summary: count of High-complexity and evaluate objects; count of rebuild-type reverse ETL syncs
 - Recommended phasing approach — note that reverse ETL syncs cannot be re-pointed until their dependent warehouse objects and dbt models are migrated in earlier phases
 
@@ -258,6 +347,7 @@ artifacts:
     generated_date: "{{TODAY}}"
     total_objects: N
     estimated_hours: N
+    snapshots: N           # 0 if the project defines no snapshots
     reverse_etl_syncs: N   # 0 if not applicable
 ```
 
@@ -292,6 +382,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -376,6 +470,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

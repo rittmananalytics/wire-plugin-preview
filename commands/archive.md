@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -117,58 +122,74 @@ inputs:
   required:
     - name: release_folder
       description: "Path to the release folder"
-description: Archive a completed Data Platform project
-argument-hint: <dashboard-folder>
+description: Archive a completed release within the current engagement
+argument-hint: <release-folder>
 
 ---
 
-# Data Platform Archive Project Command
+# Wire Archive Release Command
 
 ## Purpose
 
-Move a completed project to the archive folder to keep the active project list small. Archived projects are excluded from `/wire:status` and `/wire:start` scans but remain accessible via `/wire:status --archived`.
+Move a completed release to an archive location within the current engagement, to keep the active release list small. Archived releases are excluded from `/wire:status` and `/wire:start` scans but remain accessible via `/wire:status --archived`.
+
+Wire is one-engagement-per-repo: there is exactly one client per `.wire/` root, so "archiving" here means archiving one completed **release** (e.g. `01-discovery`) within the current engagement — not switching between sibling client projects, which is not a concept that exists in the current layout.
+
+## Archive Convention
+
+Archived releases move one level deeper, from:
+```
+.wire/releases/<release_folder>/
+```
+to:
+```
+.wire/releases/_archive/<release_folder>/
+```
+
+This means a plain `.wire/releases/*/status.md` glob (used by `/wire:status` and `/wire:start`) naturally excludes archived releases without needing an exclude-list, and `/wire:status --archived` globs `.wire/releases/_archive/*/status.md` specifically. `_archive` is not a valid release folder name (release folders are always `NN-name`), so it can never collide with a real release.
 
 ## Usage
 
 ```bash
-/wire:archive 20260210_rowcal
+/wire:archive 01-discovery
 ```
 
 ## Workflow
 
-### Step 1: List Active Projects
+### Step 1: List Active Releases
 
 **Process**:
-1. Use Glob to find all active project folders: `.wire/[0-9]*_*/status.md`
-2. If `$ARGUMENTS` is provided, match against known projects
-3. If no arguments, present selection
+1. Use Glob to find all active release folders: `.wire/releases/*/status.md`
+2. Exclude any match under `.wire/releases/_archive/` (shouldn't normally match the glob above, but guard against it anyway)
+3. If `$ARGUMENTS` is provided, match against known release folders
+4. If no arguments, present selection
 
-**If no projects found**:
+**If no releases found**:
 ```
-No active projects found in `.wire/`. Nothing to archive.
+No active releases found in `.wire/releases/`. Nothing to archive.
 ```
 
-### Step 2: Select Project to Archive
+### Step 2: Select Release to Archive
 
-**If argument provided**: Validate the folder exists in `.wire/`
+**If argument provided**: Validate the folder exists under `.wire/releases/`
 
-**If no argument**: Use `AskUserQuestion` to present project options:
+**If no argument**: Use `AskUserQuestion` to present release options:
 
 ```json
 {
   "questions": [{
-    "question": "Which project do you want to archive?",
+    "question": "Which release do you want to archive?",
     "header": "Archive",
     "options": [
-      {"label": "20260210_rowcal", "description": "Client: RowCal"},
-      {"label": "20260203_b2b_template_tabs", "description": "Client: Internal"}
+      {"label": "01-discovery", "description": "discovery — Discovery (Shape Up)"},
+      {"label": "02-full-platform", "description": "full_platform — Requirements"}
     ],
     "multiSelect": false
   }]
 }
 ```
 
-Build options dynamically from discovered projects. Include up to 4 projects as options (AskUserQuestion limit). If more than 4 projects exist, list them all in chat first and ask user to specify by name.
+Build options dynamically from discovered releases (folder name plus `release_type` and `current_phase` from each `status.md`). Include up to 4 releases as options (AskUserQuestion limit). If more than 4 releases exist, list them all in chat first and ask the user to specify by name.
 
 ### Step 3: Confirm Archive
 
@@ -177,11 +198,11 @@ Build options dynamically from discovered projects. Include up to 4 projects as 
 ```json
 {
   "questions": [{
-    "question": "Archive this project? It will be moved to .wire/archive/ and hidden from /wire:status and /wire:start.",
+    "question": "Archive this release? It will be moved to .wire/releases/_archive/ and hidden from /wire:status and /wire:start.",
     "header": "Confirm",
     "options": [
-      {"label": "Yes, archive it", "description": "Move project to .wire/archive/"},
-      {"label": "Cancel", "description": "Keep the project active"}
+      {"label": "Yes, archive it", "description": "Move release to .wire/releases/_archive/"},
+      {"label": "Cancel", "description": "Keep the release active"}
     ],
     "multiSelect": false
   }]
@@ -199,11 +220,11 @@ And exit.
 **Process**:
 1. Create archive directory if it doesn't exist:
    ```bash
-   mkdir -p .wire/archive/
+   mkdir -p .wire/releases/_archive/
    ```
-2. Move the project folder:
+2. Move the release folder:
    ```bash
-   git mv .wire/{folder_name}/ .wire/archive/{folder_name}/
+   git mv .wire/releases/{release_folder}/ .wire/releases/_archive/{release_folder}/
    ```
 
 ### Step 5: Confirm Archive
@@ -211,52 +232,53 @@ And exit.
 Output confirmation:
 
 ```
-## Project Archived
+## Release Archived
 
-**Moved:** `.wire/{folder_name}/` → `.wire/archive/{folder_name}/`
+**Moved:** `.wire/releases/{release_folder}/` → `.wire/releases/_archive/{release_folder}/`
 
-The project won't appear in `/wire:status` or `/wire:start`.
+The release won't appear in `/wire:status` or `/wire:start`.
 
-To view archived projects: `/wire:status --archived`
+To view archived releases: `/wire:status --archived`
 ```
 
 ## Edge Cases
 
-### No Projects Exist
+### No Releases Exist
 
-If no project folders are found:
+If no release folders are found:
 ```
-No active projects found in `.wire/`. Nothing to archive.
+No active releases found in `.wire/releases/`. Nothing to archive.
 ```
 
-### Project Not Found
+### Release Not Found
 
-If the specified project doesn't exist:
+If the specified release doesn't exist:
 ```
-Project "{folder_name}" not found in `.wire/`.
+Release "{release_folder}" not found in `.wire/releases/`.
 
-Active projects:
-[list active projects]
+Active releases:
+[list active releases]
 ```
 
 ### Already Archived
 
-If the project is already in `.wire/archive/`:
+If the release is already in `.wire/releases/_archive/`:
 ```
-Project "{folder_name}" is already archived.
+Release "{release_folder}" is already archived.
 ```
 
 ### Git Not Available
 
-If `git mv` fails, fall back to regular move:
+If `git mv` fails, fall back to a regular move:
 ```bash
-mv .wire/{folder_name}/ .wire/archive/{folder_name}/
+mkdir -p .wire/releases/_archive/
+mv .wire/releases/{release_folder}/ .wire/releases/_archive/{release_folder}/
 ```
 
 ## Output
 
 This command:
-- Moves `.wire/{folder_name}/` to `.wire/archive/{folder_name}/`
+- Moves `.wire/releases/{release_folder}/` to `.wire/releases/_archive/{release_folder}/`
 
 Final output is a confirmation message.
 
@@ -265,6 +287,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -349,6 +375,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

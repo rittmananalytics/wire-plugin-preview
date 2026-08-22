@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -144,7 +149,7 @@ Follow `specs/utils/precondition_gate.md` before proceeding.
 
 ## Purpose
 
-Validate generated documentation against quality standards, naming conventions, and best practices.
+Validate that the generated project documentation is internally consistent and actually points at real, current artifacts — a handover document that links to a file that no longer exists, or claims a component is deployed when `status.md` says otherwise, is worse than no documentation at all.
 
 ## Usage
 
@@ -162,7 +167,7 @@ Validate generated documentation against quality standards, naming conventions, 
 
 **Process**:
 1. Check that `documentation.generate == complete` in status.md
-2. Verify generated files exist
+2. Verify `enablement/documentation.md` exists
 
 **If not generated**:
 ```
@@ -177,11 +182,13 @@ Run `/wire:documentation-generate <project>` first.
 
 | Check | Rule | Severity |
 |-------|------|----------|
-| [Check 1] | [Description] | Critical |
-| [Check 2] | [Description] | Major |
-| [Check 3] | [Description] | Info |
-
-[Specific validation checks for this artifact type]
+| Artifact Index links resolve | Every file path in the "Artifact Index" table points to a file that actually exists in `.wire/releases/[release_folder]/` | Critical |
+| Artifact Index status matches status.md | Every "Status" value in the Artifact Index table matches the corresponding artifact's real state in `status.md` (no stale "complete" for an artifact that's since regressed, or vice versa) | Critical |
+| Data dictionary covers all warehouse models | Every warehouse-layer (`_dim`/`_fact`) dbt model appears in the Data Dictionary section, per `wire/skills/dbt-development/testing-reference.md`'s "warehouse models always 100% documented" convention | Major |
+| Data dictionary links, not re-authors, descriptions | Data Dictionary entries reference/link the model's `schema.yml` description rather than containing a materially different, independently-authored description that could drift out of sync | Major |
+| Architecture diagram matches complete artifacts | The Mermaid architecture diagram includes only components (`pipeline`, dbt layers, `semantic_layer`, `dashboards`) that are actually `complete` in `status.md` — it doesn't depict a component that hasn't been built yet | Major |
+| No unfilled placeholders | The document contains no leftover `[...]`-style placeholder text from the template | Info |
+| Runbook has at least one troubleshooting entry | If `deployment` or `data_quality` are complete, the Operational Runbook's Troubleshooting table is not empty | Info |
 
 ### Step 3: Generate Validation Report
 
@@ -196,9 +203,9 @@ Run `/wire:documentation-generate <project>` first.
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| [Check 1] | ✅ | |
-| [Check 2] | ✅ | |
-| [Check 3] | ⚠️ | [Warning details] |
+| Artifact Index links resolve | ⚠️ | "Deployment Plan" links to deploy/deployment_plan.md, which does not exist |
+| Data dictionary covers all warehouse models | ✅ | |
+| Architecture diagram matches complete artifacts | ✅ | |
 
 ### Next Steps
 
@@ -226,20 +233,36 @@ Follow the Jira sync workflow in `specs/utils/jira_sync.md`:
 - Action: `validate`
 - Status: the validate state just written to status.md (pass/fail)
 
+### Step 5.5: Sync to Linear (Optional)
+
+Follow the Linear sync workflow in `specs/utils/linear_sync.md`:
+- Artifact: `documentation`
+- Action: `validate`
+- Status: the validate state just written to status.md (pass/fail)
+
 ## Edge Cases
 
 ### Validation Failures
 
 If checks fail:
 - Set validate status to `fail`
-- List all issues
-- Suggest fixes
+- List all issues, distinguishing broken links (Critical) from missing dictionary coverage (Major) from cosmetic placeholders (Info)
+- Suggest fixes (e.g. "regenerate the Artifact Index — deployment_plan.md was moved or renamed")
 - User must fix and re-validate
+
+### Referenced Artifact Regressed Since Generation
+
+If an artifact the documentation references was `complete` when `documentation.md` was generated but has since regressed (e.g. `dashboards` was reset to `in_progress` after a rebuild):
+```
+Warning: documentation.md was generated when [artifact] was complete, but status.md now shows it as [current_status].
+
+Regenerate documentation once [artifact] is complete again, or note the discrepancy and proceed? (y/n)
+```
 
 ## Output
 
 This command:
-- Validates documentation completeness and quality
+- Validates that documentation's links, status claims, and data dictionary match the real state of the project
 - Updates `status.md` with validation results
 - Provides actionable feedback if issues found
 
@@ -248,6 +271,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -332,6 +359,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

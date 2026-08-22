@@ -74,6 +74,26 @@ flowchart LR
     style LOG fill:#fff3e0,stroke:#e65100
 ```
 
+## Automatic validation
+
+**Since v4.0.0.** Validate used to be a separate step a consultant had to remember to run between generate and review. It no longer is: every `generate` command that has a matching `validate` command for the same artifact now runs that validate step automatically once it finishes writing the artifact, and folds the PASS/FAIL result straight into generate's own output — no separate command, nothing to remember.
+
+```mermaid
+flowchart LR
+    GEN["/wire:data_model-generate"] --> WRITE["Artifact written"]
+    WRITE --> AUTO{"auto_validate\nfalse?"}
+    AUTO -->|"No (default)"| RUN["Runs data_model-validate\nautomatically"]
+    RUN --> RESULT["PASS/FAIL folded into\ngenerate's own output"]
+    AUTO -->|Yes| SKIP["States plainly why, and that\nyou must run validate yourself"]
+
+    style RUN fill:#e8f5e9,stroke:#2e7d32
+    style SKIP fill:#fff3e0,stroke:#e65100
+```
+
+A handful of validate steps are expensive because they do real work beyond re-reading local files — `dbt-validate` runs an actual `dbt run`/`dbt test`, some migration and semantic-layer validates query a live warehouse or BI tool directly. Those generate commands declare `auto_validate: false` in front-matter (see [command schema](https://github.com/rittmananalytics/wire/blob/main/wire/schemas/command-schema.md#auto_validate-generate-commands-only)) and skip the automatic run, stating plainly why and that you need to trigger `validate` yourself once you're ready to pay that cost — rather than paying it on every draft iteration of generate.
+
+Either way, nothing changes about the actual gate that matters: `review` already requires `validate: PASS` for its own artifact as one of its declared preconditions (see below), enforced by the precondition gate regardless of whether validation happened automatically or manually. An `auto_validate: false` artifact can never reach review unvalidated — the opt-out only changes *when* validate runs, never *whether* it's required. A handful of artifacts have no separate validate step at all (`mockups`, `workshops`, `uat`, `viz_catalog`, `playbook`, Droughty's own umbrella `generate`) and this section doesn't apply to them either way.
+
 ## Git branching
 
 `/wire:new` enforces a mandatory branch check. If you run it while on `main` or `master`, the framework will stop and ask you to create a feature branch before any project files are created. It suggests `feature/{folder_name}` but you can choose your own name.

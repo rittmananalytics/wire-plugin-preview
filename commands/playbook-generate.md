@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -187,7 +192,7 @@ Use this canonical mapping to determine phases and whether the release type has 
 | `dashboard_extension` | Requirements → Mockups → Development → Review | No |
 | `dashboard_first` | Mockups → Data Model → Development → Review | No |
 | `enablement` | Content → Delivery | No |
-| `platform_migration` | Phase 1: Audit (parallel) → Phase 2: Inventory & Strategy → Phase 3: Target Setup → Phase 4: Migration (parallel batches) → Phase 5: Equivalency → Phase 6: Cutover | Yes: Phase 1 audits run in parallel; Phase 4 dbt batches run in parallel per batch group |
+| `platform_migration` | Phase 1: Audit (parallel) → Phase 2: Inventory & Strategy → Phase 3: Target Setup → Phase 4: Migration (parallel batches; dbt models and snapshots, each snapshot ordered ahead of its dependents) → Phase 5: Equivalency → Phase 6: Cutover | Yes: Phase 1 audits run in parallel; Phase 4 dbt batches run in parallel per batch group |
 
 For `platform_migration` the canonical Phase 2 step sequence is:
 
@@ -213,7 +218,7 @@ Read `migration.scope` from `status.md`. When it is absent or `full_migration`, 
 
 - **After Phase 1 audits** — region-tagging: tag every in-scope item with the region / tenant boundary it belongs to, scoped by `migration.tenant_predicate`. Run `/wire:region-tagging-generate <release> [--region <code>]` → `/wire:region-tagging-validate` → `/wire:region-tagging-review` (the human adjudication gate).
 - **Alongside Phase 2 strategy** — data-residency-assessment: the GDPR and data-residency assessment, including the legal review of the historical data window being migrated. Run `/wire:data-residency-assessment-generate <release>` → `-validate` → `-review` (the client DPO/legal sign-off gate). RA prepares this as data processor; the lawful-basis and retention determinations are the client's. This is a Stage 1 contractual deliverable with its own gate.
-- **Phase 4 migration** — bulk-copy-migration **in place of the re-ingest assumption**: a tenant-scoped Snowflake→BigQuery bulk copy filtered by `migration.tenant_predicate`, instead of re-running ingestion connectors. Run `/wire:bulk-copy-migration-generate <release>` → `-validate` → `-review` (safety gate before the first copy).
+- **Phase 4 migration** — bulk-copy-migration **in place of the re-ingest assumption**: a tenant-scoped Snowflake→BigQuery bulk copy filtered by `migration.tenant_predicate`, instead of re-running ingestion connectors. This copy also moves each `copy_and_continue` snapshot's built SCD-2 history (payload + `dbt_scd_id`/`dbt_updated_at`/`dbt_valid_from`/`dbt_valid_to`, frozen at the baseline `T`, tenant-filtered) so the target `dbt snapshot` run adopts and continues it rather than restarting history from empty. Run `/wire:bulk-copy-migration-generate <release>` → `-validate` → `-review` (safety gate before the first copy).
 - **Reporting layer** — reinstate the tenant's reporting layer against the target, tool-dependent on `migration.reporting_tool`: for `metabase`, run `/wire:metabase-migration-generate <release>` → `-validate` → `-review` (preceded by `/wire:metabase-audit-*` if not yet catalogued); for `omni`, run `/wire:omni-migration-generate <release>` → `-validate` → `-review` (preceded by `/wire:omni-audit-*` if not yet catalogued); for `oac`, run `/wire:oac-migration-generate <release>` → `-validate` → `-review` (preceded by `/wire:oac-audit-*` if not yet catalogued). Reporting-layer commands are gated on `migration.reporting_tool` being set to the matching tool, not on scope.
 - **Before Phase 6 cutover** — logical-access-uat: verify tenant-scoped logical access (roles, row-level security, masking) on the target before cutover. Run `/wire:logical-access-uat-generate <release> [--region <code>]` → `-validate` → `-review` (the isolation-proof sign-off gate).
 
@@ -301,7 +306,7 @@ After the diagram, produce a narrative section for each step in the release sequ
 
 Also include the following sections at the end:
 
-**Daily rhythm** — covering `/wire:plan` and how to scope each session (applicable to any release type with workshop or interview steps).
+**Daily rhythm** — covering `/wire:session-plan` and how to scope each session (applicable to any release type with workshop or interview steps).
 
 **What Wire does and does not do** — write this as two short paragraphs, not a single bullet.
 
@@ -360,6 +365,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -444,6 +453,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

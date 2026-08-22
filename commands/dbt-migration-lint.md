@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -163,22 +168,33 @@ The two are complementary and must not be merged:
 
 ## Flags
 
-- `--batch N` — lint batch N only (default: `current_batch` in status.md)
+- `--batch N` — lint batch N only (default: `current_batch` in status.md). Reads `dbt_audit.csv`'s `batch_number` — the topological, finer-grained translation batch. Use it for a topological-only or re-run slice.
+- `--wave <id>` — **the intended execution unit for a normal run.** Lint every dbt-model row `migration/migration_batching.csv` assigns to this wave (`batch_id`), cross-referenced against `dbt_audit.csv` for the actual model set. Accepts zero-padded (`B01`) or bare (`1`) forms; both normalise the same way. Wave-id form and normalisation are the shared contract in `specs/utils/wave_resolution.md` (normative; accepts `2`, `B02`, `b2`, or the `W02` display form). See Step 1w below — it mirrors `dbt_migration-generate`'s Step 1w exactly, reusing the same resolution so the two commands never disagree about what "wave B01" means. `--wave` and `--batch` are different numbering schemes — abort if both are supplied: `[wire] --wave and --batch read different numbering schemes and cannot be combined. Pick one.`
 - `--model name` — lint a single translated model
+- `--macros` — lint the translated **macro definitions** instead of the model tree; see **Macro Mode** below.
 - `--severity error|warn|info` — minimum severity to report (default: `info`)
 - `--format md|json` — report format (default: `md`; `json` for CI gating)
+- `--config <path>` — load a per-run config overlay file overriding status.md-sourced fields (`migration.dbt_project_path`, `migration.source_platform`/`migration.target_platform`, `migration.materialization_overrides_path`, etc.) for this invocation only — never written back to status.md. Mirrors `dbt_migration-generate`'s `--config` overlay exactly; see that spec's **Config overlay** section for the mechanism and the `data_safety.production_projects` exclusion. Orthogonal to scope — combine freely with `--batch`, `--wave`, `--model`, or `--macros`.
+- `--tag-map <path>` / `--target-dataset <name>` / `--dbt-project-path <path>` — discrete single-field overlay shorthands (for `migration.pii_tag_map_path` / `migration.target_schema` / `migration.dbt_project_path` respectively). Mirror `dbt_migration-generate`'s equivalents exactly; see that spec's **Config overlay** section.
+
+`--macros` is a standalone scope — abort if combined with `--batch`, `--wave`, or `--model`: `[wire] --macros is a standalone scope. Run it on its own; do not combine with --batch/--wave/--model.`
 
 ## Inputs
 
 - Translated model SQL in `migration/dbt/` (output of `dbt_migration-generate`)
-- Source model SQL at `migration.dbt_project_path` (for the before/after pair)
-- Active platform pair, resolved from `status.md` `source_platform` / `target_platform`:
+- Source model SQL at `migration.dbt_project_path` (for the before/after pair) — resolved via `specs/utils/dbt_manifest_parse.md` Steps 1–2 (nested/multi-project aware; see Step 1 below), not by assuming a single project sits directly at that path
+- `.wire/releases/$ARGUMENTS/migration/migration_batching.csv` — consumed only by `--wave` mode
+- `.wire/releases/$ARGUMENTS/audit/dbt_audit.csv` — cross-referenced by `--wave` mode
+- `--macros` mode: translated macro files under `migration/dbt/macros/` (output of `dbt_migration-generate --macros`) in place of the model tree
+- Active platform pair, resolved from `status.md` `source_platform` / `target_platform` (or the `--config` overlay's equivalents, if loaded):
   - `wire/platform_pairs/{pair}/feature_detection.md` — the tag regexes the rules build on
   - `wire/platform_pairs/{pair}/translation_reference.md` — the §11 gotcha checklist this rule set is derived from; the authoritative description for every rule
   - `wire/platform_pairs/{pair}/translation_guide.md` — pattern table
 - Engagement overrides at `.wire/engagement/platform_pair_overrides/{pair}/lint_rules.md`, if present — extra rules or per-engagement severity overrides, layered on top (override wins on the same rule id)
-- `<migration.dbt_project_path>/target/manifest.json` — the resolved source `config.materialized` per model, for `MATERIALIZATION_DRIFT`; when absent, fall back to the `dbt_project.yml` + in-file config scan and note the reduced confidence per model
-- The engagement's materialisation overrides file at `migration.materialization_overrides_path` (status.md), if set — declared overrides suppress `MATERIALIZATION_DRIFT` hits
+- The resolved source manifest(s) (per Step 1's `dbt_manifest_parse.md` resolution) — the source `config.materialized` per model, for `MATERIALIZATION_DRIFT`; when the manifest is unavailable, fall back to the `dbt_project.yml` + in-file config scan and note the reduced confidence per model
+- The engagement's materialisation overrides file at `migration.materialization_overrides_path` (status.md, or the `--config` overlay), if set — declared overrides suppress `MATERIALIZATION_DRIFT` hits
+- **`--config <path>` overlay (optional)**: see `dbt_migration-generate`'s **Config overlay** section — same mechanism, same fields, held in memory for this invocation only
+- **`--tag-map <path>` / `--target-dataset <name>` / `--dbt-project-path <path>` (optional)**: discrete single-field overlay shorthands — see `dbt_migration-generate`'s **Config overlay** section
 
 ## Engines
 
@@ -222,6 +238,14 @@ Rules are derived from `translation_reference.md` §11 and the per-pair `feature
 | `FLOAT_NULL_SORT` | info | `ORDER BY` on a float/nullable column feeding a window/rank, no explicit `NULLS FIRST/LAST` | NaN and default NULL position differ; make it explicit | §19 |
 | `ARRAY_TO_STRING_NULLS` | warn | `ARRAY_TO_STRING(a, sep)` with no null_text arg | BQ drops NULL elements; SF rendered empties — key columns diverge | §13 |
 | `MERGE_NO_PRUNE` | info | `MERGE` into a partitioned target with no partition predicate in `ON`/`WHEN` | Scans whole target each run; add a target partition predicate | §10 |
+| `CLUSTER_BY_ORDER_BY_CONFLICT` | error | Model's resolved config has `cluster_by` set **and** `materialized` is `table` or `incremental` (the first-run/full-refresh path issues the same CTAS shape), **and** the compiled SQL's outermost query has a top-level trailing `ORDER BY` — not an `ORDER BY` nested inside `OVER (...)`, `QUALIFY ... OVER (...)`, or an aggregate like `ARRAY_AGG(x ORDER BY y)` | Strip the trailing `ORDER BY` on the outer query — clustering doesn't preserve physical row order, so it does nothing on a clustered table and BigQuery rejects the DDL outright (`Result of ORDER BY queries cannot be clustered`) | §11.26 |
+
+**`CLUSTER_BY_ORDER_BY_CONFLICT` is a pure static check — no BigQuery connection is needed and none is used.** It fires deterministically every time the model in question goes through a real `CREATE TABLE ... CLUSTER BY (...) AS (compiled_sql)`, so it belongs in this offline lint pass rather than being left to surface (inconsistently — see below) at materialisation time.
+
+- **Config resolution.** Read `cluster_by` and `materialized` from the model's resolved config exactly the way `MATERIALIZATION_DRIFT` and `dbt-migration-generate`'s materialisation hook do — the manifest node's `config` block, not a fallback re-derivation from `dbt_project.yml` + in-file blocks. Skip the model entirely (not even a `PASS`) if `cluster_by` is unset — an `ORDER BY` with no clustering is legal BigQuery and does nothing wrong.
+- **Distinguishing a real conflict from a false positive.** Do not simply grep for the `ORDER BY` keyword — track parenthesis depth over the compiled SQL (after Jinja rendering) and record the depth at which each `ORDER BY` keyword occurs. Only an `ORDER BY` at **depth 0** — outside every paren, i.e. the query's own outermost, unwrapped trailing clause — is a real conflict. An `ORDER BY` inside `OVER (...)`, `QUALIFY ... OVER (...)`, an aggregate call like `ARRAY_AGG(x ORDER BY y)`, or a CTE's own subquery (`WITH x AS (SELECT ... ORDER BY ...)`) is always nested inside at least one paren opened by that construct, so it never reaches depth 0 and must not be flagged. This is the exact false-positive shape a from-scratch keyword search hits on window-function-heavy models.
+- **Suggested fix, never auto-applied here.** This rule has a fully deterministic fix (delete the outer `ORDER BY` clause) — per the **Engines** section above, where sqlglot is available the report shows the rewritten SQL as a suggested starting point. Applying it is `dbt-migration-generate`'s job (re-translate) or a hand edit, then re-lint, the same as every other rule in this catalogue; this command stays read-only.
+- **Why this belongs in the static lint, not the equivalency loop.** A model carrying this pattern can "pass" `dbt-migration-generate`'s inline materialisation step and later `equivalency-validate`'s row-count/schema/sampling checks in one session and still fail outright the next time the same SQL runs through a real `dbt-bigquery` CTAS — whether the failure surfaces depends on incidental DDL-wrapping choices in how a given session executed the write, not on anything about the data. Catching it here, before any materialisation is attempted, removes that inconsistency; it is not a gap in equivalency validation; equivalency correctly validates data that already materialised; the gap is that nothing checked the DDL shape before materialisation was attempted at all.
 
 ### BigQuery → Snowflake rules
 
@@ -237,34 +261,95 @@ Rules are derived from `translation_reference.md` §11 and the per-pair `feature
 
 ### Direction-agnostic rules
 
-These run in both directions and in both engines — they read model config, not the SQL parse tree, so they work identically under AST and regex modes.
+These run in both directions and in both engines. `MATERIALIZATION_DRIFT` reads model config, not the SQL parse tree, so it works identically under AST and regex; `UNPINNED_SELECT_STAR` reads the model's final output projection (AST preferred, regex fallback via the same paren-depth scan the cluster-by rule uses).
 
-| id | severity | detect (on translated model config) | fix hint | ref |
+| id | severity | detect (on translated model config or output projection) | fix hint | ref |
 |---|---|---|---|---|
 | `MATERIALIZATION_DRIFT` | warn | Translated model's resolved materialisation (in-file `{{ config(...) }}` / companion YAML) differs from the source manifest node's `config.materialized`, and no rule in the engagement's materialisation overrides file declares the change | Restore the preserved source materialisation, or declare the change as an override rule so it is on the record | `generate.md` "Materialisation config" |
+| `UNPINNED_SELECT_STAR` | error | The model's **final/output** `SELECT` projection — the depth-0 outermost query, not an import/staging CTE — is an unpinned star: `SELECT *`, `SELECT <alias>.*`, or `SELECT * EXCEPT(...)` | Expand to an explicit column list in source ordinal order. A lift-and-shift's output schema must be authored and reviewable: an unpinned `*` silently gains, loses, or reorders columns as the upstream evolves — breaking positional consumers (UNION/INSERT by position, CSV/SAR exports, BI and reverse-ETL pinned to column order) and defeating the `column_order_drift` parity check | §11.27 |
 
 `MATERIALIZATION_DRIFT` exists precisely because `dbt-migration-generate`'s materialisation hook (preserve-by-default plus declarative overrides) cannot catch every case: a model hand-edited after generation, or a model where no override was declared and the written materialisation is simply wrong. The hook is proactive, this rule is the after-the-fact backstop — both are intentionally kept; they are complementary, not redundant. A hit is not automatically a defect: when the overrides file declares the change (the model matches a rule's `select`, is not caught by its `exclude`, and the written materialisation equals that rule's `force_materialized`), the rule stays silent — a declared override is the hook working as designed, never a lint finding. Severity is `warn` because an undeclared change compiles fine and silently re-shapes the build: an incremental flattened to `table` changes cost and freshness, and with late-arriving data can change results.
 
+`UNPINNED_SELECT_STAR` targets the model's **output** projection only. Import/staging CTEs may `SELECT *` internally — that is idiomatic and safe; the rule fires only on the outermost, depth-0 `SELECT` that produces the model's output.
+
+- **Finding the output projection.** Track parenthesis depth over the compiled/static SQL exactly as `CLUSTER_BY_ORDER_BY_CONFLICT` does. A `*` inside a CTE body, a scalar/`IN` subquery, or `EXISTS(SELECT *)` is always inside at least one paren, never reaches depth 0, and is **not** flagged. Only a star in the depth-0 outermost `SELECT` list — the projection that becomes the model's schema — is a hit.
+- **All three forms are unpinned.** `SELECT *`, `SELECT <alias>.*`, and `SELECT * EXCEPT(col, ...)` are equally implicit: the emitted column set still depends on the upstream shape at run time rather than being authored in the model. All three are `error` on the output projection.
+- **Why `error`, not `warn`.** In a lift-and-shift the target's output schema is a contract. An unpinned star means a column added, dropped, or reordered upstream silently changes this model's output — and because the rows still match, no row-level equivalency check sees it. It also makes `column_order_drift` (W6b) unenforceable: there is no authored order to compare against.
+- **Deterministic fix — applied by `dbt-migration-fix`, never here.** Expand the star into the explicit source column list, in source ordinal order (per §11.27), so the projection is reviewable and `column_order_drift` can then verify it. Where sqlglot and the resolved upstream schema are available, the report attaches the expanded list as a suggested starting point.
+
+### Deployment-integration rules (pair-declared)
+
+These read the pair's **"Deployment-integration / provenance defect patterns"** section, not a rule hardcoded here — a new pair inherits them by declaring the section. They catch the deploy-time defects that pass a co-located validation warehouse and break under the real deployment project split or against the live source. All three are deterministic, and each has a deterministic auto-fix that `dbt-migration-generate`'s inline pass applies and `dbt-migration-fix` re-applies; this lint is the independent backstop for hand-edited or non-Wire code.
+
+| id | severity | detect | fix hint | ref |
+|---|---|---|---|---|
+| `MODEL_NOT_REGISTERED_FOR_DEPLOYMENT` | error | The model's dataset/folder is absent from the deployment orchestrator's model-selection manifest, resolved via the pair's `deployment_manifest` pointer in status.md | Add the folder to the manifest's selection | pair "Deployment-integration / provenance defect patterns" (rule 1) |
+| `HARDCODED_TARGET_DATABASE_XPROJECT` | error | A cross-project relation reference built from `{{ target.database }}` or a hardcoded target-project literal that should be a `source()` call | Rewrite to `source('<source>', '<table>')` resolving to the correct deployment source database | pair section (rule 2) |
+| `CDC_SOURCE_NO_SOFT_DELETE_FILTER` | error | A read of a CDC source carrying the pair's soft-delete marker (`_fivetran_deleted`) with no soft-delete filter | Inject the pair's soft-delete filter macro (`{{ filter_soft_deletes() }}` / `WHERE NOT COALESCE(_fivetran_deleted, FALSE)`) | pair section (rule 3) |
+
+**`MODEL_NOT_REGISTERED_FOR_DEPLOYMENT` is a documented no-op when unconfigured.** Read the `migration.deployment_manifest` pointer from status.md (or the `--config` overlay). If it is unset or its `path` does not resolve, do **not** emit a PASS for this rule — record it in the report's **Coverage gaps** section (`deployment manifest not configured — MODEL_NOT_REGISTERED_FOR_DEPLOYMENT not checked`) so a clean result is never mistaken for a checked one. The `STALE_NULL_PAD_BRONZE_PRESENT` pattern (rule 4 in the same pair section) is **not** a lint rule — it needs the live source warehouse and each model's `last_migrated_commit`, so it lives in `migration-drift`, not here.
+
 Engagement override files may add rows (e.g. a client-specific UDF that has no target equivalent) or downgrade a severity with a documented reason.
+
+### Rules this command does not evaluate (`applies_to`)
+
+An engagement rule row may carry an `applies_to` field naming the artefact class it describes. It defaults to `dbt_models`, which is what this command lints (plus `dbt_macros` under `--macros`). Anything else — `reverse_etl_config`, `orchestration_config`, `semantic_layer` — describes files this command never opens.
+
+**A rule this command cannot evaluate is reported, never silently skipped.** For each such rule, the report's **Rules not evaluated here** section names the rule id, its severity, its `applies_to`, and the command that does evaluate it. A rule whose `applies_to` is outside this command's scope **and** which names no evaluating command is itself a finding, at the rule's own severity: `RULE_HAS_NO_EVALUATOR`.
+
+The reason this exists as a check rather than a convention: an engagement wrote `primaryKey` casing on BigQuery-source Hightouch syncs as an **error**-severity rule, in the engagement rule file this command loads. This command loads that file, operates on the dbt project, and contains no reverse-ETL path — so it never opened a sync config and the rule could not fire. Nobody noticed, because the rule was written down and people stop checking once they believe a rule exists. A later hand sweep found 22 violations, every one of which would have run green and sent nothing. The lesson generalises past that one rule: a rule set loaded by a command that cannot evaluate part of it needs to say so out loud.
+
+Known evaluators for non-model rule classes:
+
+| `applies_to` | Evaluated by |
+|---|---|
+| `dbt_models` (default) | this command |
+| `dbt_macros` | this command, under `--macros` |
+| `reverse_etl_config` | `reverse-etl-migration-validate` (Checks 13–14) |
 
 ## Workflow
 
+### Step 0 — Load config overlay, resolve project(s)
+If `--config <path>` was supplied, load it exactly as `dbt_migration-generate` Step 0c describes — held in memory for this invocation only, never written back to status.md, `data_safety.production_projects` never overridable. Then resolve the dbt project(s) at `migration.dbt_project_path` (or the overlay's equivalent) via `specs/utils/dbt_manifest_parse.md` Steps 1–2 — nested/multi-project aware, hard-fail on an unresolvable path — rather than assuming a single project sits directly at that path. Where a model or macro's manifest node is needed below, locate it by its project-qualified node ID (`model.<package_name>.<model_name>` / `macro.<package_name>.<macro_name>`) in whichever resolved project's manifest contains it.
+
 ### Step 1 — Resolve scope and pair
-Read `current_batch` (or `--batch`/`--model`) and the batch model list. Resolve the platform pair from status.md. Load the pair's `feature_detection.md`, `translation_reference.md`, and any engagement `lint_rules.md` overrides. Detect whether `sqlglot` is importable; pick the engine and note it.
+Determine the lint scope:
+- `--macros` provided: this is not a model scope — skip Steps 2–4 below and run **Macro Mode** instead.
+- `--wave <id>` provided: resolve the model set per **Step 1w**.
+- `--model <name>` provided: lint that single model.
+- `--batch N` provided: load all models with `batch_number = N` from `dbt_audit.csv`.
+- Otherwise: read `current_batch` from status.md.
+
+`--wave` and `--batch` read different numbering schemes (the authoritative execution schedule vs. the topological micro-batch) — never combine them; see Flags.
+
+Resolve the platform pair from status.md (or the `--config` overlay). Load the pair's `feature_detection.md`, `translation_reference.md`, and any engagement `lint_rules.md` overrides. Detect whether `sqlglot` is importable; pick the engine and note it.
+
+### Step 1w — Resolve `--wave` (only when `--wave` is used)
+
+Identical resolution to `dbt_migration-generate`'s Step 1w — the two commands must never disagree about what a given wave id resolves to:
+
+1. Normalise the wave id: zero-padded (`B01`) or bare (`1`) both resolve to the same `batch_id`, e.g. `B01`. Reject anything else.
+2. Load `migration/migration_batching.csv`; abort if missing (`run /wire:migration-batching-generate $ARGUMENTS first`).
+3. Filter to rows where `batch_id` matches the normalised wave id and `object_type` indicates a dbt model (`dbt_model`). Abort if the wave id matches no rows at all; print-and-stop cleanly (not an error) if it matches rows but none are dbt-model rows.
+4. Cross-reference each matched `object_id` against `dbt_audit.csv`'s `model_name` to resolve the actual model set (and its `file_path` for locating the translated SQL). List, rather than silently drop, any `object_id` with no matching audit row.
+5. Print the resolved model-count preview before lint runs, same posture as a `--batch` run.
+
+The resolved model list flows into Step 2 unchanged. Where Step 3 below names the report file with the batch number `N` (`batch_N_lint.md`), substitute the wave id (`wave_B01_lint.md`) when the scope is `--wave`.
 
 ### Step 2 — Per-model lint
 For each model in scope:
 1. Strip/render Jinja; obtain the largest parseable SQL (compiled artifact if available).
 2. **Parse-check** in the target dialect → `PARSE` rule on failure.
-3. Run every rule for the active direction, plus the direction-agnostic rules. AST rules read the tree; regex rules apply the pattern; config rules (`MATERIALIZATION_DRIFT`) compare the translated model's config against the source manifest and the declared overrides. Each hit records: `model`, `rule_id`, `severity`, line/span, the offending snippet, the fix hint, and the `translation_reference.md` section.
+3. Run every rule for the active direction, plus the direction-agnostic rules. AST rules read the tree; regex rules apply the pattern; config rules (`MATERIALIZATION_DRIFT`) compare the translated model's config against the source manifest and the declared overrides; `CLUSTER_BY_ORDER_BY_CONFLICT` reads the resolved `cluster_by`/`materialized` config the same way and then tracks paren depth over the compiled SQL to find a real top-level trailing `ORDER BY`; `UNPINNED_SELECT_STAR` tracks paren depth the same way to find an unpinned star in the depth-0 output projection. Each hit records: `model`, `rule_id`, `severity`, line/span, the offending snippet, the fix hint, and the `translation_reference.md` section.
 4. Where a rule has a deterministic rewrite and sqlglot is present, attach the suggested fix (informational).
 
 ### Step 3 — Write the report
-Write `migration/lint/batch_N_lint.md` (and `.json` if `--format json`). Structure:
-- **Header**: engine used, direction, batch, model count, the "Tier 1 — not an equivalence pass; Tier 3 still required" disclaimer.
+Write `migration/lint/batch_N_lint.md` (and `.json` if `--format json`) — or `migration/lint/wave_{id}_lint.md` when the scope is `--wave`. Structure:
+- **Header**: engine used, direction, batch (or wave id), model count, the "Tier 1 — not an equivalence pass; Tier 3 still required" disclaimer.
 - **Summary**: counts by severity; models clean vs flagged.
 - **Findings**: grouped by model, ordered by severity. Each finding shows snippet, fix hint, and reference link.
 - **Coverage gaps**: models that could only be partially parsed (heavy Jinja, no compiled artifact), so a clean result there is "not fully checked", not "clean".
+- **Rules not evaluated here**: every loaded rule whose `applies_to` is outside this command's scope, with its severity and the command that does evaluate it. A rule with no named evaluator appears here as a `RULE_HAS_NO_EVALUATOR` finding at its own severity. Omit the section only when there are none — never omit it because the rules are "not this command's problem", which is exactly how an error-severity rule went unevaluated for a whole engagement.
 
 ### Step 4 — Update status
 ```yaml
@@ -277,12 +362,43 @@ artifacts:
       error: <n>
       warn: <n>
       info: <n>
+    wave_lint:                    # set only when run with --wave, keyed by wave id
+      B01: pass | fail
 ```
 `fail` when any `error`-severity finding remains unresolved (warn/info do not fail the gate by default; `--severity` can tighten this for CI).
 
+## Macro Mode (`--macros`)
+
+Runs instead of Steps 1–4 above when `--macros` is supplied. Mirrors `dbt_migration-generate`'s `--macros` batch-zero pass: that command's compile check confirms a translated macro *compiles*, but never runs this command's static dialect/behaviour-change rule catalogue against it — a translated macro gets compile-validation without ever getting the same silent-divergence scrutiny a model gets. This mode closes that gap.
+
+### Macro Step 1 — Resolve macro scope and pair
+Point the rule engine at the translated macro files under `migration/dbt/macros/` (the exact output tree `dbt_migration-generate --macros` writes, mirroring the source project's `macros/` subdirectory structure per that command's Macro Mode Workflow) instead of the model tree under `migration/dbt/`. Resolve the platform pair and load `feature_detection.md` / `translation_reference.md` / engagement `lint_rules.md` overrides exactly as Step 1 does for models. Detect the before/after pair from the source project's `macros/` tree at the same relative path (resolved per Step 0), the macro equivalent of the model before/after pair.
+
+### Macro Step 2 — Per-macro lint
+For each translated macro file:
+1. Strip/render Jinja around the macro body; obtain the largest parseable SQL span (a macro is a template, not a standalone statement, so expect more coverage gaps here than for models — note them the same way).
+2. **Parse-check** in the target dialect where the macro body is parseable SQL → `PARSE` rule on failure.
+3. Run the same rule catalogue used for models — every rule in **Rule catalogue** applies identically to a macro body; there is no separate macro rule set. `MATERIALIZATION_DRIFT` does not apply (macros carry no `config.materialized`); skip it here.
+4. Record findings in the same shape as Step 2 for models: `macro` (in place of `model`), `rule_id`, `severity`, line/span, snippet, fix hint, reference section.
+
+### Macro Step 3 — Write the report
+Write `migration/lint/macros_lint.md` (and `.json` if `--format json`), same structure as Step 3 for models, with "macro" in place of "model" throughout and the tier (from `batch_zero_plan.json`) shown alongside each macro.
+
+### Macro Step 4 — Update status
+```yaml
+artifacts:
+  dbt_migration:
+    macros_lint: pass | fail
+    macros_linted_date: "{{TODAY}}"
+    macros_lint_findings:
+      error: <n>
+      warn: <n>
+      info: <n>
+```
+
 ## CI gating
 
-With `--format json --severity error`, the command exits non-zero when any `error` finding exists, so it drops into a pre-merge check on the migration repo. The intent is to stop a translated batch reaching the (paid) Tier 3 parallel run while it still carries a known silent-divergence pattern. Document any rule deliberately suppressed for a batch in the batch summary, the same way `-- MANUAL REVIEW` flags are tracked — silent suppression reads as "clean" when it isn't.
+With `--format json --severity error`, the command exits non-zero when any `error` finding exists, so it drops into a pre-merge check on the migration repo. The intent is to stop a translated batch (or, in `--macros` mode, a translated macro pass) reaching the (paid) Tier 3 parallel run while it still carries a known silent-divergence pattern. Document any rule deliberately suppressed for a batch in the batch summary, the same way `-- MANUAL REVIEW` flags are tracked — silent suppression reads as "clean" when it isn't.
 
 ## Notes for the implementer
 
@@ -295,6 +411,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -379,6 +499,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -153,12 +158,13 @@ Follow `specs/utils/meeting_context.md` to surface any Fathom recordings touchin
 ### Step 2: Present the batching summary
 
 Display:
+- The partition mode (`domain`, `build_ordered_waves`, or `readiness_waves`) — if the SCC fallback fired, explain that the estate is a single dependency SCC, so the plan is build-ordered waves rather than domain batches, and the domain column is a rollup tag not the build order. In readiness mode, explain that waves are readiness bands (shipped / ready / per-approval-group gated / waiting on parent / residue, plus holding pens), that each gated wave unlocks whole when the client approves its rule group (recorded via `region-tagging-review` or a `resolved_by: manual` registry edit, then a re-run), and that `B00` is shipped history, not schedulable work
 - The batch summary table (batch_id, name, domain, object count, effort hours, depends_on_batches, batch-zero prerequisite)
 - The batch-level dependency DAG
-- The parallel-safe groupings
+- The parallel-safe groupings (none in build-ordered mode — waves are strictly sequential)
 - The seed-reconciliation note from generate
 
-Reaffirm to the reviewer that these are candidates — no batch has a committed date, owner, or approval yet. This gate is where that happens.
+Reaffirm to the reviewer that these are candidates — no batch has a committed date, owner, or approval yet. This gate is where that happens. In build-ordered mode the reviewer still schedules and owns each wave, but reordering waves against the build order is a dependency violation — treat it like any Check 3 violation (withdraw or record an explicit risk acceptance).
 
 ### Step 3: Adjudicate
 
@@ -189,7 +195,9 @@ Update `migration_batching.md` (and the affected `migration_batching.csv` rows, 
 [Per acceptance: the dependency edge being overridden, who accepted it, and the rationale — or "none"]
 ```
 
-### Step 5: Update status
+### Step 5: Record a provenance marker, then update status
+
+Step 4 may have rewritten `migration_batching.csv` rows in place (renames, merges, moves) with no marker distinguishing an adjudicated CSV from a freshly-generated candidate. That silence is what let a re-run of `/wire:migration-batching-generate` overwrite a hand-corrected plan without warning — including a hand-fix for exactly the kind of defect Fix W-7 addresses (an object generate misclassified that a human moved by hand at this gate). Close that gap here: after Step 4's edits are written to disk, compute a checksum of the final `migration_batching.csv` (e.g. `shasum -a 256 migration/migration_batching.csv`) and record it as `reviewed_checksum` alongside the review outcome. This is what `/wire:migration-batching-generate`'s idempotency guard reads before it will overwrite anything.
 
 ```yaml
 artifacts:
@@ -197,6 +205,7 @@ artifacts:
     review: approved | changes_requested
     reviewed_by: "{{REVIEWER_NAME}}"
     reviewed_date: "{{TODAY}}"
+    reviewed_checksum: "{{SHA256_OF_MIGRATION_BATCHING_CSV}}"
 ```
 
 ### Step 6: Output next command
@@ -228,6 +237,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -312,6 +325,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

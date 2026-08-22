@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -103,6 +108,80 @@ with open('.wire/releases/<release_folder>/trace.jsonl', 'a') as f:
 {"ts":"2026-07-05T14:41:15Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"command_end","step":null,"step_name":null,"result":"complete","detail":"Generated data_model_specification.md — 14 models (5 staging, 4 integration, 5 warehouse), including 2 informed by the accepted registry proposals above."}
 ```
 
+## Automatic Validation (on by default)
+
+---
+description: Internal utility — injected auto-validate section so generate commands run their matching validate step automatically and fold the result into their output
+---
+
+Every `generate` command that has a matching `validate` command for the
+same artifact runs that validate step automatically as part of generate —
+by default, with no separate command to remember. This section only appears
+on commands where that applies; artifacts with no separate validate step at
+all (e.g. mockups, workshops, UAT) never carry this section.
+
+## Step: Check `auto_validate`
+
+Read this command's own `auto_validate` front-matter field, in the Workflow
+Specification below. Two states:
+
+- **Absent, or `true`** (the default — most artifacts): auto-validate runs.
+- **`false`**: this artifact's validate step is expensive — it runs real
+  code, queries a live warehouse or BI tool, or otherwise does IO beyond
+  re-reading local files — so it does not run automatically. Skip to
+  "If `auto_validate: false`" below.
+
+## If `auto_validate` is absent or `true`: run validate automatically
+
+Once this command finishes writing its artifact, before ending:
+
+1. Run this artifact's own `/wire:<artifact-with-dashes>-validate` workflow
+   in full, exactly as if the consultant had typed it themselves — same
+   inputs, same `status.md` write to `artifacts.<artifact>.validate`, same
+   report. This is not optional or an extra step layered on top; it is the
+   default behavior for this artifact.
+2. Fold the result into this command's own closing output rather than
+   presenting it as a separate command run:
+   - **PASS** — add a single closing line: `✅ Auto-validated — PASS`. The
+     full report already went to `status.md`/`execution_log.md`, exactly as
+     it would from a standalone validate run — no need to repeat it here.
+   - **FAIL** — surface the validate command's own failure report in full,
+     exactly as running validate standalone would show it, so the
+     consultant sees what's wrong immediately without running anything
+     else themselves.
+3. This never blocks or undoes generate itself — the artifact is written
+   either way, and its content is never rolled back because validate
+   failed. Auto-validation only means validate has already run and its
+   result is already on record by the time generate finishes, instead of
+   waiting for the consultant to remember to run it separately.
+
+## If `auto_validate` is `false`: state this plainly, don't run it
+
+Do not run validate. End with a line naming why, as specifically as this
+spec's own context makes possible (e.g. "runs `dbt run`/`dbt test`",
+"queries the live target warehouse", "calls the Looker API directly") —
+fall back to "performs live checks against an external system" only if no
+more specific reason is evident from context:
+
+```
+⚠ This artifact's validate step [reason] and does not run automatically.
+Run /wire:<artifact-with-dashes>-validate <release_folder> before
+requesting review — review is blocked until it passes.
+```
+
+## Why this is always safe either way
+
+`review` already requires `validate: PASS` for this same artifact as one of
+its own declared preconditions (see `specs/utils/precondition_gate.md`) —
+this is existing, independent enforcement, not something added by this
+section. So an `auto_validate: false` opt-out never lets an artifact reach
+review unvalidated; it only decides *when* the consultant pays validate's
+cost — automatically on every draft (the default), or once, on their own
+schedule, before requesting review (the opt-out). Auto-validation is a
+convenience that closes the "forgot to run it" gap for the common case; the
+gate that actually prevents unvalidated work from being reviewed was already
+there.
+
 ## Workflow Specification
 
 ---
@@ -119,7 +198,7 @@ inputs:
     - name: release_folder
       description: "Path to the release folder"
 preconditions: []
-description: Catalog all Metabase collections, dashboards, cards/questions, their SQL, and permission groups with migration approach and warehouse dependency mapping
+description: BI-tool audit — catalog all Metabase collections, dashboards, cards/questions (SQL, template tags, snippets, card references), permission groups and sandboxing, with the card-to-dashboards reverse index, migration approach, and warehouse dependency mapping
 
 ---
 
@@ -136,16 +215,21 @@ Follow `specs/utils/stale_artifact_check.md` with `artifact_id: metabase_audit` 
 
 Catalogs the client's Metabase reporting layer: every collection, dashboard, and card/question (with its SQL), the warehouse objects each card reads from, and the permission groups that govern access. The output maps card-to-warehouse dependencies so the migration inventory can sequence cutover correctly — cards cannot be repointed to the target until their source warehouse objects exist there — and records which cards carry source-platform SQL dialect that needs translating.
 
-This is a **reporting-layer** audit, the Metabase counterpart to the reverse ETL audit. It is **not gated by `migration.scope`** — it runs for any migration where the client uses Metabase, full migration or tenant carve-out alike.
+This is the first member of the **BI-tool audit category** (#184) — audits of report/dashboard estates, a different object class from the semantic-model audits (Looker/Omni/OAC), which catalogue a modelling layer rather than an inventory of end-user reports. It is **not gated by `migration.scope`** — it runs for any migration where the client uses Metabase, full migration or tenant carve-out alike. Under a carve-out its catalog is what region tagging classifies (`item_type: metabase_card` / `metabase_dashboard`), so the tenant's reports get carve-in/exclude rulings like every other object.
+
+Its output feeds four downstream consumers: `migration-inventory-generate` (card nodes and card-to-warehouse-model edges), `region-tagging-generate` (carve-out classification), `metabase-migration-generate` (dialect translation), and `metabase-carveout-generate` (tenant scoping) — which is why the catalog must carry the full per-card object graph (template tags, snippets, card references, the dashboards reverse index), not just the SQL.
 
 ## Prerequisites
 
 - Release folder with `release_type: platform_migration` in `status.md`
 - `migration.reporting_tool: metabase` set in `status.md`
 - One of the following data sources (in priority order, see `skills/metabase/SKILL.md` Step 0):
-  1. metabase-cli / serialization export configured against the instance
-  2. `MB_HOST` + `MB_API_KEY` (read-only) for the Metabase REST API
-  3. Client-supplied query inventory CSV at `audit/metabase_cards_input.csv`
+  1. The **Metabase MCP server** (https://www.metabase.com/docs/latest/ai/mcp), where the instance exposes it — the preferred discovery surface for enumeration and per-card reads
+  2. metabase-cli / serialization export configured against the instance
+  3. `MB_HOST` + `MB_API_KEY` (read-only) for the Metabase REST API
+  4. Client-supplied query inventory CSV at `audit/metabase_cards_input.csv`
+
+The MCP server serves **discovery and reads**; the write paths downstream (translation, carve, import) route through serialization or the REST API regardless, because bulk transformations need a diffable, reviewable artifact between read and write. All four sources produce the same catalog shape.
 
 ## Inputs
 
@@ -172,9 +256,12 @@ If the audit file already exists at `audit/metabase_audit.md`, ask whether to re
 
 Check data sources in priority order per `skills/metabase/SKILL.md` Step 0:
 
+- **Option 0 — MCP server**: when the instance exposes the Metabase MCP server, use it to enumerate collections, dashboards, cards, databases, and permission groups, and for per-card reads. Set `data_source: mcp`.
 - **Option 1 — serialization export**: export via the `mb` CLI and parse the YAML. Set `data_source: serialization`.
 - **Option 2 — REST API**: enumerate collections, dashboards, cards, databases, and permission groups via the endpoints in the skill. Set `data_source: api`.
 - **Option 3 — CSV fallback**: use `audit/metabase_cards_input.csv`. Set `data_source: csv`.
+
+Whichever source is used, the catalog shape (Step 3) is identical — a downstream consumer never needs to know how the audit connected.
 
 If none is available, stop and output the required CSV columns:
 
@@ -208,6 +295,9 @@ Capture the collection → dashboard → card hierarchy, plus database connectio
 | `warehouse_objects` | resolved source tables/views (see resolution below) |
 | `source_resolved` | true if ≥1 object resolved, else false |
 | `permission_groups` | groups with access to the card's collection / database |
+| `template_tags` | the card's `template-tags` — each tag's name, type, and (for field filters) the source-database **field id** it binds to. Field ids do not survive a connection change, so this is the remap input for `metabase-migration` |
+| `snippets_used` | `{{snippet: name}}` references — snippets are separate objects with their own SQL and must be converted before the cards that use them |
+| `card_references` | `{{#id-name}}` references to other cards — these create a conversion dependency order (leaf cards first) |
 | `complexity` | assigned in Step 4 |
 | `migration_approach` | assigned in Step 4 |
 | `include_in_migration` | true (default) unless archived / unused >90 days |
@@ -215,7 +305,9 @@ Capture the collection → dashboard → card hierarchy, plus database connectio
 
 Also catalog:
 - **Database connections** — id, name, engine (e.g. `snowflake`), and which cards run against each. The connection is the pivot for repointing.
-- **Permission groups** — each group and the databases/collections it can access (from the permission graph).
+- **Permission groups and sandboxing** — each group, the databases/collections it can access (from the permission graph), and any **data sandboxing policies** (row-level filters per group) — under a carve-out, sandboxing is one of the candidate tenant-scoping layers, so it must be visible at audit time.
+- **Snippets** — every snippet, its SQL, and the cards that use it.
+- **The card-to-dashboards reverse index** — for every card, every dashboard whose dashcards reference it, with a `shared_card` flag when that count exceeds one. **Cards are shared objects**: editing a card on one dashboard changes it on all of them, so no downstream command may write to a card without this index in hand (the edit-in-place vs clone decision reads it). Also record each dashboard's own **filter parameter mappings** (dashboard parameters bound to card fields by field id — they need the same remap as template tags).
 
 **Warehouse object extraction**: resolve `warehouse_objects` for every card.
 - **`native` (SQL)** — parse the SQL to extract referenced schema-qualified table/view names.
@@ -242,12 +334,14 @@ Default: active MBQL cards and simple portable-SQL cards → `repoint` (Low). Re
 **Output location**: `.wire/releases/$ARGUMENTS/audit/metabase_audit.md`
 
 Include:
-- Summary table (total cards, dashboards, collections; by approach; by complexity)
+- Summary table (total cards, dashboards, collections; by approach; by complexity; **MBQL vs native split** — MBQL cards are dialect-neutral and usually the majority, so the split is what scopes the manual translation effort)
 - **Source-resolution coverage**: `resolved_card_count` / `active_card_count` (`source_resolution_coverage_pct`), broken down by query type
 - Full card catalog table
 - Collection → dashboard → card hierarchy
+- **Card-to-dashboards reverse index** — shared cards (on more than one dashboard) listed explicitly with their dashboard sets
+- **Snippet inventory** and the **card-reference dependency edges** (which cards must convert before which)
 - Database connection inventory (engine, cards per connection)
-- **Permission group inventory** — each group and its database/collection access
+- **Permission group inventory** — each group, its database/collection access, and any sandboxing policies
 - Warehouse object dependency map (which warehouse objects each card depends on)
 - **Unresolved cards** — every active card with `source_resolved: false`, listed explicitly
 - dbt model dependencies (cards that cannot be repointed until a dbt migration batch is complete)
@@ -266,7 +360,11 @@ artifacts:
     dashboard_count: N
     collection_count: N
     permission_group_count: N
-    data_source: "serialization" | "api" | "csv"
+    data_source: "mcp" | "serialization" | "api" | "csv"
+    native_card_count: N
+    mbql_card_count: N
+    shared_card_count: N          # cards on more than one dashboard (the reverse index)
+    snippet_count: N
     decommission_count: N
     active_card_count: N
     resolved_card_count: N
@@ -305,6 +403,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -389,6 +491,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

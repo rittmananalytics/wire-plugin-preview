@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -144,7 +149,7 @@ Follow `specs/utils/precondition_gate.md` before proceeding.
 
 ## Purpose
 
-Validate generated training against quality standards, naming conventions, and best practices.
+Validate generated training materials against the completeness and deliverability checks `training_generate.md` itself defines in "Validation Checks (for next step)", plus the structural cross-references between a training type's session plan, exercise workbook, and delivery checklist.
 
 ## Usage
 
@@ -162,7 +167,12 @@ Validate generated training against quality standards, naming conventions, and b
 
 **Process**:
 1. Check that `training.generate == complete` in status.md
-2. Verify generated files exist
+2. Verify generated files exist for every training type listed in `artifacts.training.session_plans`:
+   - `enablement/training_<type>_session_plan.md`
+   - `enablement/training_<type>_slides.md`
+   - `enablement/training_<type>_exercises.md`
+   - `enablement/training_<type>_quick_reference.md`
+3. Verify `enablement/training_delivery_checklist.md` exists (shared across all training types)
 
 **If not generated**:
 ```
@@ -173,15 +183,19 @@ Run `/wire:training-generate <project>` first.
 
 ### Step 2: Run Validation Checks
 
-**Validation Checklist**:
+**Validation Checklist** (per training type, unless noted as delivery-checklist-level):
 
 | Check | Rule | Severity |
 |-------|------|----------|
-| [Check 1] | [Description] | Critical |
-| [Check 2] | [Description] | Major |
-| [Check 3] | [Description] | Info |
-
-[Specific validation checks for this artifact type]
+| Learning objectives present | Session plan's "Learning Objectives" section has at least one objective, and no objective is left as an unfilled `[...]` placeholder | Critical |
+| Learning objectives are specific | Each objective names a concrete skill/action (not generic filler text like "understand the platform") | Major |
+| Prerequisites stated | Session plan's "Prerequisites" section lists at least one required item | Major |
+| Agenda timing is realistic | Each agenda part has a stated duration, and the parts' durations sum to the session's stated total "Duration" (± 5 minutes) | Major |
+| Exercises are cross-referenced | Every exercise named in the session plan's "Hands-On Exercises" section has a matching entry (same name) in that training type's `_exercises.md` workbook | Critical |
+| Exercise solutions present | Every exercise in `_exercises.md` has a corresponding entry under its "Solutions" section | Major |
+| Post-session support defined | Session plan's "Post-Session Support" section lists at least one resource or support channel | Major |
+| Delivery checklist references all files | `training_delivery_checklist.md`'s "Materials to Share" section (or equivalent) accounts for the session plan, slides, exercises, and quick reference file actually generated for every training type in scope | Major |
+| No unfilled placeholders | None of the generated files contain literal `[...]`-style placeholder text left over from the template | Info |
 
 ### Step 3: Generate Validation Report
 
@@ -194,11 +208,13 @@ Run `/wire:training-generate <project>` first.
 
 ### Validation Results
 
-| Check | Status | Notes |
-|-------|--------|-------|
-| [Check 1] | ✅ | |
-| [Check 2] | ✅ | |
-| [Check 3] | ⚠️ | [Warning details] |
+| Training Type | Check | Status | Notes |
+|----------------|-------|--------|-------|
+| Data Team Enablement | Learning objectives present | ✅ | |
+| Data Team Enablement | Agenda timing is realistic | ✅ | |
+| Data Team Enablement | Exercises are cross-referenced | ⚠️ | Exercise 3 in session plan has no matching entry in training_data_team_exercises.md |
+| End User Training | Post-session support defined | ✅ | |
+| (shared) | Delivery checklist references all files | ✅ | |
 
 ### Next Steps
 
@@ -226,20 +242,41 @@ Follow the Jira sync workflow in `specs/utils/jira_sync.md`:
 - Action: `validate`
 - Status: the validate state just written to status.md (pass/fail)
 
+### Step 5.5: Sync to Linear (Optional)
+
+Follow the Linear sync workflow in `specs/utils/linear_sync.md`:
+- Artifact: `training`
+- Action: `validate`
+- Status: the validate state just written to status.md (pass/fail)
+
 ## Edge Cases
 
 ### Validation Failures
 
 If checks fail:
 - Set validate status to `fail`
-- List all issues
-- Suggest fixes
+- List all issues, grouped by training type
+- Suggest fixes (e.g. "add a matching exercise entry", "state a duration for Part 3")
 - User must fix and re-validate
+
+### Exercise Cross-Reference Mismatch
+
+If a session plan names an exercise that has no matching workbook entry (or vice versa — a workbook exercise never referenced in any session plan's agenda):
+```
+Warning: Exercise cross-reference mismatch for [Training Type].
+
+Session plan references: [Exercise names from session plan]
+Exercise workbook contains: [Exercise names from _exercises.md]
+
+Missing from workbook: [list]
+Orphaned in workbook (not referenced in any session plan): [list]
+```
+This is a Critical-severity check only when the workbook is missing an exercise the session plan promises to cover; an orphaned workbook exercise (extra material not used in the agenda) is a Major-severity note, not a failure.
 
 ## Output
 
 This command:
-- Validates training completeness and quality
+- Validates training completeness, cross-references, and deliverability per training type
 - Updates `status.md` with validation results
 - Provides actionable feedback if issues found
 
@@ -248,6 +285,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -332,6 +373,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

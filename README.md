@@ -22,12 +22,14 @@ Wire does not replace consultants or developers. It gives them an AI that works 
 
 ## Key Features
 
-- **261 slash commands** covering the full delivery lifecycle: Discovery (Shape Up + RA Canonical SOP), Requirements, Design, Development, Testing, Deployment, Enablement, Platform Migration, Agentic Data Stack
+- **301 slash commands** covering the full delivery lifecycle: Discovery (Shape Up + RA Canonical SOP), Requirements, Design, Development, Testing, Deployment, Enablement, Platform Migration, Agentic Data Stack
 - **12 release types** matching common engagement shapes: Shape Up discovery, SOP / Canonical discovery (sponsor-facing Findings Playback), full platform builds, pipeline-only, dbt development, dashboard extensions, dashboard-first rapid dev, enablement, platform migration (BigQuery ↔ Snowflake), agentic data stack (governed self-service analytics with eval suite), droughty (schema introspection and base-layer generation from live warehouses), and custom (bespoke deliverables defined from SoW documents) — every release type is now backed by a machine-readable process definition (see Precondition Gate below), not just documentation
 - **Two-tier engagement structure** separating long-running client context from individual scoped releases
 - **Generate / validate / review lifecycle** for every artifact: structured generation, automated checks, stakeholder sign-off
 - **Precondition gate** (v4.0.0) — every command blocks by default on an unmet prerequisite; overriding requires a recorded name and reason, so skipping a step on purpose is always a visible, attributable decision rather than something that silently happened
 - **Process and data model registries** (v4.0.0) — release-type sequencing and command specs are sourced from a private, branch-protected `wire-process-registry`; an optional, automatically-detected canonical data model registry (`wire-data-model-registry`) proposes industry-standard entity structures without ever bundling proprietary content into this public plugin — see [wire-plugin-preview.readthedocs.io/advanced/registries](https://wire-plugin-preview.readthedocs.io/advanced/registries)
+- **Plain Language by default**: the plugin ships a `Plain Language` output style that activates automatically while Wire is enabled, so every response is written in simple, concise, jargon-free English. Generated artifacts are unaffected (they follow their own templates and the reference-legibility convention); override per project in `.claude/settings.local.json` or by editing the style
+- **Status reconciliation** (`/wire:status-sync`) for work done outside command runs: diffs recorded state against git history, files on disk, and the execution log, then repairs status files, sprint-plan story states, and session history with consultant confirmation
 - **27 ad-hoc development skills** that activate automatically during coding work (dbt, LookML, Dagster, Python, Fivetran, Airbyte, Coupler.io, RudderStack, Segment, Looker, Snowflake, Hightouch, BigQuery, Cloud Run, gcloud) without any explicit invocation, plus **26 Amplitude product-analytics skills** for working with an Amplitude instance
 - **Wire Agents** — 13 specialist subagents (dbt developer, semantic layer developer, pipeline engineer, migration specialist, and 9 others) dispatched automatically on every generate and validate command. `/wire:delegate` computes a full parallel/sequential execution plan across all pending work, with fan-out parallelism for large model sets (layers stay sequential; agents within each layer run in parallel)
 - **Autopilot mode** for autonomous end-to-end delivery
@@ -301,7 +303,7 @@ A VS Code extension (`wire-vscode/`) is in early development. The intention is t
 
 - [Documentation site](https://wire-plugin-preview.readthedocs.io/) — full documentation with search, covering all release types, commands, skills, and MCP servers
 - [User Guide](USER_GUIDE.md) — full operational guide covering all release types, worked examples, Autopilot, and troubleshooting
-- [Command Registry](wire/COMMANDS.md) — command catalog and conventions (run `/wire:help` for the full, current list of all 261 commands)
+- [Command Registry](wire/COMMANDS.md) — command catalog and conventions (run `/wire:help` for the full, current list of all 301 commands)
 - [Changelog](CHANGELOG.md)
 - [Release Notes](RELEASE_NOTES.md)
 - [Framework Source README](wire/README.md) — internals, build process, package structure

@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -142,6 +147,7 @@ Typically invoked automatically by generate commands. Inputs are passed by the c
 | `artifact_name` | Human-readable display name | `Requirements Specification` |
 | `file_path` | Path to generated markdown file | `.wire/releases/01-discovery/requirements/requirements_specification.md` |
 | `project_id` | Release folder path | `releases/01-discovery` |
+| `--no-publish` | Optional flag. Per-invocation opt-out of document store sync, passed through from `$ARGUMENTS` by the calling command. When present, the utility exits immediately without publishing, regardless of `docstore.provider` | `--no-publish` |
 
 ## Prerequisites
 
@@ -149,6 +155,7 @@ Typically invoked automatically by generate commands. Inputs are passed by the c
 - For Confluence: Atlassian MCP server must be configured
 - For Notion: Notion MCP server must be configured
 - If `docstore.provider` is `null`, the utility exits immediately without error
+- If the caller passed `--no-publish`, the utility exits immediately without error, regardless of `docstore.provider`
 
 ---
 
@@ -157,10 +164,11 @@ Typically invoked automatically by generate commands. Inputs are passed by the c
 ### Step 1: Check Document Store Configuration
 
 **Process**:
-1. Read the project's `status.md`
-2. Check `docstore.provider` in YAML frontmatter
-3. If `provider` is `null`, absent, or the `docstore` section does not exist: **exit silently** — no output, no error. The generate command continues normally.
-4. Otherwise, extract:
+1. Check whether the caller passed `--no-publish` (via `$ARGUMENTS`). If so: **exit silently** — no output, no error. The generate command continues normally.
+2. Read the project's `status.md`
+3. Check `docstore.provider` in YAML frontmatter
+4. If `provider` is `null`, absent, or the `docstore` section does not exist: **exit silently** — no output, no error. The generate command continues normally.
+5. Otherwise, extract:
    - `docstore.provider` (`confluence`, `notion`, or `both`)
    - `docstore.confluence.cloud_id` (if Confluence)
    - `docstore.confluence.space_key` (if Confluence)
@@ -677,6 +685,9 @@ If a provider was skipped (not configured) or failed silently, omit it from the 
 **generate command invoked without docstore configured:**
 - Exit silently at Step 1 — no output, no side effects
 
+**`--no-publish` passed by caller:**
+- Exit silently at Step 1 — no output, no side effects, regardless of `docstore.provider`
+
 **Rate limiting (Notion API):**
 - If a 429 response is received when appending blocks, wait 2 seconds and retry once
 - If the retry also fails, log the error and mark the sync as incomplete
@@ -691,13 +702,17 @@ This utility:
 - Records `page_id`, `page_url`, and `last_synced` in `status.md` for each configured provider
 - Outputs a one-line confirmation per provider on success
 - Fails gracefully per provider — Confluence and Notion failures are independent
-- Exits silently if no document store is configured
+- Exits silently if no document store is configured, or if the caller passed `--no-publish`
 
 Execute the complete workflow as specified above.
 
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -782,6 +797,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

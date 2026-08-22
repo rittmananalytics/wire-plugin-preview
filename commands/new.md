@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -323,7 +328,7 @@ Use `AskUserQuestion`:
       {"label": "Dashboard extension", "description": "New dashboards on existing platform"},
       {"label": "Dashboard-first rapid dev", "description": "Interactive mocks drive data model"},
       {"label": "Enablement", "description": "Training and documentation"},
-      {"label": "Platform Migration", "description": "Full lifecycle migration of a data platform from one warehouse stack to another. Covers ingestion audit, db object audit, security audit, dbt audit, orchestration audit → migration inventory → strategy → target setup → parallel ingestion → batched dbt translation → orchestration migration → equivalency validation loop → cutover."},
+      {"label": "Platform Migration", "description": "Full lifecycle migration of a data platform from one warehouse stack to another. Covers ingestion audit, db object audit, security audit, dbt audit, orchestration audit → migration inventory → strategy → target setup → parallel ingestion → batched dbt translation (models and snapshots, with SCD-2 snapshot history preserved) → orchestration migration → equivalency validation loop → cutover."},
       {"label": "Agentic Data Stack", "description": "Build a governed self-service agentic data stack — dataset governance, semantic layer expansion, per-domain knowledge skills, and an eval suite with per-domain accuracy gates. Delivers an installable Claude agentic data stack skill and maintenance infrastructure."},
       {"label": "Droughty", "description": "Schema introspection and base-layer generation using Droughty. Use for discovery sprints on existing warehouses (ERD, field docs, QA) or as a post-dbt phase to generate staging SQL, schema tests, and base LookML views. Can also be added as an optional phase to any delivery release."},
       {"label": "Custom", "description": "Bespoke scope not covered by a standard release type. Wire analyses your SoW or plan and proposes a tailored release structure — mapping deliverables to existing commands where possible, generating new project-scoped specs for the rest."}
@@ -414,6 +419,26 @@ If "Change settings", return to Step 2.
    - Create and switch: `git checkout -b [branch_name]`
 5. Store `branch_name` for display in the confirmation step
 
+### Step 8.5: Tenant Carve-out Scope Check (existing engagements only)
+
+This step only runs when **both** of these are true:
+1. `.wire/engagement/context.md` already existed at the start of this run — this is the same detection used in Step 1 to distinguish "new engagement" from "new release in an existing engagement" (re-run `ls .wire/engagement/context.md 2>/dev/null` here if the result wasn't retained).
+2. The release type selected for this new release is `platform_migration`.
+
+If either is false, skip this step entirely and proceed to Step 9 — the `migration.scope` question stays in its normal place at Step 14 Question 9, and Steps 9/9.5 run unmodified.
+
+If both are true, ask the scope question now (pulled forward from Step 14 Question 9) so Steps 9 and 9.5 below can branch on it:
+
+"Is this a **full platform migration** or a **tenant carve-out** (extracting a single tenant's data into the target)?" (Options: Full migration (default) / Tenant carve-out). If **Tenant carve-out** is selected, also ask: "What is the **tenant predicate** that scopes the extracted tenant — the WHERE clause or tenant key? (e.g. `tenant_id = 4815`)".
+
+Store `migration.scope` (`full_migration` | `tenant_carveout`) and `migration.tenant_predicate` here. Step 14 Question 9 must reuse these stored values instead of re-asking when they were already captured in this step.
+
+**If `migration.scope` resolves to `tenant_carveout`**, identify the parent release this carve-out is being spawned from:
+1. Read each subdirectory in `.wire/releases/` and check its `status.md` frontmatter for `project_type: "platform_migration"`.
+2. If exactly one such release is found, store its folder name as `parent_release_folder`.
+3. If more than one is found, ask the user directly: "Which existing release is the parent for this carve-out?" and list the candidates by folder name.
+4. If none is found, there is no parent to share from — proceed to Steps 9 and 9.5 as normal (the carve-out branches below only fire when a `parent_release_folder` is identified).
+
 ### Step 9: Issue Tracker Integration (Optional)
 
 Use `AskUserQuestion`:
@@ -433,6 +458,42 @@ Use `AskUserQuestion`:
   }]
 }
 ```
+
+**Tenant carve-out branch**: If Step 8.5 identified `migration.scope: tenant_carveout` with a `parent_release_folder`, replace the tracker-specific setup questions below with this upfront share-or-separate choice, asked once per tracker selected above. For non-carve-out releases, or when no `parent_release_folder` was identified, this branch does not fire — proceed with the setup questions exactly as written below.
+
+If Jira or Both was selected:
+```json
+{
+  "questions": [{
+    "question": "This carve-out release can either share the parent release's Jira project, or use its own — which do you want?",
+    "header": "Carve-out Jira Setup",
+    "options": [
+      {"label": "Share the parent's Jira project", "description": "Reuse [parent_release_folder]'s Jira project key — this release still gets its own Epic and Tasks, inside that same project"},
+      {"label": "Use a separate Jira project", "description": "Set up a new, dedicated Jira project for this carve-out release"}
+    ],
+    "multiSelect": false
+  }]
+}
+```
+- If "Share the parent's Jira project": read `jira.project_key` from `parent_release_folder`'s `status.md` and use it directly as `jira_project_key`. Still ask the normal "How would you like to set up Jira?" mode question below to determine `jira_mode`/`jira_structure` for this release's own issue hierarchy — only the project key question is skipped.
+- If "Use a separate Jira project": continue with the normal Jira setup questions below, unchanged (fresh project key + mode).
+
+If Linear or Both was selected, ask the equivalent question for Linear:
+```json
+{
+  "questions": [{
+    "question": "This carve-out release can either share the parent release's Linear team/project, or use its own — which do you want?",
+    "header": "Carve-out Linear Setup",
+    "options": [
+      {"label": "Share the parent's Linear team/project", "description": "Reuse [parent_release_folder]'s Linear team and project — this release's issues are created inside that same project"},
+      {"label": "Use a separate Linear team/project", "description": "Set up a new, dedicated Linear team identifier and/or project for this carve-out release"}
+    ],
+    "multiSelect": false
+  }]
+}
+```
+- If "Share the parent's Linear team/project": read `linear.team_id` and `linear.project_id` from `parent_release_folder`'s `status.md` and use them directly, with `linear_mode: "create_in_existing"` — skip Questions 1–3 below.
+- If "Use a separate Linear team/project": continue with the normal Linear setup Questions 1–3 below, unchanged.
 
 **If Jira or Both selected**: Ask for the Jira project key and preferred mode:
 ```json
@@ -500,6 +561,42 @@ Store `linear_team_id`, `linear_project_id` (if provided, extract from URL or us
   }]
 }
 ```
+
+**Tenant carve-out branch**: If Step 8.5 identified `migration.scope: tenant_carveout` with a `parent_release_folder`, replace Questions 2 and 3 below with this upfront share-or-separate choice, asked once per provider selected in Question 1. For non-carve-out releases, or when no `parent_release_folder` was identified, this branch does not fire — proceed with Questions 2 and 3 exactly as written below.
+
+If Confluence or Both Confluence and Notion was selected:
+```json
+{
+  "questions": [{
+    "question": "This carve-out release can either share the parent release's Confluence space, or use its own — which do you want?",
+    "header": "Carve-out Confluence Setup",
+    "options": [
+      {"label": "Share the parent's Confluence space", "description": "Publish this release's documents into [parent_release_folder]'s existing Confluence space"},
+      {"label": "Use a separate Confluence space", "description": "Publish this release's documents into their own, dedicated Confluence space"}
+    ],
+    "multiSelect": false
+  }]
+}
+```
+- If "Share the parent's Confluence space": read `docstore.confluence.space_key` from `parent_release_folder`'s `status.md` and use it directly as `confluence_space_key` — skip Question 2 below.
+- If "Use a separate Confluence space": continue with Question 2 below, unchanged (ask for a new space key).
+
+If Notion or Both Confluence and Notion was selected, ask the equivalent question for Notion:
+```json
+{
+  "questions": [{
+    "question": "This carve-out release can either share the parent release's Notion parent page, or use its own — which do you want?",
+    "header": "Carve-out Notion Setup",
+    "options": [
+      {"label": "Share the parent's Notion parent page", "description": "Publish this release's documents under [parent_release_folder]'s existing Notion parent page"},
+      {"label": "Use a separate Notion parent page", "description": "Publish this release's documents under their own, dedicated Notion parent page"}
+    ],
+    "multiSelect": false
+  }]
+}
+```
+- If "Share the parent's Notion parent page": read `docstore.notion.parent_page_id` from `parent_release_folder`'s `status.md` and use it directly as `notion_parent_page_id` — skip Question 3 below.
+- If "Use a separate Notion parent page": continue with Question 3 below, unchanged.
 
 **Question 2** — If "Confluence" or "Both Confluence and Notion" was selected, ask directly in chat:
 ```
@@ -653,7 +750,7 @@ Ask the following additional questions (one at a time):
    - Also ask: "Does the client use a **reverse ETL tool**?" (Options: Hightouch / None / Other). Store as `migration.reverse_etl_tool` with values `hightouch` / `none` / `other`. `hightouch` enables `reverse-etl-audit` and `reverse-etl-migration` as a sixth audit alongside the five core audits (see `wire/skills/hightouch/SKILL.md`); `none` is the default — the sixth audit simply doesn't run. "Other" covers Census and Polytomic, which `reverse-etl-audit`'s spec documents as following the same output shape via tool-specific API branches, but aren't implemented yet — falls back to the same manual `migration.reverse_etl_tool` value with a note that automated cataloguing isn't available for that tool.
 7. "What is the **target project / account**?" (The GCP project ID for BigQuery, or Snowflake account identifier for the target environment — the place all migration writes will land.)
 8. "Are there any **production project IDs** that should be treated as off-limits for writes?" (Comma-separated list, or press Enter to skip. These are client production environment IDs that Claude will refuse to write to during migration commands.) Store as `data_safety.production_projects` list.
-9. "Is this a **full platform migration** or a **tenant carve-out** (extracting a single tenant's data into the target)?" (Options: Full migration (default) / Tenant carve-out). If **Tenant carve-out** is selected, also ask: "What is the **tenant predicate** that scopes the extracted tenant — the WHERE clause or tenant key? (e.g. `tenant_id = 4815`)". Store as `migration.scope` (`full_migration` | `tenant_carveout`) and `migration.tenant_predicate`. If the user selects Full migration or presses Enter, leave `migration.scope` at its default of `full_migration` and `migration.tenant_predicate` null.
+9. "Is this a **full platform migration** or a **tenant carve-out** (extracting a single tenant's data into the target)?" (Options: Full migration (default) / Tenant carve-out). If **Tenant carve-out** is selected, also ask: "What is the **tenant predicate** that scopes the extracted tenant — the WHERE clause or tenant key? (e.g. `tenant_id = 4815`)". Store as `migration.scope` (`full_migration` | `tenant_carveout`) and `migration.tenant_predicate`. If the user selects Full migration or presses Enter, leave `migration.scope` at its default of `full_migration` and `migration.tenant_predicate` null. **If `migration.scope` and `migration.tenant_predicate` were already captured in Step 8.5** (adding a tenant-carve-out release to an existing engagement), skip this question entirely and reuse the stored values — do not ask again.
 
 If **Private network with MCP tunnel** is selected, output these setup instructions and wait for confirmation before proceeding:
 
@@ -758,7 +855,7 @@ Store `warehouse` and `droughty_context`.
    - `{{CREATED_DATE}}` → today's date
    - `{{LAST_UPDATED}}` → today's date
    - `{{RELEASE_FOLDER}}` → release_folder
-   - `{{SOURCE_DOCUMENTS}}` → "TBD — provided in /wire:custom-release-define"
+   - `{{SOURCE_DOCUMENTS}}` → "TBD — provided in /wire:custom-define"
 3. Write to `.wire/releases/[release_folder]/status.md`
 4. **Invoke `wire/specs/custom/define.md`** to handle document ingestion, deliverable mapping, custom spec generation, and `.claude/commands/` wrapper creation. The `define` command handles all remaining scaffolding — do not write a standard deliverables section to status.md; `define` does this after the user confirms the proposed structure.
 
@@ -809,7 +906,7 @@ When **Both** is selected, run both workflows. They operate independently — fa
    /wire:problem-definition-generate [release_folder]
 
 2. Or start a session first:
-   /wire:session:start [release_folder]
+   /wire:session-start [release_folder]
 
 [If `sop_discovery`]:
 1. Draft the engagement brief from the signed SoW and deal record:
@@ -819,7 +916,7 @@ When **Both** is selected, run both workflows. They operate independently — fa
    /wire:stakeholder-map-generate [release_folder]
 
 3. Or start a session first:
-   /wire:session:start [release_folder]
+   /wire:session-start [release_folder]
 
 [If delivery release type]:
 1. Add source materials to .wire/releases/[release_folder]/artifacts/
@@ -827,7 +924,7 @@ When **Both** is selected, run both workflows. They operate independently — fa
    /wire:requirements-generate releases/[release_folder]
 
 3. Or start a session first:
-   /wire:session:start [release_folder]
+   /wire:session-start [release_folder]
 
 [If `droughty` release type]:
 1. Configure Droughty — install and connect to the warehouse:
@@ -837,7 +934,7 @@ When **Both** is selected, run both workflows. They operate independently — fa
    /wire:droughty-generate releases/[release_folder]
 
 [If `custom` release type]:
-Custom spec generation is already underway via /wire:custom-release-define.
+Custom spec generation is already underway via /wire:custom-define.
 Once complete, invoke your first custom generate command:
   /[first-artifact-name]-generate [release_folder]
 
@@ -848,7 +945,7 @@ Or check what commands were created:
 
 | Command | Purpose |
 |---------|---------|
-| `/wire:session:start [folder]` | Start a focused working session |
+| `/wire:session-start [folder]` | Start a focused working session |
 | `/wire:status releases/[folder]` | Check release status |
 | `/wire:problem-definition-generate [folder]` | [discovery] Start the Shape Up workflow |
 | `/wire:engagement-brief-generate [folder]` | [sop_discovery] Start the SOP discovery workflow |
@@ -856,9 +953,9 @@ Or check what commands were created:
 | `/wire:migration-audit-all [folder]` | [platform_migration] Run all 5 source platform audits in parallel |
 | `/wire:ingestion-audit-generate [folder]` | [platform_migration] Audit Fivetran connectors on source platform |
 | `/wire:ads-audit-all [folder]` | [agentic_data_stack] Run all three audits in parallel |
-| `/wire:aa_dataset-audit-generate [folder]` | [agentic_data_stack] Inventory warehouse tables and grade governance maturity |
-| `/wire:aa_metric-audit-generate [folder]` | [agentic_data_stack] Inventory metric definitions and coverage gaps |
-| `/wire:aa_query-audit-generate [folder]` | [agentic_data_stack] Analyse query history for question patterns |
+| `/wire:ads_dataset-audit-generate [folder]` | [agentic_data_stack] Inventory warehouse tables and grade governance maturity |
+| `/wire:ads_metric-audit-generate [folder]` | [agentic_data_stack] Inventory metric definitions and coverage gaps |
+| `/wire:ads_query-audit-generate [folder]` | [agentic_data_stack] Analyse query history for question patterns |
 | `/wire:droughty-setup [folder]` | [droughty] Install Droughty and generate profile.yaml + droughty_project.yaml |
 | `/wire:droughty-generate [folder]` | [droughty] Run the full Droughty phase in sequence |
 ```
@@ -896,6 +993,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -980,6 +1081,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

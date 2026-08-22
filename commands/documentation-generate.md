@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -103,6 +108,80 @@ with open('.wire/releases/<release_folder>/trace.jsonl', 'a') as f:
 {"ts":"2026-07-05T14:41:15Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"command_end","step":null,"step_name":null,"result":"complete","detail":"Generated data_model_specification.md — 14 models (5 staging, 4 integration, 5 warehouse), including 2 informed by the accepted registry proposals above."}
 ```
 
+## Automatic Validation (on by default)
+
+---
+description: Internal utility — injected auto-validate section so generate commands run their matching validate step automatically and fold the result into their output
+---
+
+Every `generate` command that has a matching `validate` command for the
+same artifact runs that validate step automatically as part of generate —
+by default, with no separate command to remember. This section only appears
+on commands where that applies; artifacts with no separate validate step at
+all (e.g. mockups, workshops, UAT) never carry this section.
+
+## Step: Check `auto_validate`
+
+Read this command's own `auto_validate` front-matter field, in the Workflow
+Specification below. Two states:
+
+- **Absent, or `true`** (the default — most artifacts): auto-validate runs.
+- **`false`**: this artifact's validate step is expensive — it runs real
+  code, queries a live warehouse or BI tool, or otherwise does IO beyond
+  re-reading local files — so it does not run automatically. Skip to
+  "If `auto_validate: false`" below.
+
+## If `auto_validate` is absent or `true`: run validate automatically
+
+Once this command finishes writing its artifact, before ending:
+
+1. Run this artifact's own `/wire:<artifact-with-dashes>-validate` workflow
+   in full, exactly as if the consultant had typed it themselves — same
+   inputs, same `status.md` write to `artifacts.<artifact>.validate`, same
+   report. This is not optional or an extra step layered on top; it is the
+   default behavior for this artifact.
+2. Fold the result into this command's own closing output rather than
+   presenting it as a separate command run:
+   - **PASS** — add a single closing line: `✅ Auto-validated — PASS`. The
+     full report already went to `status.md`/`execution_log.md`, exactly as
+     it would from a standalone validate run — no need to repeat it here.
+   - **FAIL** — surface the validate command's own failure report in full,
+     exactly as running validate standalone would show it, so the
+     consultant sees what's wrong immediately without running anything
+     else themselves.
+3. This never blocks or undoes generate itself — the artifact is written
+   either way, and its content is never rolled back because validate
+   failed. Auto-validation only means validate has already run and its
+   result is already on record by the time generate finishes, instead of
+   waiting for the consultant to remember to run it separately.
+
+## If `auto_validate` is `false`: state this plainly, don't run it
+
+Do not run validate. End with a line naming why, as specifically as this
+spec's own context makes possible (e.g. "runs `dbt run`/`dbt test`",
+"queries the live target warehouse", "calls the Looker API directly") —
+fall back to "performs live checks against an external system" only if no
+more specific reason is evident from context:
+
+```
+⚠ This artifact's validate step [reason] and does not run automatically.
+Run /wire:<artifact-with-dashes>-validate <release_folder> before
+requesting review — review is blocked until it passes.
+```
+
+## Why this is always safe either way
+
+`review` already requires `validate: PASS` for this same artifact as one of
+its own declared preconditions (see `specs/utils/precondition_gate.md`) —
+this is existing, independent enforcement, not something added by this
+section. So an `auto_validate: false` opt-out never lets an artifact reach
+review unvalidated; it only decides *when* the consultant pays validate's
+cost — automatically on every draft (the default), or once, on their own
+schedule, before requesting review (the opt-out). Auto-validation is a
+convenience that closes the "forgot to run it" gap for the common case; the
+gate that actually prevents unvalidated work from being reviewed was already
+there.
+
 ## Workflow Specification
 
 ---
@@ -143,7 +222,7 @@ Follow `specs/utils/delivery_lead_delegate.md` before executing the workflow bel
 
 ## Purpose
 
-Generate documentation based on requirements and design specifications.
+Generate the project's handover documentation: an architecture overview, a data dictionary, and an operational runbook, plus an index linking out to every other generated artifact (dbt docs, semantic layer, dashboards, pipeline, orchestration, deployment). This is the single document a client team member reaches for after the engagement ends — everything in it must point at something that actually exists, not restate content that's better maintained elsewhere.
 
 ## Usage
 
@@ -155,6 +234,7 @@ Generate documentation based on requirements and design specifications.
 
 - Requirements must be approved
 - Relevant design artifacts should be complete
+- At least one of `dbt`, `pipeline`, `orchestration`, `semantic_layer`, `dashboards`, `deployment` should be complete (there's nothing to document a handover for otherwise — see Edge Cases)
 
 ## Workflow
 
@@ -162,19 +242,95 @@ Generate documentation based on requirements and design specifications.
 
 **Process**:
 1. Read `requirements/requirements_specification.md`
-2. Read relevant design documents
-3. Identify what needs to be generated
+2. Read `design/conceptual_model.md`, `design/data_model.md`, `design/pipeline_architecture.md` (whichever exist)
+3. Read `status.md` to see which development artifacts (`pipeline`, `orchestration`, `dbt`, `semantic_layer`, `dashboards`, `deployment`) are complete, and their generated file paths
+4. Read the dbt project's model descriptions (`schema.yml` files) — these are the source of truth for the data dictionary, not a re-authored copy
 
-### Step 2: Generate documentation
+### Step 2: Generate Architecture Overview
 
-**Process**:
-1. Apply templates and best practices
-2. Generate structured output
-3. Save to appropriate location
+Summarize the platform's actual shape, sourced from the design and development artifacts read in Step 1 — not invented:
+- Data sources and ingestion method (from `pipeline` artifact / `pipeline_design.md`)
+- Transformation layers present (from the dbt project's actual staging/integration/warehouse models)
+- Orchestration/scheduling approach (from `orchestration` artifact)
+- BI/semantic layer (from `semantic_layer` artifact)
+- A simple architecture diagram (Mermaid) showing source → pipeline → dbt layers → semantic layer → dashboards, using only components that are actually complete per `status.md`
 
-[Detailed generation logic here - specific to artifact type]
+### Step 3: Generate Data Dictionary
 
-### Step 3: Update Status
+For every warehouse-layer dbt model (and integration models where `schema.yml` descriptions exist):
+- Model name, layer, grain, and its `schema.yml` description
+- Primary key and foreign key columns
+- Link to the model's dbt docs page if a dbt docs site was generated
+
+Do not re-describe columns already documented in `schema.yml` — link/reference them, so the data dictionary can't drift out of sync with the actual model descriptions.
+
+### Step 4: Generate Operational Runbook
+
+- How to re-run the pipeline and dbt models manually (commands, from `pipeline`/`orchestration`/`dbt` artifacts)
+- Common troubleshooting scenarios and their fixes (pull from `deployment`'s rollback steps and `data_quality`'s test failure investigation queries, if those artifacts are complete)
+- Support/escalation contacts (from `requirements_specification.md`'s stakeholder list, if present)
+
+### Step 5: Generate Artifact Index
+
+A single table linking to every other generated artifact's actual file path (from `status.md`), so this document functions as the entry point for the whole engagement:
+
+| Artifact | File | Status |
+|----------|------|--------|
+| Data Model | `design/data_model.md` | [status from status.md] |
+| dbt Models | dbt docs site link, or `dbt/` directory | [status] |
+| Semantic Layer | `development/semantic_layer.md` | [status] |
+| Dashboards | `development/dashboards.md` | [status] |
+| Deployment Plan | `deploy/deployment_plan.md` | [status] |
+
+### Step 6: Write Documentation File
+
+**File**: `.wire/releases/[release_folder]/enablement/documentation.md`
+
+```markdown
+# Project Documentation: [Project Name]
+
+**Generated**: [Date]
+
+## Architecture Overview
+
+[Summary from Step 2]
+
+```mermaid
+flowchart LR
+    Source[Data Sources] --> Pipeline
+    Pipeline --> Staging[dbt: staging]
+    Staging --> Integration[dbt: integration]
+    Integration --> Warehouse[dbt: warehouse]
+    Warehouse --> Semantic[Semantic Layer]
+    Semantic --> Dashboards
+```
+
+## Data Dictionary
+
+[Table from Step 3 — links to schema.yml descriptions, not re-authored copies]
+
+## Operational Runbook
+
+### Re-running the Pipeline
+
+[Commands from Step 4]
+
+### Troubleshooting
+
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| [from deployment rollback steps / data_quality investigation queries] | | |
+
+### Support Contacts
+
+[From requirements_specification.md]
+
+## Artifact Index
+
+[Table from Step 5]
+```
+
+### Step 7: Update Status
 
 **Process**:
 1. Read `status.md`
@@ -188,14 +344,21 @@ Generate documentation based on requirements and design specifications.
    ```
 3. Write updated status.md
 
-### Step 4: Sync to Jira (Optional)
+### Step 8: Sync to Jira (Optional)
 
 Follow the Jira sync workflow in `specs/utils/jira_sync.md`:
 - Artifact: `documentation`
 - Action: `generate`
 - Status: the generate state just written to status.md
 
-### Step 5: Sync to Document Store (Optional)
+### Step 8.5: Sync to Linear (Optional)
+
+Follow the Linear sync workflow in `specs/utils/linear_sync.md`:
+- Artifact: `documentation`
+- Action: `generate`
+- Status: the generate state just written to status.md
+
+### Step 9: Sync to Document Store (Optional)
 
 If a document store is configured for this project, follow the workflow in `specs/utils/docstore_sync.md`:
 - `artifact_id`: `documentation`
@@ -205,13 +368,16 @@ If a document store is configured for this project, follow the workflow in `spec
 
 If docstore sync fails, log the error and continue — do not block the generate command.
 
-### Step 6: Confirm and Suggest Next Steps
+### Step 10: Confirm and Suggest Next Steps
 
 **Output**:
 ```
 ## documentation Generated Successfully
 
-**File(s):** [list generated files]
+**Artifacts indexed:** [N]
+**Warehouse models in data dictionary:** [N]
+
+**File(s):** .wire/releases/[release_folder]/enablement/documentation.md
 
 ### Next Steps
 
@@ -232,10 +398,34 @@ Current status: [status]
 Complete requirements approval: /wire:requirements-review <project>
 ```
 
+### No Development Artifacts Complete
+
+If none of `pipeline`, `orchestration`, `dbt`, `semantic_layer`, `dashboards`, `deployment` are complete:
+```
+Error: No development artifacts are complete yet, so there's nothing to document a handover for.
+
+Complete at least one development artifact before generating documentation:
+- /wire:dbt-generate <project>
+- /wire:pipeline-generate <project>
+- /wire:semantic_layer-generate <project>
+```
+
+### dbt Models Have No schema.yml Descriptions
+
+If dbt models exist but lack `schema.yml` descriptions to source the data dictionary from:
+```
+Warning: dbt models exist but several lack schema.yml descriptions.
+
+The data dictionary can only be as complete as the underlying schema.yml files. Models missing descriptions:
+- [model list]
+
+Add descriptions via /wire:dbt-generate, then regenerate this documentation, or proceed with a partial data dictionary now? (y/n)
+```
+
 ## Output
 
 This command creates:
-- [List of output files specific to artifact]
+- `.wire/releases/[release_folder]/enablement/documentation.md` — architecture overview, data dictionary, operational runbook, and artifact index
 - Updates `status.md`
 
 Execute the complete workflow as specified above.
@@ -243,6 +433,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -327,6 +521,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

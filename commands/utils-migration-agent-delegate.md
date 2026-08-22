@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -169,5 +174,9 @@ Then return immediately. The subagent will complete the work and update `status.
 ### Step 4: Inline fallback
 
 If delegation was skipped (agent not found or already in a subagent context), proceed with the workflow steps below as normal.
+
+## Fleet mode
+
+When the dispatch above runs as part of a multi-lane fleet (roughly 6+ concurrent lanes, or whenever the release director has invoked the fleet operating model), follow `specs/utils/migration_fleet.md` in addition to the protocol above. In fleet mode every lane brief must state: the lane's state file path and resume contract, its declared tree ownership, its budget line, and the flat-lane rule (no sub-agent fan-out below a lane). The dispatching session is the single writer for the register and verdict log, and runs the consolidation and backstop pass over lane output before anything ships.
 
 Execute the complete workflow as specified above.

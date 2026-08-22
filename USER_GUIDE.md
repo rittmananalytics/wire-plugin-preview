@@ -448,6 +448,26 @@ flowchart LR
 
 You can still override it, but only explicitly — the gate asks for your name and a reason, and records both in `status.md`'s `precondition_overrides` and as an `override` result in `execution_log.md`. This makes "I skipped a step on purpose" a visible, attributable decision instead of something that silently happened. Autopilot never answers this prompt on its own behalf — see "Handling a precondition-gate block" in [Section 21](#21-wire-autopilot-autonomous-execution).
 
+### Automatic validation
+
+**As of v4.0.0**, validate is no longer a separate step you have to remember to run between generate and review. Every `generate` command that has a matching `validate` command for the same artifact now runs that validate step automatically once it finishes writing the artifact, and folds the PASS/FAIL result straight into generate's own output.
+
+```mermaid
+flowchart LR
+    GEN["/wire:data_model-generate"] --> WRITE["Artifact written"]
+    WRITE --> AUTO{"auto_validate\nfalse?"}
+    AUTO -->|"No (default)"| RUN["Runs data_model-validate\nautomatically"]
+    RUN --> RESULT["PASS/FAIL folded into\ngenerate's own output"]
+    AUTO -->|Yes| SKIP["States plainly why, and that\nyou must run validate yourself"]
+
+    style RUN fill:#e8f5e9,stroke:#2e7d32
+    style SKIP fill:#fff3e0,stroke:#e65100
+```
+
+A handful of validate steps are expensive because they do real work beyond re-reading local files — `dbt-validate` runs an actual `dbt run`/`dbt test`, some migration and semantic-layer validates query a live warehouse or BI tool directly. Those generate commands declare `auto_validate: false` in front-matter (see `wire/schemas/command-schema.md`) and skip the automatic run, stating plainly why and that you need to trigger `validate` yourself when you're ready to pay that cost, rather than paying it on every draft iteration of generate.
+
+Either way, nothing changes about the gate that actually matters: `review` already requires `validate: PASS` for its own artifact as one of its declared preconditions (see above), enforced by the precondition gate regardless of whether validation happened automatically or manually. An `auto_validate: false` artifact can never reach review unvalidated — the opt-out only changes *when* validate runs, never *whether* it's required. A handful of artifacts have no separate validate step at all (`mockups`, `workshops`, `uat`, `viz_catalog`, `playbook`, Droughty's own umbrella `generate`) and this section doesn't apply to them either way.
+
 ### Git branching
 
 `/wire:new` enforces a mandatory branch check. If you run it while on `main` or `master`, the framework will stop and ask you to create a feature branch before any project files are created. It suggests `feature/{folder_name}` (e.g., `feature/20260210_acme_marketing_analytics`) but you can choose your own name.
@@ -625,7 +645,7 @@ graph LR
 /wire:sprint-plan-review 01-discovery              # team approval
 
 # Spawn the downstream delivery releases:
-/wire:release:spawn 01-discovery
+/wire:release-spawn 01-discovery
 
 # End each session:
 ```
@@ -718,12 +738,12 @@ Validates that: no single story is 13 points or more, total points fit the appet
 /wire:sprint-plan-review 01-discovery
 ```
 
-Team review and approval. Once approved, the sprint plan marks the discovery release as complete. The AI suggests running `release:spawn`.
+Team review and approval. Once approved, the sprint plan marks the discovery release as complete. The AI suggests running `release-spawn`.
 
 ### Spawning delivery releases
 
 ```
-/wire:release:spawn 01-discovery
+/wire:release-spawn 01-discovery
 ```
 
 Reads the approved release brief to identify the planned downstream delivery releases, then creates the folder structure and `status.md` for each one:
@@ -815,7 +835,7 @@ A new engagement with an uncertain scope:
 /wire:sprint-plan-validate 01-discovery    → PASS
 /wire:sprint-plan-review 01-discovery      → Team approved
 
-/wire:release:spawn 01-discovery
+/wire:release-spawn 01-discovery
 → Creates .wire/releases/02-acme-data-foundation/ (full_platform)
 → Creates .wire/releases/03-acme-enablement/ (enablement)
 → Both releases ready to start
@@ -1792,6 +1812,7 @@ The Platform Migration release type (`release_type: platform_migration`) covers 
 | `equivalency_validation` | `/wire:equivalency-*` | No (loop) | Iterative row-count, schema, value, freshness comparison |
 | `migration_register` | `/wire:migration-register-*` | No | Per-model state store — source commit, BigQuery target, state, last equivalence result; maintained incrementally by other migration commands |
 | `migration_drift` | `/wire:migration-drift-*` | No | Scheduled gate — diffs the live source against each model's last-migrated commit, flags downstream Hightouch syncs and masking-policy changes |
+| `dbt_migration_reverse_port` | `/wire:dbt-migration-reverse-port` | No | Post-merge sweep: carries changes made to a model in the client's repo back into the delivery tree, and never overwrites unraised local work |
 | `cutover` | `/wire:cutover-*` | **Yes** | Go-live runbook — point of no return |
 | `migration_report` | `/wire:migration-report-*` | No | Post-migration record |
 
@@ -1891,6 +1912,8 @@ It then parses each resolved project to a manifest (`dbt parse`, no warehouse co
 
 **The macro layer is scanned too.** Every macro is checked against the same feature-detection patterns, and any macro that needs Snowflake→BigQuery translation is classified `translate`, `redesign` (no direct target equivalent — a Snowpark or JS UDF, say — surfaced at the human review gate), or `manual-review-out-of-scope` (session/catalog/dev-tooling operations, not model-build SQL). Each model's `platform_macros` column records, direct or transitive, which of those macros it calls. The audit then produces a **batch-zero macro translation plan** (`audit/batch_zero_plan.json` + `audit/batch_zero_macro_plan.md`) — the macros needing translation, tiered by macro-to-macro dependency, meant to be translated once before model batch 1 starts (a widely-used macro can be referenced by hundreds of models scattered across every batch).
 
+Each plan entry carries a **`layer`** that routes it to the command that owns its lifecycle. `layer: macro` entries — Jinja / dispatched SQL-dialect macros — are translated by `/wire:dbt-migration-generate --macros`. `layer: udf` entries — `create_udfs` and `fn_*` `CREATE FUNCTION` objects — are warehouse DDL, deployed to the target by `/wire:target-setup-generate` as `05_udfs.sql`. See [The batch-zero pass](#the-batch-zero-pass-macros-and-udfs) for the run order.
+
 The audit produces a narrative report (`audit/dbt_audit.md`) and a machine-readable CSV (`audit/dbt_audit.csv`) with one row per model. `dbt-audit-validate` independently re-walks the filesystem and re-parses the manifest rather than trusting the generate run's self-report — it reconciles the catalogue against the files actually on disk (catching a stale or substituted catalogue however it arose), re-verifies the batch order against the real dependency graph, and confirms every macro needing translation is classified and every affected model is flagged.
 
 ---
@@ -1904,6 +1927,8 @@ The audit produces a narrative report (`audit/dbt_audit.md`) and a machine-reada
 Like `region-tagging-generate`, this command produces **candidates, not decisions** — it never marks a batch approved or assigns a committed date. `/wire:migration-batching-review` is the human/client adjudication gate: rename, merge, or split batches, and assign dates and owners, but a change that would violate a real dependency edge must be withdrawn or explicitly accepted as a documented risk — the DAG doesn't get silently overridden. `/wire:migration-batching-validate` re-derives the dependency graph independently (same posture as `dbt-audit-validate`) rather than trusting the generate run's own report, so a batch plan that stops matching reality gets caught automatically instead of by hand, mid-migration.
 
 If a hand-drafted batch plan already exists from an earlier planning stage, pass it as a seed (`--seed <path>`, or `migration.sow.batch_allocation` in status.md) — it's read as a naming/grouping hint to reconcile against the graph, never accepted or discarded silently.
+
+**When the whole estate is one dependency cycle, it falls back to build-ordered waves.** Some migrations cross-reference in every direction — the domains collapse to a single strongly-connected component, and no domain grouping can be both acyclic *and* declare every cross-batch edge (validate's "DAG acyclic" and "every edge declared" checks become mutually exclusive). On a real Snowflake→BigQuery migration (client anonymized) — 1,731 models, 3,467 objects, one SCC — the seed 13-domain partition left 1,108 of 1,542 cross-batch edges undeclared and could never pass. `migration-batching-generate` detects that and switches `partition_mode` to `build_ordered_waves`: it topologically sorts the model graph (zero forward references), cuts it into `--target-batches N` waves (default: the domain-group count), and sets each wave to depend on the full prefix of earlier waves. That's trivially acyclic and declares every edge by construction, so it validates cleanly — and, unlike the hand-rolled script the pattern used to require, it reproduces from the command. The `domain` tag stays on every row for client and milestone rollup even though it can no longer be the build order, and the fallback is recorded in the narrative and `status.md` (`scc_fallback: true`) so it's explicit why the output isn't domain-grouped.
 
 ---
 
@@ -1995,6 +2020,21 @@ Before running `dbt-migration-generate`, register the source dbt project so Wire
 | `tag:pilot`, `path:models/staging` | Set selectors by tag, config, or path |
 
 A bare `--select vehicles` is identical to `--model vehicles`. `--select` cannot be combined with `--batch`, `--model`, or `--models` (each names the set a different way) — Wire aborts if you mix them. Before translating, Wire prints the resolved model list for confirmation and aborts if the selector matches nothing. Full grammar and resolution algorithm: `wire/docs/specs/dbt-node-selection.md`.
+
+#### The batch-zero pass: macros and UDFs
+
+A macro or UDF a model expands must exist in translated form *before* that model can compile. Because a single macro reaches models scattered across every batch, it can't be translated "inside" a model batch — it's the batch-zero pass, run once up front. `dbt-audit` produces the plan (`audit/batch_zero_plan.json`); each entry's `layer` field routes it to one of two commands:
+
+```
+/wire:dbt-migration-generate <release-folder> --macros   # translate the layer:macro Jinja/dispatched macros
+/wire:target-setup-generate  <release-folder>            # deploy the layer:udf CREATE FUNCTION objects → 05_udfs.sql
+```
+
+`--macros` is a standalone scope mode — it can't be combined with `--batch`, `--model`, `--models`, or `--select`, and doesn't overload `--batch 0` (audit batches run 1–N). It translates the shared macro *definition* files in tier order (tier 0 first, then tier 1, …) into `migration/dbt/macros/`, mirroring the source tree, reusing the same platform-pair guides and macro-first strategy as model translation. There's no row-equivalency loop — a macro is validated when the models that expand it compile — so it's a compile-only pass; `dbt-migration-validate --macros` checks it (every macro-layer entry translated, tier order respected, no source-dialect functions left in the bodies).
+
+The UDF layer (`create_udfs`, `fn_*`) is warehouse DDL, not Jinja, so it deploys with the other target objects rather than through `dbt-migration`. `target-setup-generate` translates each `action: translate` UDF into a target `CREATE FUNCTION`, writes them tier-ordered (`create_udfs` last) to `05_udfs.sql`, and runs them as target-setup Phase 1 after the safety-gate review. A UDF with no direct target equivalent (`action: redesign` — Snowpark Python, JS VARIANT handling) is *not* mechanically translated; it surfaces in the MANIFEST's **UDF redesign decisions** section as an architecture choice — BigQuery ML, Vertex AI, a remote UDF, or an in-model rewrite — that `target-setup-review` must sign off before the affected models are translated. This formalises what an earlier pilot engagement did by hand: the dispatched macros translated inline while assembling the runnable project, and `STRIP_NULL_VALUE` plus the helper UDFs deployed manually as target-setup Phase 1.
+
+Run order: `dbt-audit` → `dbt-migration-generate --macros` → `target-setup-generate` (deploys UDFs) → `dbt-migration-generate --batch 1`.
 
 **Parallel agents within each batch** — Wire splits each batch into groups of ~5 models and spawns one `wire:migration-specialist` agent per group simultaneously. A batch of 20 models runs as 4 agents in parallel; 3 pending batches of 20 models each launches 12 agents at once. Each agent operates on a distinct file set with no write conflicts.
 
@@ -2136,7 +2176,7 @@ graph TD
 *Pending review by `/wire:migration-acceptance-pack-review 01-gdp-snowflake-to-bq --batch 1`*
 
 ---
-*Generated automatically by Wire Framework v3.10.4 · `/wire:dbt-migration-generate 01-gdp-snowflake-to-bq`*
+*Generated automatically by Wire Framework v3.10.19 · `/wire:dbt-migration-generate 01-gdp-snowflake-to-bq`*
 ````
 
 After `/wire:migration-acceptance-pack-review` is run, the reviewer's decision is appended to the same file:
@@ -2179,7 +2219,7 @@ Once data is flowing into both platforms (after `ingestion_migration` is approve
 /wire:equivalency-validate <release-folder>
 ```
 
-This command is **not** a standard generate/validate/review artifact — it is a repeatable loop. Each run performs up to seven check types against all in-scope tables and dbt models: row count, schema, value sampling, freshness, dbt tests, row-level checksum, and business invariants (release-level aggregate control totals). `--batch N` scopes a run to one migration batch, so batch 1's equivalency can validate as soon as its models reach terminal state rather than waiting for the whole estate.
+This command is **not** a standard generate/validate/review artifact — it is a repeatable loop. Each run performs up to eight check types against all in-scope tables and dbt models: row count, schema, value sampling, freshness, dbt tests, row-level checksum, business invariants (release-level aggregate control totals), and column governance/masking equivalence (check type 8 — see below). `--batch N` scopes a run to one migration batch, so batch 1's equivalency can validate as soon as its models reach terminal state rather than waiting for the whole estate.
 
 **Live mode (default) vs. baseline-pin mode.** By default, checks read live source and target tables. Two things matter here:
 
@@ -2201,6 +2241,18 @@ When a check fails, investigate and fix before re-running:
 
 ---
 
+### Widening the equivalency gate to match the deployment surface
+
+The equivalency loop proves the same rows come out, for the sampled data, on one default code path, in the validation warehouse. A model can pass all of that and still fail at deploy — on a Jinja branch a single full-refresh build never compiled, a test `dbt run` never executed, an edge-case input row absent from the sample, a validation warehouse whose column types differ from the real deployment target, or a source masking policy dropped in translation. From v3.10.19 four checks close that gap, all driven by the active platform pair so they generalise across every migration:
+
+- **`dbt-migration-validate` exercises every rendered code path.** It compiles each model under every target profile the project defines (discovered from `profiles.yml`, never hardcoded), builds incremental models twice so the `is_incremental()` branch renders, and runs `dbt build` — not `dbt run` — so generic and singular tests execute. A per-model coverage report shows what was exercised. A dev-only branch, an incremental-only predicate, or an unported test is failed before a PR is opened.
+- **A deployment-warehouse type pre-flight**, shared by `dbt-migration-generate` and `equivalency-validate`, reads the real deployment warehouse's column types rather than the scratch/sample warehouse a model was validated against, flags the pair's type-divergence patterns (a `TIMESTAMP()` wrap on an already-typed column, a JSON function on a STRING-versus-JSON mismatch, an implicit cross-type join coercion), and warns explicitly whenever the validation and deployment warehouses differ.
+- **A column governance equivalence check** (equivalency check type 8) compares each column's protection at target against the source masking policy and fails when a column masked at source lands unprotected at target — a regression row-level equivalency cannot see, since the rows are identical either way.
+- **`/wire:dbt-migration-pre-pr-review`** runs a faithfulness review over the translated diff before a PR is opened, composing the checks above plus the pair's edge-case runtime patterns (an uncast blank-string-to-numeric, an unguarded JSON accessor such as `JSON_VALUE`, an unanchored regex, and a string function on a non-string column) into a structured findings list with severity, `file:line`, and a suggested fix.
+- **`/wire:dbt-migration-fix`** is the mutation counterpart to that read-only review. It ingests the findings, classifies each `auto` (deterministic and safe — applied automatically, then the gate re-runs, looping until clean), `propose` (drafted for a human to confirm), or `decision` (escalated, never guessed), and leaves the consultant only the residue that needs judgment — DAG registration, an unconfirmed Bronze type, a parity-versus-correctness call — rather than the mechanical fix volume. The policy mapping lives in the platform pair and engagement overrides; `--dry-run` shows the plan without editing. Run it with `--format json --severity error` to gate CI, so the defects are resolved locally instead of in the client's PR queue.
+
+---
+
 ### Keeping migrated models in sync: register and drift gate
 
 A long migration runs against a moving source — models get added, edited, and removed on the source platform while batches are still being translated and validated elsewhere. Two commands keep migrated models honest against that moving target.
@@ -2209,9 +2261,17 @@ A long migration runs against a moving source — models get added, edited, and 
 
 **`/wire:migration-drift-generate`** is the scheduled gate. It diffs the live source dbt repo against each migrated model's `last_migrated_commit` (`dbt ls --select state:modified`, no warehouse connection needed — falls back to a `git diff`-based approximation if no dbt binary is available), classifies each model new / modified / removed, updates register state accordingly, and surfaces blast radius: which downstream Hightouch syncs a drifted model feeds (via `lineage-generate`'s `model_sync_map.json`), and whether a source `meta.masking_policy` change needs the policy tags regenerated. It's meant to run on a schedule and as a CI gate — drift gets caught the day it happens, not during a cutover scramble.
 
+**`/wire:dbt-migration-reverse-port`** closes the other direction. Once a model's PR merges, the version on the client's default branch can differ from the delivery tree's copy: a CI fix applied in the PR, a reviewer's change, a conflict resolved at merge time. Nothing carried that back, so the delivery tree that the next wave translates against stops being the authored truth. On one release 86 of 94 models had drifted this way, because the sweep existed only as a habit in a process document. This is a different axis from the drift gate: that one asks whether the source we translated has changed underneath us, this one asks whether what we shipped changed after we shipped it. Both can be true at once.
+
+Each merged model is classified four ways against a common ancestor: `in_sync` (nothing to do), `client_ahead` (the client's version is copied into the delivery tree), `delivery_ahead` (flagged, never written), and `diverged` (flagged as a conflict for a person). There is no override flag on `delivery_ahead`: the drift is a stale copy of something that also exists in the client repo, while an unraised local edit exists nowhere else. A register row at `merged` whose file is absent from the client repo is reported as `merge_state_stale` and skipped, not classified. A port supersedes the model's standing equivalence verdict, since that verdict was bound to the file version the port replaced, so re-verification is emitted as owed. The register gains `last_reverse_ported_commit`, and `migration-status exceptions` lists merged models that have never been swept.
+
 Two bundled CI templates (`TEMPLATES/migration/ci/`) deploy this: `migrated-model-ci.yml` runs a tiered sweep (Tier 1 `dbt-migration-lint`, Tier 3 `equivalency-validate --baseline`) on any pull request touching a migrated model's path (derived from the register's `source_path` column), and `migration-drift-schedule.yml` runs the drift gate on a cron (default weekdays 06:00 UTC — adjust to the engagement's cadence).
 
 ---
+
+### Ship and verify: from migrated to production-verified (v3.11.0)
+
+From v3.11.0 the release does not stop at "migrated". Four commands carry each model into the client's repo and prove the production build: `/wire:dbt-migration-defer-build` (cost-guarded sandbox builds), `/wire:dbt-migration-batch-raise` (register-driven PRs with a deterministic eligibility table, pre-raise comparison, and drop-on-defect), `/wire:utils-ci-parity` (the client's own CI checks, replicated locally, as the final pre-raise gate), and `/wire:equivalency-post-merge-verify` (production comparison after the merge, advancing the register to `production_verified`). Equivalency verdicts follow a six-value taxonomy with every divergence drilled to a named mechanism, and every verdict appends to `migration/migration_verdict_log.csv`. At fleet scale the release runs under `specs/utils/migration_fleet.md`: one director issuing rulings, one orchestrating session invoking the commands, 6 to 12 flat lanes reporting back through incremental state files. Configuration: `migration.gate_policy`, `migration.client_repos`, `migration.cost_controls`. The full write-up is on the docs-site platform-migration page.
 
 ### Safety gates
 
@@ -2301,6 +2361,9 @@ Four commands require explicit confirmation before proceeding. Each gate display
 # or run ad hoc any time source changes mid-migration are suspected
 /wire:migration-drift-generate <release>
 /wire:migration-drift-validate <release>
+
+# Post-merge sweep: run after every merge, before the next wave translates
+/wire:dbt-migration-reverse-port <release> [--wave B01 | --models a,b] [--dry-run]
 
 # ⚠ SAFETY GATE — point of no return
 /wire:cutover-generate <release>
@@ -3769,7 +3832,7 @@ Proceed with autonomous execution?
 
 For each planned delivery release, Autopilot:
 
-1. Creates the release folder structure (equivalent to `/wire:release:spawn`)
+1. Creates the release folder structure (equivalent to `/wire:release-spawn`)
 2. Creates the release `status.md` with the correct artifact scope for the release type
 3. Resolves the artifact order and runs it
 4. Commits all artifacts after the release is complete before moving to the next
@@ -4111,6 +4174,42 @@ The entire session — from SOW to complete multi-release deliverables with all 
 Wire Agents replaces the single-agent pattern with thirteen named specialist agents, each with a focused skill set, dispatched by the `/wire:delegate` command.
 
 The core insight is simple: a single Claude Code agent doing requirements, dbt development, LookML authoring, data quality, and migration audits across a full engagement dilutes context and produces generic output. A specialist with a narrow brief — "your job is dbt models and nothing else" — operates with a much cleaner context and makes better decisions within its domain.
+
+Two delegation patterns cover everything Wire does: a sequential chain when each step's specialist needs the previous one's output, and a parallel fan-out when a batch of work splits into independent items with no relationship to each other.
+
+```mermaid
+flowchart TD
+    MAIN[Main session<br/>/wire:delegate computes the plan]:::main
+    MAIN --> PLAN{Independent items,<br/>no dependency between them?}
+
+    PLAN -->|No — each depends<br/>on the last| SEQ1[data-designer<br/>subagent]:::sub
+    SEQ1 --> SEQ2[dbt-developer<br/>subagent]:::sub
+    SEQ2 --> SEQ3[semantic-layer-developer<br/>subagent]:::sub
+
+    PLAN -->|Yes — parallelisable| SPAWN[Spawn one Migration<br/>Sub-agent per independent item]:::main
+
+    subgraph FANOUT["Parallel Migration Sub-agents"]
+        direction LR
+        S1[Migration Sub-agent 1]:::sub
+        S2[Migration Sub-agent 2]:::sub
+        S3[Migration Sub-agent 3]:::sub
+        SN[Migration Sub-agent N]:::sub
+    end
+
+    SPAWN --> S1 & S2 & S3 & SN
+    S1 & S2 & S3 & SN --> COLLECT[Main session<br/>collects all results]:::main
+    SEQ3 --> COLLECT
+
+    COLLECT --> NEXT{More work,<br/>dependent on this batch?}
+    NEXT -->|Yes| MAIN
+    NEXT -->|No| DONE([All work complete]):::event
+
+    classDef main fill:#1a3a5c,stroke:#4a90d9,color:#fff
+    classDef sub fill:#2d4a1e,stroke:#6abf4b,color:#fff
+    classDef event fill:#1a1a1a,stroke:#888,color:#fff
+```
+
+The sequential branch is the ordinary case across a release: `data-designer` produces the data model before `dbt-developer` can generate anything against it, and `dbt-developer`'s models have to exist before `semantic-layer-developer` can build LookML on top of them — each a different specialist, run in strict order. The parallel branch is `migration-specialist` fanning out across a batch of independently-migratable items (see the Platform Migration release type below) — every sub-agent in the batch runs at once, and the main session only moves on once all of them have returned. The same fan-out shape governs large dbt model sets too, covered next.
 
 ### The thirteen agents
 
@@ -4994,7 +5093,7 @@ The `/wire:*` command system requires a CLI-based AI coding agent (Claude Code o
 
 **Q: How do I know when a release is complete?**
 
-Run `/wire:status <release-folder>`. When all in-scope artifacts show `review: approved` (or `not_applicable` for out-of-scope artifacts), the release is complete. Run `/wire:archive <release-folder>` to close it out. For a discovery release, completion means the sprint plan is approved and downstream releases have been spawned via `/wire:release:spawn`.
+Run `/wire:status <release-folder>`. When all in-scope artifacts show `review: approved` (or `not_applicable` for out-of-scope artifacts), the release is complete. Run `/wire:archive <release-folder>` to close it out. For a discovery release, completion means the sprint plan is approved and downstream releases have been spawned via `/wire:release-spawn`.
 
 ---
 
@@ -5108,7 +5207,7 @@ Shape Up is a product development methodology (from Basecamp) that emphasises fi
 
 **Q: Can I run a discovery release and a delivery release at the same time?**
 
-Not recommended. The discovery release should be completed and delivery releases spawned via `release:spawn` before delivery work begins. Discovery is specifically about determining *what* to build — starting delivery before that is known creates rework risk. If you are joining an engagement mid-stream where discovery has already been done informally, create the delivery release directly without a discovery release.
+Not recommended. The discovery release should be completed and delivery releases spawned via `release-spawn` before delivery work begins. Discovery is specifically about determining *what* to build — starting delivery before that is known creates rework risk. If you are joining an engagement mid-stream where discovery has already been done informally, create the delivery release directly without a discovery release.
 
 ---
 
@@ -5302,6 +5401,59 @@ This release turns that graph into structured YAML per release type, then builds
 - **Data model registry fixes** (found via an Autopilot dry run on an RA staff member's own machine, then confirmed and extended by a follow-up verification dry run) — `/wire:new`, Autopilot, **and now `/wire:release-spawn`** all attempt the registry clone automatically (previously only ever checked for, never fetched, so even genuine GitHub access got silently skipped — and `release-spawn`, the standard discovery-to-delivery path, was still missing this as of the first fix); `data_model-generate` now proposes an adjacent vertical match and independent cross-vertical patterns instead of giving up when no vertical is a confident industry fit, reading the registry's live directory listing rather than assuming a fixed set of verticals (which has already grown once since this was written).
 - **Detailed execution tracing (opt-in)** — `WIRE_TRACE=true` makes every command write a step-by-step, unlimited-detail trace to `.wire/releases/<release>/trace.jsonl`; off by default, local-only, applies uniformly across all ~260 commands via the same build-time injection mechanism Telemetry uses. See [Detailed execution tracing](#detailed-execution-tracing-opt-in).
 - **Fathom Call Sync** (automatic by default, once a client domain is given) — generalises a previously per-client, hand-maintained script into a proper Wire feature: a new `fathom-sync` skill (Claude Code only) pulls new Fathom call transcripts for the engagement's client into `.wire/engagement/calls/` once per session, with an analytical findings write-up per call, using the Fathom MCP server and a client domain `/wire:new` now captures directly. Refuses to enable itself for internal RA engagements (own-domain or self-referential client name), checked both at setup and on every run. `/wire:utils-fathom-sync` provides the same logic manually. See [Section 25.5: Fathom Call Sync](#255-fathom-call-sync-automatic-by-default-safeguarded).
+### v3.11.6 — The reverse-ETL path closes at both ends (August 2026)
+
+The reverse-ETL commands covered the middle well and stopped at both ends (#193). **Twin authoring**: `/wire:reverse-etl-twin-generate` authors the target-warehouse copy per in-scope sync — additive (the existing sync is untouched and stays the rollback), paused, pointed at the same-type decoy, model carried from the approved runbook, manifest keyed on the normalised sync id. 575 of 643 were written by hand on one engagement, and because nothing generated them, nothing validated them. **The `primaryKey` casing rule now runs**: an upper-case key on a BigQuery-source sync makes it run green and send nothing; the rule sat at error severity in a rule file loaded by `dbt-migration-lint`, which has no reverse-ETL path, so it could not fire — a hand sweep of 621 twins found 22 violations. It is now `reverse-etl-migration-validate` Check 13, and lint reports any rule it cannot evaluate with the command that does. **Destination safety** is a set comparison against every source-warehouse destination on the client default branch, built once, with no destination type named in the check (the first attempt was a fixed list of Google Sheets ids: right for 151 of 776 syncs, silent on 625). **Retirement**: `/wire:reverse-etl-retire-generate` produces the runbook with deterministic eligibility, ordered groups, evidence per sync, and irreversible retirements marked; execution stays a client action. **Blocked syncs**: `migration-status` names every sync waiting on an unmerged upstream table, grouped by the blocking table.
+
+---
+
+### v3.11.5 — Metabase reports become first-class migration objects (August 2026)
+
+Implements the Metabase gap review (#184). **The BI-tool audit**: `metabase-audit` connects via the Metabase MCP server where available and catalogues template tags (field ids), snippets, card references, sandboxing, and the card-to-dashboards reverse index — cards are shared objects, and no write decision is made without it. **Migration behind a manifest gate**: native cards transform across five surfaces in snippet-first dependency order, MBQL cards split out as repoint-only, every write gated by a signed-off card-manifest row, shared cards carrying explicit edit-vs-clone decisions. **Carve-out** (`/wire:metabase-carveout-*`): layer decisions first (sandboxing, warehouse view, dashboard parameter), card edits last with registry-resolved filters injected via AST; unresolved cards flagged, never carved unfiltered; no-tenant-data cards lose dashcards, never the card. **Equivalence** (`/wire:metabase-equivalency-validate`): card-grain verdicts in the model taxonomy, with the connection cutover gated on every card passing. Metabase objects join the inventory, register, verdict log, region tagging, wave schedule, and `migration-status`.
+
+---
+
+### v3.11.4 — The migration gap backlog closes (August 2026)
+
+Implements every remaining item of the two gap reviews (#179 platform_migration, #180 tenant_carveout). **Structured qualifiers**: a declared availability window (floor auto-derived from target Bronze `MIN(loaded_at)`, reasoned exclusions, cap at the pinned as-of) turns a short-history shortfall into `diff_availability` with the window as structured verdict fields, claimable only on an exact in-window pass; a connector-emission known-differences registry (`migration/known_differences.yaml`) classifies a proven behaviour class `pass_qualified` with the entry cited, only when its detection query accounts for the entire delta. **Cross-release linkage**: register columns `parent_release`/`parent_model`/`parent_verdict_ref`; the relocate step refuses models whose parent verdict is `fail`; the relocate-mode comparator requires a proven parent; `cross_release_triggers` are evaluated by the drift gate, and a parent defect sweep marks relocated copies re-verify-owed. **Five new commands**: `/wire:equivalency-sweep` (estate-wide defect-class classification, closing with a lint rule), `/wire:reverse-etl-equivalency-validate` (sync-grain tier-1/tier-2 equivalence, exact-pass promotion), `/wire:migration-status` (live per-wave exclusive stages with provenance), `/wire:utils-client-watch` and `/wire:utils-ask-list-generate` (the answers ledger and its re-ask guard). Plus `bulk-copy-migration --mode bring-in` (sizing pass, COPYABLE/EXPORT/CONNECTOR-ONLY gate, resumable chunk-ledgered copies, client-run execute-packs), register bootstrap from region tagging with retroactive PR ingestion, and the fleet spec completed (report-once protocol, chunk ledgers, cost governance, contention rules).
+
+---
+
+### v3.11.3 — A tenant predicate per item, and the carve-out review queue shrinks (August 2026)
+
+Two carve-out gaps. **The predicate registry**: `migration.tenant_predicate` is one string, and a real carve-out needs several mechanisms at once — a plain row predicate, a differently-named column on globalised models, an object-level schema-prefix carve where no row predicate exists, an enumerated account-id list, a derived expression over a composite key. `migration/tenant_predicate_registry.csv` resolves one item at a time across five mechanisms, with provenance and a verified date; the global string narrows to the seed's default. `region-tagging-generate` seeds it; `equivalency-validate`, `bulk-copy-migration-generate`, `dbt-carveout-relocate-generate` and `dbt-migration-defer-build` read it. An item with no resolved mechanism is flagged everywhere and never compared or copied unfiltered. **The resolution ladder**: `dbt-carveout-relocate-generate` used to detect injection ambiguity and stop, so every ambiguous shape reached the reviewer — 128 models on one wave, almost none needing judgment. Six rungs now resolve the mechanical shapes (comment stripping, unconditional parenthesizing, Jinja-conditional restructure, alias resolution, row-distribution probes proposed for review, upstream inheritance over a wave graph built up front), and `manual_review_required` narrows to what is genuinely novel.
+
+---
+
+### v3.11.2 — Shared specs actually ship, and batches stop stacking (August 2026)
+
+Two gaps logged against the 3.11.1 migration release types. **Packaging**: a command's own spec is inlined into its command file, but the shared docs specs read by path (`specs/utils/commit.md`, `specs/migration/equivalency/verdict_schema.md`, and 28 others) shipped in neither package — the build copied `TEMPLATES/`, `platform_pairs/` and `docs-site/` and skipped `specs/`. All 30 now ship in the Claude plugin and the Gemini extension, and every command says where they resolve (`${CLAUDE_PLUGIN_ROOT}/specs/` in the plugin). The shipped set is derived by rule, and Tier 0's new check 8 holds both the build wiring and the committed `wire/dist/`. **Anti-stack rule**: `dbt-migration-batch-raise` refuses to cut a batch branch from a branch that has not merged (`stack_depth_exceeded`, base chain printed); `--allow-stack-depth N` overrides on condition the chain's merge order is published in the PR body and to the client. Prefer drop-on-defect batches — two engagements deadlocked client review on deep dependent-PR chains, one closing five PRs unmerged.
+
+---
+
+### v3.11.1 — Ship-and-verify for the tenant carve-out (August 2026)
+
+The v3.11.0 pipeline adapted to `tenant_carveout` scope: relocate-origin models compare parent target (predicate-scoped, via the new `migration.parent_target_project` key) against the tenant target; `dbt-carveout-relocate-generate` writes the register and chains the downstream gates; `defer-build` gains a mechanical tenant write guard and a parent-manifest defer fallback; `batch-raise` refuses `ship_then_verify` until the adjudication and residency gates are complete; `utils-ci-parity --scaffold-from` covers brand-new tenant repos; carve-out fleet lanes treat the three human gates as park points. The region-tagging roles rule (classify by grant scope) closes a documented spec ambiguity.
+
+### v3.11.0 — Ship and verify: the pipeline beyond "migrated", and the fleet operating model (August 2026)
+
+The platform_migration release type used to end at "migrated" in the register; everything from a passing verdict to verified code on the client's main was free-form. v3.11.0 productises that tail, generalised from the first engagement to run the release at fleet scale, and writes the operating model down: the director types intents and rulings, the orchestrating agent invokes the Wire commands and dispatches lane-agent fleets that report back through incremental state files (`specs/utils/migration_fleet.md`, including the mandatory consolidation/backstop pass).
+
+- **`/wire:dbt-migration-defer-build`** — cost-guarded sandbox builds: refs deferred to prod state, scratch-dataset writes only, exact-name selectors (graph operators refused without `--allow-graph`), dry-run cost screen against per-run/daily budgets, per-project build-slot lock.
+- **`/wire:dbt-migration-batch-raise`** — register-driven client PRs: deterministic eligibility (gate policy x verdict x external-output exactness), smoke-build from the branch's own checkout, pre-raise comparison, drop-on-defect, evidence-first PR body, merge detection.
+- **`/wire:utils-ci-parity`** — detect the client repo's CI system and replicate its locally-runnable checks with the client's own config; the final pre-raise gate.
+- **`/wire:equivalency-post-merge-verify`** — after the client merges, wait for their pipeline to materialise, compare production at the full bar, advance the register to `production_verified`.
+- **Verdict taxonomy + append-only verdict log** — six verdicts (`pass`/`pass_qualified`/`diff_vintage`/`diff_availability`/`diff_schema_type`/`fail`), every divergence drilled to a named mechanism, verdicts bound to exact file versions and run points; `migration/migration_verdict_log.csv` keeps the dated history the current-state register cannot. Register gains `delivery_stage`/`pr_url`.
+
+Additive throughout: `/wire:upgrade` adds the new keys and columns to existing releases; legacy pass/fail verdicts stay valid.
+
+### v3.10.19 — Batch-zero macro & UDF pass, single-SCC batching fallback (July 2026)
+
+Completes the batch-zero pass `dbt-audit` has planned all along but nothing consumed, and makes migration batching reproduce the build-ordered plan that SCC-heavy estates always needed by hand.
+
+- **`dbt-migration-generate --macros`** — a standalone scope mode that translates the batch-zero Jinja/dispatched macro *definition* files from `audit/batch_zero_plan.json` in tier order (tier 0 first), mirroring the source `macros/` tree, reusing the same platform-pair guides and macro-first strategy as model translation. Compile-only — a macro is validated when the models that expand it compile — and checked by `dbt-migration-validate --macros`.
+- **`target-setup-generate` deploys the UDF layer** — the batch-zero UDFs (`create_udfs`, `fn_*` → `CREATE FUNCTION`) are warehouse DDL, translated tier-ordered into `05_udfs.sql` and run as target-setup Phase 1. UDFs with no direct target equivalent surface as "UDF redesign decisions" at the `target-setup-review` safety gate rather than being mechanically translated. Each `batch_zero_plan.json` entry now carries a `layer` field (`macro` | `udf`) that routes it to the right command; `dbt-audit-validate` verifies it.
+- **`migration-batching-generate` falls back to build-ordered waves for single-SCC estates** — when every domain cross-references every other, no domain grouping can be both acyclic and edge-complete, so the domain partition can never validate. The command detects the single strongly-connected component and switches `partition_mode` to `build_ordered_waves`: a topological sort of the model graph cut into `--target-batches N` prefix-dependent waves. The domain tag is kept for rollup, and the fallback is recorded (`scc_fallback: true`). `migration-batching-validate` reads `partition_mode` and applies mode-aware checks.
 
 ---
 

@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -126,7 +131,7 @@ argument-hint: <custom-spec-name> [--description "use case description"]
 
 ## Purpose
 
-When a custom command spec created by `/wire:custom-release-define` represents a general pattern that other RA engagements would benefit from, this utility generalises it and raises a GitHub issue on the Wire repo proposing it as a new standard command.
+When a custom command spec created by `/wire:custom-define` represents a general pattern that other RA engagements would benefit from, this utility generalises it and raises a GitHub issue on the Wire repo proposing it as a new standard command.
 
 **This command is never automatically offered or suggested by any other Wire command.** It exists as an explicit user action only. See the User Guide for instructions.
 

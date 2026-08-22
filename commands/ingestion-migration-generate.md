@@ -1,6 +1,6 @@
 ---
 description: Generate Fivetran connector migration runbook
-argument-hint: <release-folder>
+argument-hint: <release-folder> [--wave id]
 ---
 
 # Generate Fivetran connector migration runbook
@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -103,6 +108,80 @@ with open('.wire/releases/<release_folder>/trace.jsonl', 'a') as f:
 {"ts":"2026-07-05T14:41:15Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"command_end","step":null,"step_name":null,"result":"complete","detail":"Generated data_model_specification.md — 14 models (5 staging, 4 integration, 5 warehouse), including 2 informed by the accepted registry proposals above."}
 ```
 
+## Automatic Validation (on by default)
+
+---
+description: Internal utility — injected auto-validate section so generate commands run their matching validate step automatically and fold the result into their output
+---
+
+Every `generate` command that has a matching `validate` command for the
+same artifact runs that validate step automatically as part of generate —
+by default, with no separate command to remember. This section only appears
+on commands where that applies; artifacts with no separate validate step at
+all (e.g. mockups, workshops, UAT) never carry this section.
+
+## Step: Check `auto_validate`
+
+Read this command's own `auto_validate` front-matter field, in the Workflow
+Specification below. Two states:
+
+- **Absent, or `true`** (the default — most artifacts): auto-validate runs.
+- **`false`**: this artifact's validate step is expensive — it runs real
+  code, queries a live warehouse or BI tool, or otherwise does IO beyond
+  re-reading local files — so it does not run automatically. Skip to
+  "If `auto_validate: false`" below.
+
+## If `auto_validate` is absent or `true`: run validate automatically
+
+Once this command finishes writing its artifact, before ending:
+
+1. Run this artifact's own `/wire:<artifact-with-dashes>-validate` workflow
+   in full, exactly as if the consultant had typed it themselves — same
+   inputs, same `status.md` write to `artifacts.<artifact>.validate`, same
+   report. This is not optional or an extra step layered on top; it is the
+   default behavior for this artifact.
+2. Fold the result into this command's own closing output rather than
+   presenting it as a separate command run:
+   - **PASS** — add a single closing line: `✅ Auto-validated — PASS`. The
+     full report already went to `status.md`/`execution_log.md`, exactly as
+     it would from a standalone validate run — no need to repeat it here.
+   - **FAIL** — surface the validate command's own failure report in full,
+     exactly as running validate standalone would show it, so the
+     consultant sees what's wrong immediately without running anything
+     else themselves.
+3. This never blocks or undoes generate itself — the artifact is written
+   either way, and its content is never rolled back because validate
+   failed. Auto-validation only means validate has already run and its
+   result is already on record by the time generate finishes, instead of
+   waiting for the consultant to remember to run it separately.
+
+## If `auto_validate` is `false`: state this plainly, don't run it
+
+Do not run validate. End with a line naming why, as specifically as this
+spec's own context makes possible (e.g. "runs `dbt run`/`dbt test`",
+"queries the live target warehouse", "calls the Looker API directly") —
+fall back to "performs live checks against an external system" only if no
+more specific reason is evident from context:
+
+```
+⚠ This artifact's validate step [reason] and does not run automatically.
+Run /wire:<artifact-with-dashes>-validate <release_folder> before
+requesting review — review is blocked until it passes.
+```
+
+## Why this is always safe either way
+
+`review` already requires `validate: PASS` for this same artifact as one of
+its own declared preconditions (see `specs/utils/precondition_gate.md`) —
+this is existing, independent enforcement, not something added by this
+section. So an `auto_validate: false` opt-out never lets an artifact reach
+review unvalidated; it only decides *when* the consultant pays validate's
+cost — automatically on every draft (the default), or once, on their own
+schedule, before requesting review (the opt-out). Auto-validation is a
+convenience that closes the "forgot to run it" gap for the common case; the
+gate that actually prevents unvalidated work from being reviewed was already
+there.
+
 ## Workflow Specification
 
 ---
@@ -122,10 +201,11 @@ preconditions:
   - artifact: target_setup
     action: review
     outcome: approved
+auto_validate: false          # validate's MCP-executed path queries live connector-status MCP tools
 delegates_to:
   - utils/precondition_gate
 description: Execute ingestion connector migration via MCP server, or generate runbook if MCP unavailable
-
+argument-hint: <release-folder> [--wave id]
 ---
 
 ## Auto-Delegation
@@ -186,11 +266,20 @@ Handle each tool group separately. Never mix-apply one tool's MCP server to anot
 
 - `target_setup review: approved`
 - Target warehouse schemas exist (target_setup scripts executed)
+- `migration/migration_batching.csv` exists — required only when running with `--wave`
+
+## Flags
+
+- `--wave <id>` — restrict this run to the connectors `migration/migration_batching.csv` assigns to this wave. Resolution is identical to `dbt-migration-generate`'s Step 1w: normalise the wave id (zero-padded `B01` or bare `1`, both accepted) Wave-id form and normalisation are the shared contract in `specs/utils/wave_resolution.md` (normative; accepts `2`, `B02`, `b2`, or the `W02` display form)., load `migration_batching.csv` (abort if missing: `[wire] No migration_batching.csv found — run /wire:migration-batching-generate $ARGUMENTS first.`), filter to rows where `batch_id` matches **and** `object_type == "connector"` (rows for other object types in the same wave belong to other migration commands). Cross-reference each matched row's `object_id` against `ingestion_audit.md`'s connector identifiers to pull the actual per-connector detail (`service_type`, `complexity`, `include_in_migration`, destination schema). Print the mandatory resolved-connector preview before proceeding, exactly as `dbt-migration-generate` Step 1w does. If no rows match the wave at all, abort: `[wire] No rows found for wave <id> in migration_batching.csv.` If rows match the wave but none are `connector` rows, print `[wire] Wave <id> has no connector objects — nothing to migrate for this command.` and stop cleanly (not an error).
+- No flag — process every connector with `include_in_migration: true` in the ingestion audit (today's behaviour, unchanged).
+
+When `--wave` is supplied, every output below is wave-labelled: the runbook (if the runbook fallback path is used) is written to `migration/ingestion_migration_runbook_{wave_id}.md` instead of the unscoped filename, and status.md tracks the wave under `wave` / `waves_complete` (Step 5) rather than treating the run as covering the whole ingestion scope.
 
 ## Inputs
 
 - `.wire/releases/$ARGUMENTS/audit/ingestion_audit.md`
 - `.wire/releases/$ARGUMENTS/migration/migration_strategy.md`
+- `.wire/releases/$ARGUMENTS/migration/migration_batching.csv` — consumed only by `--wave` mode
 
 ## Workflow
 
@@ -198,9 +287,13 @@ Handle each tool group separately. Never mix-apply one tool's MCP server to anot
 
 Confirm `target_setup review: approved`. If not, stop with message.
 
+### Step 1w: Resolve `--wave` (only when `--wave` is used)
+
+Resolve the in-scope connector set per the **Flags** section above. This replaces "every connector with `include_in_migration: true`" everywhere below with the wave-resolved subset — the rest of the workflow is otherwise unchanged.
+
 ### Step 2: Pre-flight — identify all in-scope tools and check connectivity
 
-Read `ingestion_audit.md`. Collect every distinct `service_type` or `ingestion_tool` that has at least one connector with `include_in_migration: true`. This is the in-scope tool list for this run.
+Read `ingestion_audit.md`. Collect every distinct `service_type` or `ingestion_tool` that has at least one connector with `include_in_migration: true` (or, under `--wave`, at least one connector in the Step 1w-resolved set). This is the in-scope tool list for this run.
 
 For each tool in the in-scope list, determine its connectivity status using the table above:
 
@@ -244,7 +337,7 @@ Then continue to Step 3 for each CONNECTED tool and Step 4 for each fallback too
 
 ### Step 3: MCP-driven migration (primary path)
 
-For each connector in the ingestion audit with `include_in_migration: true` where an MCP server is available, working in order of ascending complexity (Low first):
+For each connector in scope (Step 1w's resolved set under `--wave`, otherwise every connector with `include_in_migration: true`) where an MCP server is available, working in order of ascending complexity (Low first):
 
 1. **Identify the target destination**: use the MCP server's list/group call (e.g. `mcp__fivetran__list_groups`, `mcp__airbyte__list_destinations`) to find the destination that corresponds to the target warehouse, as named in the target setup.
 
@@ -272,9 +365,9 @@ Write a per-connector status summary as each one completes.
 
 If no MCP server is reachable for a given set of connectors, generate a step-by-step runbook for those connectors.
 
-**Output location**: `.wire/releases/$ARGUMENTS/migration/ingestion_migration_runbook.md`
+**Output location**: `.wire/releases/$ARGUMENTS/migration/ingestion_migration_runbook.md` — or `migration/ingestion_migration_runbook_{wave_id}.md` when run with `--wave`.
 
-For each connector with `include_in_migration: true`:
+For each connector in scope (Step 1w's resolved set under `--wave`, otherwise every connector with `include_in_migration: true`):
 
 1. **Identify destination mapping**: map the source destination schema to its target platform equivalent (from the target setup DDL)
 2. **Connector steps**: always document **new connector creation** steps — never "edit destination" on the existing connector
@@ -301,6 +394,8 @@ artifacts:
     generated_date: "{{TODAY}}"
     connectors_migrated: N
     connectors_pending_credentials: N   # connectors with connect card URL not yet confirmed
+    wave: "B01"                        # set only when run with --wave; the wave id just processed
+    waves_complete: ["B01"]            # set only when run with --wave; accumulates across runs
 ```
 
 ### Step 6: Output next command
@@ -311,7 +406,7 @@ artifacts:
 
 ## Output Files
 
-- `.wire/releases/$ARGUMENTS/migration/ingestion_migration_runbook.md` (runbook fallback only)
+- `.wire/releases/$ARGUMENTS/migration/ingestion_migration_runbook.md` (runbook fallback only; `_{wave_id}` suffix when run with `--wave`)
 - Per-connector connect card URLs and status summary (MCP path, printed to console)
 - Updated `.wire/releases/$ARGUMENTS/status.md`
 
@@ -333,6 +428,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -417,6 +516,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

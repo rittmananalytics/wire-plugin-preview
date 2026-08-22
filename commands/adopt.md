@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -327,7 +332,7 @@ Scan for file patterns that indicate which Wire artifact categories have work al
 |---------|---------------------|
 | `dbt/models/staging/**/*.sql` | `dbt` — staging layer |
 | `dbt/models/integration/**/*.sql` | `dbt` — integration layer |
-| `dbt/models/warehouse/**/*.sql` or `*_fct.sql`, `*_dim.sql` | `dbt` — warehouse layer |
+| `dbt/models/warehouse/**/*.sql` or `*_fact.sql`, `*_dim.sql` | `dbt` — warehouse layer |
 | `*.view.lkml`, `*.model.lkml`, `*.explore.lkml` | `semantic_layer` |
 | `*.dashboard.lookml` | `dashboards` |
 | `fivetran_config*.yml`, `airbyte_config*/` | `pipeline` |
@@ -884,7 +889,7 @@ Next command: /wire:[first_priority_artifact]-[action] [release_folder]
 
 If `remote_repo: true`, instead output the assessment and playbook content to the terminal and clean up the temporary clone directory.
 
-**Companion skill**: For a deeper delivery health picture anchored on SOW milestones, sprint velocity, and named ticket/MR status, the `client-delivery-status-report` skill (`wire/skills/engagement-status-report/client-delivery-status-report.skill`) can be run alongside `/wire:adopt`. It is particularly valuable for steady-state sprint and closeout/suspension states where delivery-level detail matters. `/wire:adopt` establishes the Wire framework structure; the delivery status skill explains what the team has actually been doing and how healthy the delivery is.
+**Companion skill**: For a deeper delivery health picture anchored on SOW milestones, sprint velocity, and named ticket/MR status, the `engagement-status-report` skill (`wire/skills/engagement-status-report/SKILL.md`) can be run alongside `/wire:adopt`. It is particularly valuable for steady-state sprint and closeout/suspension states where delivery-level detail matters. `/wire:adopt` establishes the Wire framework structure; the delivery status skill explains what the team has actually been doing and how healthy the delivery is.
 
 ---
 
@@ -944,6 +949,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -1028,6 +1037,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

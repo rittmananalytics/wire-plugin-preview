@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -163,7 +168,7 @@ Examples:
 
 Store both `client_name` (display) and `client_slug` (search).
 
-**Client directory fast-path**: Before doing any fuzzy channel searching, check whether a client directory is available at `wire/skills/engagement-status-report/client-delivery-status-report.skill` (extract and read `references/client_directory.md`). If the client name matches a known entry, use the pre-confirmed values directly:
+**Client directory fast-path**: Before doing any fuzzy channel searching, check whether a client directory is available at `wire/skills/engagement-status-report/references/client_directory.md`. If the client name matches a known entry, use the pre-confirmed values directly:
 - `email_domain` — used for Fathom domain-filtered listing
 - `slack_channel` and `slack_channel_internal` — exact channel names or IDs, skip fuzzy search
 - `jira_project_key` — skip Jira text search, query by key directly

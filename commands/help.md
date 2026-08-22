@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -150,7 +155,7 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 
 | Command | Arguments | Description |
 |---------|-----------|-------------|
-| `/wire:session-start` | `(optional: release-folder)` | DEPRECATED — context loading is now automatic via the engagement-context skill; use /wire:plan for optional structured planning |
+| `/wire:session-start` | `(optional: release-folder)` | DEPRECATED — context loading is now automatic via the engagement-context skill; use /wire:session-plan for optional structured planning |
 | `/wire:session-end` | `(optional: release-folder)` | DEPRECATED — session state is now written automatically after each Wire command completes |
 | `/wire:session-plan` | `(optional: release-folder)` | Optional planning ritual — propose a focused 3–5 step plan before starting work |
 
@@ -222,6 +227,12 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 | `/wire:dbt-generate` | `<project-folder>` | Generate dbt models |
 | `/wire:dbt-validate` | `<project-folder>` | Run dbt tests and validation |
 | `/wire:dbt-review` | `<project-folder>` | Review dbt code |
+| `/wire:dbt-staging-generate` | `<project-folder>` | Generate dbt staging-layer models only (alternative to the monolithic dbt-generate) |
+| `/wire:dbt-staging-validate` | `<project-folder>` | Validate dbt staging-layer models |
+| `/wire:dbt-integration-generate` | `<project-folder>` | Generate dbt integration-layer models only (alternative to the monolithic dbt-generate) |
+| `/wire:dbt-integration-validate` | `<project-folder>` | Validate dbt integration-layer models |
+| `/wire:dbt-warehouse-generate` | `<project-folder>` | Generate dbt warehouse-layer models only (alternative to the monolithic dbt-generate) |
+| `/wire:dbt-warehouse-validate` | `<project-folder>` | Validate dbt warehouse-layer models |
 | `/wire:dashboards-generate` | `<project-folder>` | Generate dashboards |
 | `/wire:dashboards-validate` | `<project-folder>` | Validate dashboards |
 | `/wire:dashboards-review` | `<project-folder>` | Review dashboards |
@@ -237,10 +248,18 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 | `/wire:dbt-migration-generate` | `<release-folder> [--batch N] [--model name]` | Translate dbt models batch by batch to target dialect |
 | `/wire:dbt-migration-validate` | `<release-folder> [--batch N]` | Validate dbt model translations compile on target profile |
 | `/wire:dbt-migration-lint` | `<release-folder> [--batch N] [--model name] [--severity LEVEL] [--format FORMAT]` | Static pre-warehouse equivalence lint — dialect parse-check plus silent-behaviour-change rules on translated models |
-| `/wire:dbt-migration-review` | `<release-folder> [--batch N]` | Review translated dbt models |
-| `/wire:orchestration-migration-generate` | `<release-folder>` | Generate orchestration job migration runbook |
-| `/wire:orchestration-migration-validate` | `<release-folder>` | Validate orchestration migration runbook |
-| `/wire:orchestration-migration-review` | `<release-folder>` | Safety-gated approval before activating jobs on target |
+| `/wire:dbt-migration-pre-pr-review` | `<release-folder> [--batch N ` | Pre-submission faithfulness review over a translated diff — deploy-time defect class static parse/lint cannot catch, before a PR is opened |
+| `/wire:dbt-migration-fix` | `<release-folder> [--batch N ` | Closed fix-and-re-review loop — auto-apply the deterministic pre-PR-review fixes, re-run the gate, escalate only findings that need a human decision |
+| `/wire:dbt-migration-review` | `<release-folder> [--batch N ` | Review translated dbt models |
+| `/wire:dbt-migration-defer-build` | `<release-folder> --models <list> [--allow-graph] [--override-budget] [--dry-run]` | Cost-guarded sandbox build: refs deferred to prod state, writes gated to the scratch dataset, exact-name selectors, dry-run cost screen |
+| `/wire:dbt-migration-batch-raise` | `<release-folder> [--wave id ` | Register-driven PR shipping pipeline: derive gate-passing candidates, smoke-build from the client branch, pre-raise comparison, drop-on-defect, raise with evidence-first body |
+| `/wire:dbt-migration-reverse-port` | `<release-folder> [--wave id ` | Carry merged client changes back into the delivery tree — four-way classification per merged model, never clobbering unraised local work |
+| `/wire:orchestration-migration-generate` | `<release-folder> [--wave id]` | Generate orchestration job migration runbook |
+| `/wire:orchestration-migration-validate` | `<release-folder> [--wave id]` | Validate orchestration migration runbook |
+| `/wire:orchestration-migration-review` | `<release-folder> [--wave id]` | Safety-gated approval before activating jobs on target |
+| `/wire:dbt-carveout-relocate-generate` | `<release-folder> [--wave id \` | Relocate already-translated dbt models into a post-migration tenant carve-out instead of re-translating them |
+| `/wire:dbt-carveout-relocate-validate` | `<release-folder> --target-dbt-project-path <path>` | Validate relocated carve-out dbt models — files present, predicates re-derived from disk, target compiles |
+| `/wire:dbt-carveout-relocate-review` | `<release-folder> [--wave id \` | Human adjudication gate for relocated carve-out dbt models |
 
 ### TESTING
 
@@ -273,11 +292,6 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 | Command | Arguments | Description |
 |---------|-----------|-------------|
 | `/wire:utils-run-dbt` | `<project-folder>` | Run dbt models |
-| `/wire:utils-test-pipeline` | `<project-folder>` | Test data pipeline |
-| `/wire:utils-deploy-to-dev` | `<project-folder>` | Deploy to dev environment |
-| `/wire:utils-deploy-to-prod` | `<project-folder>` | Deploy to production |
-| `/wire:utils-create-pr` | `<project-folder>` | Create pull request |
-| `/wire:utils-monitor` | `<project-folder>` | Check monitoring and alerts |
 | `/wire:utils-meeting-context` | `<project-folder> [artifact-name]` | Retrieve Fathom meeting context for artifact reviews |
 | `/wire:utils-client-context` | `<client-name>` | Gather external client context from Slack, HubSpot, Harvest, Jira, Confluence and Fathom |
 | `/wire:utils-atlassian-search` | `<project-folder> [artifact-name]` | Search Confluence and Jira for project context |
@@ -293,6 +307,14 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 | `/wire:utils-data-model-registry-setup` | `(no arguments - interactive)` | Clone the private wire-data-model-registry repo to this machine, for RA staff with access |
 | `/wire:utils-fathom-sync` | `[--after YYYY-MM-DD] [--before YYYY-MM-DD] [--limit N] [--dry-run] [--no-findings]` | Pull new Fathom call transcripts for this engagement's client into .wire/engagement/calls/, then extract findings |
 | `/wire:utils-migration-agent-delegate` | `(internal — called by migration generate commands)` | Auto-delegation protocol for migration generate commands — dispatch to migration-specialist subagent when available |
+| `/wire:utils-session-summary` | `<release-folder> [scope]` | Draft a Slack-shaped session summary from a release's execution log |
+| `/wire:utils-commit` | `<release-folder> <artifact> <action>` | Stage and commit generated or validated Wire artifacts to git |
+| `/wire:utils-pr-create` | `[release-folder]` | Create a Wire-aware GitHub pull request pre-populated from session artifacts |
+| `/wire:utils-pipeline-status` | `<release-folder>` | Check configured pipeline tool connection status |
+| `/wire:utils-git-workflow` | `<release-folder> <artifact-id> <action>` | Ensure a branch-per-artifact exists and, on validate/review, commit and open or update its PR (composes utils-commit and utils-pr-create) |
+| `/wire:utils-ci-parity` | `<release-folder> [--repo <path-or-role>] [--branch <name>]` | Client CI parity gate: detect the client repo's CI system, replicate its locally-runnable checks against a branch before raising, report pass/fail per check |
+| `/wire:utils-client-watch` | `<release-folder>` | One client-watch tick — channel replies to tracked posts recorded in the answers ledger, merged client PRs advance the register and fire the post-merge action |
+| `/wire:utils-ask-list-generate` | `<release-folder> [--max N]` | Draft the top-N client ask list from the register's blocker taxonomy — capped, and guarded against re-asking anything the answers ledger holds |
 | `/wire:utils-delivery-forecast` | `<client-name> [--release <folder>]` | Calculate % delivered and ETA per release using checklist, Jira, Harvest and Fathom velocity, compared against contractual dates |
 | `/wire:utils-doc-analyze` | `<file-path-or-url> [<file-path-2> ...]` | Extract deliverables, acceptance criteria, and timeline from SoW or project documents |
 
@@ -319,12 +341,16 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 | `/wire:reverse-etl-audit-generate` | `<release-folder>` | Catalog Hightouch reverse ETL syncs, models, and destinations |
 | `/wire:reverse-etl-audit-validate` | `<release-folder>` | Validate reverse ETL audit completeness and dependency mapping |
 | `/wire:reverse-etl-audit-review` | `<release-folder>` | Internal RA review of reverse ETL audit |
-| `/wire:reverse-etl-migration-generate` | `<release-folder>` | Generate Hightouch sync migration runbook — repoint, rewrite, rebuild |
-| `/wire:reverse-etl-migration-validate` | `<release-folder>` | Validate reverse ETL migration runbook completeness |
-| `/wire:reverse-etl-migration-review` | `<release-folder>` | Internal RA review of reverse ETL migration runbook |
+| `/wire:reverse-etl-migration-generate` | `<release-folder> [--wave id]` | Generate Hightouch sync migration runbook — repoint, rewrite, rebuild |
+| `/wire:reverse-etl-migration-validate` | `<release-folder> [--wave id] [--twins-only]` | Validate reverse ETL migration runbook completeness, plus the authored twins — primaryKey casing (error) and destination-set safety |
+| `/wire:reverse-etl-migration-review` | `<release-folder> [--wave id]` | Internal RA review of reverse ETL migration runbook |
+| `/wire:reverse-etl-equivalency-validate` | `<release-folder> [--syncs name1,name2] [--tier N]` | Sync-level equivalence — old sync vs target twin at the sync grain (PK row set + changed-field hashes), tier-2 decoy diff where possible; promotion requires a tier-1 pass |
+| `/wire:reverse-etl-twin-generate` | `<release-folder> [--wave id] [--syncs a,b] [--dry-run]` | Author the target-warehouse twin config per in-scope sync — additive, paused, decoy-pointed, model translated, manifest keyed on the normalised sync id |
+| `/wire:reverse-etl-retire-generate` | `<release-folder> [--wave id] [--min-clean-days N]` | Generate the reverse-ETL retirement runbook — superseded and retire-classified syncs, ordered, with the evidence each replacement has run cleanly and the rollback |
 | `/wire:migration-inventory-generate` | `<release-folder>` | Synthesise all audits into unified catalogue with dependency graph |
 | `/wire:migration-inventory-validate` | `<release-folder>` | Validate migration inventory object counts and dependency graph |
 | `/wire:migration-inventory-review` | `<release-folder>` | Internal RA and client scope confirmation |
+| `/wire:lineage-generate` | `<release-folder>` | Generate interactive dbt lineage HTML, with optional reverse-ETL layer showing Hightouch syncs and destinations |
 | `/wire:migration-batching-generate` | `<release-folder> [--seed <path>]` | Partition the migration inventory into independently-schedulable domain batches, checked against the real dependency graph |
 | `/wire:migration-batching-validate` | `<release-folder>` | Validate domain batching — every object classified once, DAG acyclic, every real cross-batch edge declared |
 | `/wire:migration-batching-review` | `<release-folder>` | Human/client adjudication gate — turn the proposed batch partition into a committed schedule |
@@ -334,12 +360,14 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 | `/wire:target-setup-generate` | `<release-folder>` | Generate target warehouse DDL scripts (SAFETY GATE) |
 | `/wire:target-setup-validate` | `<release-folder>` | Validate target setup scripts |
 | `/wire:target-setup-review` | `<release-folder>` | Safety-gated approval before writing to target platform |
-| `/wire:ingestion-migration-generate` | `<release-folder>` | Generate Fivetran connector migration runbook |
-| `/wire:ingestion-migration-validate` | `<release-folder>` | Validate ingestion migration runbook |
-| `/wire:ingestion-migration-review` | `<release-folder>` | Safety-gated approval before activating Fivetran to target |
-| `/wire:equivalency-validate` | `<release-folder>` | Run equivalency checks across all in-scope tables (parallel fan-out) |
+| `/wire:ingestion-migration-generate` | `<release-folder> [--wave id]` | Generate Fivetran connector migration runbook |
+| `/wire:ingestion-migration-validate` | `<release-folder> [--wave id]` | Validate ingestion migration runbook |
+| `/wire:ingestion-migration-review` | `<release-folder> [--wave id]` | Safety-gated approval before activating Fivetran to target |
+| `/wire:equivalency-validate` | `<release-folder> [--batch N ` | Run equivalency checks across all in-scope tables (parallel fan-out) |
 | `/wire:equivalency-investigate` | `<release-folder> --object <table_or_model>` | Deep diagnostics for a specific failing object |
 | `/wire:equivalency-fix` | `<release-folder> --object <name> --approach <description>` | Apply agreed fix and re-run equivalency checks for affected objects |
+| `/wire:equivalency-post-merge-verify` | `<release-folder> [--models list] [--no-wait]` | Post-merge production verification: wait for the client pipeline to materialise merged models, compare at the full verdict bar, advance the register to production_verified |
+| `/wire:equivalency-sweep` | `<release-folder> --pattern <rule-id> [--dry-run]` | Estate-wide defect-class sweep — enumerate one root-caused pattern across delivery tree, client main and open PRs, classify each site, close by encoding the lint rule |
 | `/wire:cutover-generate` | `<release-folder>` | Generate cutover runbook (SAFETY GATE — point of no return) |
 | `/wire:cutover-validate` | `<release-folder>` | Validate cutover runbook completeness |
 | `/wire:cutover-review` | `<release-folder>` | Safety-gated sign-off before live cutover |
@@ -350,15 +378,16 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 | `/wire:migration-register-validate` | `<release-folder>` | Validate the migration register — schema, coverage, state consistency |
 | `/wire:migration-drift-generate` | `<release-folder>` | Scheduled drift gate — diff live source vs last-migrated commit, flag downstream syncs and masking changes |
 | `/wire:migration-drift-validate` | `<release-folder>` | Validate the migration drift report — classification, sync flagging, masking hook |
+| `/wire:migration-status` | `<release-folder> [waves/item/blocking/exceptions] [--json]` | Operational status view — per-wave exclusive model/sync stages, drift partition, provenance header, item/blocking/exceptions subcommands, JSON output |
 | `/wire:data-residency-assessment-generate` | `<release-folder>` | Generate the GDPR and data-residency assessment, including the historical-window legal review (tenant carve-out) |
 | `/wire:data-residency-assessment-validate` | `<release-folder>` | Validate the data residency assessment — all required sections present and non-empty |
 | `/wire:data-residency-assessment-review` | `<release-folder>` | Client DPO/legal sign-off gate for the data residency assessment |
 | `/wire:region-tagging-generate` | `<release-folder> [--region <code>]` | Classify in-scope items into region buckets for a tenant carve-out (candidates, never auto-removal) |
 | `/wire:region-tagging-validate` | `<release-folder>` | Validate region tags — all three buckets populated, every item classified exactly once |
 | `/wire:region-tagging-review` | `<release-folder>` | Human adjudication gate for region tags |
-| `/wire:bulk-copy-migration-generate` | `<release-folder>` | Generate Snowflake→BigQuery bulk copy runbook (tenant carve-out, two-stage with equivalency gate) |
-| `/wire:bulk-copy-migration-validate` | `<release-folder>` | Validate bulk copy runbook — tenant guard, two-stage gate, scoped service account |
-| `/wire:bulk-copy-migration-review` | `<release-folder>` | Safety-gated approval before the first tenant bulk-copy execution |
+| `/wire:bulk-copy-migration-generate` | `<release-folder> [--wave id]` | Generate Snowflake→BigQuery bulk copy runbook (tenant carve-out, two-stage with equivalency gate) |
+| `/wire:bulk-copy-migration-validate` | `<release-folder> [--wave id]` | Validate bulk copy runbook — tenant guard, two-stage gate, scoped service account |
+| `/wire:bulk-copy-migration-review` | `<release-folder> [--wave id]` | Safety-gated approval before the first tenant bulk-copy execution |
 | `/wire:logical-access-uat-generate` | `<release-folder> [--region <code>]` | Generate a region-scoped logical-access UAT plan and evidence pack (tenant carve-out) |
 | `/wire:logical-access-uat-validate` | `<release-folder>` | Validate logical-access UAT — at least one negative test per IAM boundary |
 | `/wire:logical-access-uat-review` | `<release-folder>` | Execute and sign off logical-access UAT — the isolation-proof gate before cutover |
@@ -368,6 +397,11 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 | `/wire:metabase-migration-generate` | `<release-folder>` | Generate Metabase migration runbook — translate card SQL, remap permission groups, two-stage connection repoint |
 | `/wire:metabase-migration-validate` | `<release-folder>` | Validate Metabase migration runbook completeness |
 | `/wire:metabase-migration-review` | `<release-folder>` | Internal RA review of Metabase migration runbook |
+| `/wire:metabase-carveout-generate` | `<release-folder> [--collection id] [--dashboard id]` | Tenant carve-out of the Metabase estate — layer decision per card set (sandboxing/warehouse/dashboard-parameter/card-edit), registry-resolved filters, dashcard pruning, manifest review gate |
+| `/wire:metabase-carveout-validate` | `<release-folder>` | Validate the Metabase carve-out — filters re-derived from the registry, no unfiltered card, dashcard-level removals, explicit shared-card decisions |
+| `/wire:metabase-carveout-review` | `<release-folder>` | Human gate for the Metabase carve-out — adjudicate layer decisions, sign off manifest rows, resolve manual-review cards |
+| `/wire:metabase-carveout-transport` | `<release-folder> [--target-instance-url url] [--collection id] [--dashboard id] [--dry-run]` | Transport signed-off carve-out cards and dashboards onto the separately-hosted tenant Metabase instance: id-mapped via a confirmed database mapping, dependency-ordered, idempotent by recorded target id |
+| `/wire:metabase-equivalency-validate` | `<release-folder> [--cards id1,id2] [--dashboard id]` | Card-level equivalence — migrated/carved cards return the same rows, model verdict taxonomy; gates the connection cutover |
 | `/wire:omni-audit-generate` | `<release-folder>` | Catalog Omni connections, model (topics/views/dimensions/measures), and folders/workbooks/tiles |
 | `/wire:omni-audit-validate` | `<release-folder>` | Validate Omni audit completeness and dependency coverage |
 | `/wire:omni-audit-review` | `<release-folder>` | Internal RA review of Omni audit |
@@ -399,6 +433,8 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 
 | Command | Arguments | Description |
 |---------|-----------|-------------|
+| `/wire:delegate` | `<release-folder>` | Decompose a release's pending work into typed tasks and dispatch to specialist local subagents |
+| `/wire:status-sync` | `[release-folder]` | Reconcile recorded release state against evidence (git, execution log, disk, sprint plan) and repair the record with confirmation |
 | `/wire:playbook-generate` | `<release-folder>` | Generate a step-by-step BPMN delivery playbook for any Wire release |
 | `/wire:conceptual_model-generate` | `<project-folder>` | Generate conceptual entity model from requirements |
 | `/wire:conceptual_model-validate` | `<project-folder>` | Validate conceptual model completeness and correctness |
@@ -422,6 +458,9 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 | `/wire:adopt` | `[repo-path-or-url]` | Adopt an in-flight project into Wire — assess repo and external sources, map existing work to artifacts, set up engagement structure, generate adoption playbook |
 | `/wire:custom-define` | `<release-folder>` | Define a custom release type from SoW or project documents — map deliverables to Wire commands or generate bespoke specs |
 | `/wire:custom-feature-request` | `<custom-spec-name>` | Raise a GitHub issue on the Wire repo proposing a bespoke command as a framework addition |
+| `/wire:migration-acceptance-pack-review` | `<release-folder> [--batch N ` | Present migration batch acceptance pack for stakeholder sign-off |
+| `/wire:migration-source-register` | `<release-folder> <source_type> <github_url>` | Register a source repository for a given migration source type |
+| `/wire:migration-source-refresh` | `<release-folder> <source_type>` | Pull a fresh local snapshot of a registered migration source |
 | `/wire:ads-audit-all` | `<release-folder>` | Run all three agentic data stack audits in parallel |
 | `/wire:ads_dataset-audit-generate` | `<release-folder>` | Inventory warehouse tables, identify duplicates, grade governance maturity |
 | `/wire:ads_dataset-audit-validate` | `<release-folder>` | Verify dataset audit completeness and tier classifications |

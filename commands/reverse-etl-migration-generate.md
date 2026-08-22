@@ -1,6 +1,6 @@
 ---
 description: Generate Hightouch sync migration runbook — repoint, rewrite, rebuild
-argument-hint: <release-folder>
+argument-hint: <release-folder> [--wave id]
 ---
 
 # Generate Hightouch sync migration runbook — repoint, rewrite, rebuild
@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -103,6 +108,80 @@ with open('.wire/releases/<release_folder>/trace.jsonl', 'a') as f:
 {"ts":"2026-07-05T14:41:15Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"command_end","step":null,"step_name":null,"result":"complete","detail":"Generated data_model_specification.md — 14 models (5 staging, 4 integration, 5 warehouse), including 2 informed by the accepted registry proposals above."}
 ```
 
+## Automatic Validation (on by default)
+
+---
+description: Internal utility — injected auto-validate section so generate commands run their matching validate step automatically and fold the result into their output
+---
+
+Every `generate` command that has a matching `validate` command for the
+same artifact runs that validate step automatically as part of generate —
+by default, with no separate command to remember. This section only appears
+on commands where that applies; artifacts with no separate validate step at
+all (e.g. mockups, workshops, UAT) never carry this section.
+
+## Step: Check `auto_validate`
+
+Read this command's own `auto_validate` front-matter field, in the Workflow
+Specification below. Two states:
+
+- **Absent, or `true`** (the default — most artifacts): auto-validate runs.
+- **`false`**: this artifact's validate step is expensive — it runs real
+  code, queries a live warehouse or BI tool, or otherwise does IO beyond
+  re-reading local files — so it does not run automatically. Skip to
+  "If `auto_validate: false`" below.
+
+## If `auto_validate` is absent or `true`: run validate automatically
+
+Once this command finishes writing its artifact, before ending:
+
+1. Run this artifact's own `/wire:<artifact-with-dashes>-validate` workflow
+   in full, exactly as if the consultant had typed it themselves — same
+   inputs, same `status.md` write to `artifacts.<artifact>.validate`, same
+   report. This is not optional or an extra step layered on top; it is the
+   default behavior for this artifact.
+2. Fold the result into this command's own closing output rather than
+   presenting it as a separate command run:
+   - **PASS** — add a single closing line: `✅ Auto-validated — PASS`. The
+     full report already went to `status.md`/`execution_log.md`, exactly as
+     it would from a standalone validate run — no need to repeat it here.
+   - **FAIL** — surface the validate command's own failure report in full,
+     exactly as running validate standalone would show it, so the
+     consultant sees what's wrong immediately without running anything
+     else themselves.
+3. This never blocks or undoes generate itself — the artifact is written
+   either way, and its content is never rolled back because validate
+   failed. Auto-validation only means validate has already run and its
+   result is already on record by the time generate finishes, instead of
+   waiting for the consultant to remember to run it separately.
+
+## If `auto_validate` is `false`: state this plainly, don't run it
+
+Do not run validate. End with a line naming why, as specifically as this
+spec's own context makes possible (e.g. "runs `dbt run`/`dbt test`",
+"queries the live target warehouse", "calls the Looker API directly") —
+fall back to "performs live checks against an external system" only if no
+more specific reason is evident from context:
+
+```
+⚠ This artifact's validate step [reason] and does not run automatically.
+Run /wire:<artifact-with-dashes>-validate <release_folder> before
+requesting review — review is blocked until it passes.
+```
+
+## Why this is always safe either way
+
+`review` already requires `validate: PASS` for this same artifact as one of
+its own declared preconditions (see `specs/utils/precondition_gate.md`) —
+this is existing, independent enforcement, not something added by this
+section. So an `auto_validate: false` opt-out never lets an artifact reach
+review unvalidated; it only decides *when* the consultant pays validate's
+cost — automatically on every draft (the default), or once, on their own
+schedule, before requesting review (the opt-out). Auto-validation is a
+convenience that closes the "forgot to run it" gap for the common case; the
+gate that actually prevents unvalidated work from being reviewed was already
+there.
+
 ## Workflow Specification
 
 ---
@@ -125,7 +204,7 @@ preconditions:
 delegates_to:
   - utils/precondition_gate
 description: Generate Hightouch reverse ETL migration runbook — add target-warehouse syncs to the existing GitHub-Sync repo as PR-gated changes, reuse destinations in place, translate models drift-aware, and cut over with two client-merged PRs
-
+argument-hint: <release-folder> [--wave id]
 ---
 
 ## Auto-Delegation
@@ -174,17 +253,29 @@ Generates a step-by-step runbook for migrating every in-scope Hightouch sync fro
 
 Parallel-workspace and in-place API re-point remain documented as alternatives, no longer the default — see Step 2.
 
+
+The `migration_approach` vocabulary is the closed set in `specs/utils/reverse_etl_approach.md` (normative): `repoint`, `rewrite_model`, `rebuild`, `decommission`. There is no `retire` value.
+
 ## Prerequisites
 
 - `target_setup review: approved` — target warehouse schemas and objects exist
 - `reverse_etl_audit review: approved`
 - `dbt_migration: complete` for any batch containing models referenced by Hightouch dbt-type syncs (cannot validate those syncs until their dbt models exist on target)
 - **Per-sync source-model scope check** — each in-scope sync's source object must exist on the target before that sync is translated. Syncs whose source object is not yet built on target are deferred, not included (enforced per-sync in Step 4-pre).
+- `migration/migration_batching.csv` exists — required only when running with `--wave`
+
+## Flags
+
+- `--wave <id>` — restrict this run to the syncs `migration/migration_batching.csv` assigns to this wave. Resolution is identical to `dbt-migration-generate`'s Step 1w: normalise the wave id, load `migration_batching. Wave-id form and normalisation follow the shared contract in `specs/utils/wave_resolution.md` (normative).csv` (abort if missing), filter to rows where `batch_id` matches **and** `object_type == "reverse_etl_sync"`, then cross-reference each matched `object_id` against `reverse_etl_audit.md`'s sync identifiers for the full per-sync detail. Print the mandatory resolved-sync preview before proceeding. If rows match the wave but none are `reverse_etl_sync` rows, print `[wire] Wave <id> has no reverse-ETL sync objects — nothing to migrate for this command.` and stop cleanly.
+- No flag — process every sync with `include_in_migration: true` (today's behaviour, unchanged).
+
+When `--wave` is supplied, the runbook and decoy-mapping outputs are wave-labelled (`migration/reverse_etl_migration_runbook_{wave_id}.md`, `migration/reverse_etl_decoy_mapping_{wave_id}.csv`), and each wave gets its own PR sequence (Step 8) — a wave's target-warehouse syncs are additive alongside any prior wave's, exactly as a wave's dbt models are additive alongside prior waves in the same GitHub-Sync repo.
 
 ## Inputs
 
 - `.wire/releases/$ARGUMENTS/audit/reverse_etl_audit.md`
 - `.wire/releases/$ARGUMENTS/migration/migration_strategy.md`
+- `.wire/releases/$ARGUMENTS/migration/migration_batching.csv` — consumed only by `--wave` mode
 - `.wire/releases/$ARGUMENTS/status.md`
 - `.wire/releases/$ARGUMENTS/audit/ingestion/mds_variant_columns.csv` — per-release **type-drift manifest**: columns whose source type does not carry over to the target landing format (e.g. a Snowflake `VARIANT` that lands as `STRING` under BigLake Iceberg rather than as BigQuery `JSON`). Optional — if absent, treat as empty and proceed, but note in the runbook that no drift manifest was available. Expected columns: `source_object, column_name, source_type, target_landing_type, notes`.
 - `.wire/releases/$ARGUMENTS/migration/dbt/**/*.diff.md` — the dbt_migration per-model diffs. Where a referenced model was already migrated by dbt_migration, mirror any type reconciliation it recorded rather than re-deriving it.
@@ -199,6 +290,10 @@ Confirm `target_setup review: approved`. Confirm `reverse_etl_audit review: appr
 If prerequisites are not met, output the blockers and stop.
 
 Activate the `hightouch` skill for API connection details and the workspace / GitHub Sync model.
+
+### Step 1w: Resolve `--wave` (only when `--wave` is used)
+
+Resolve the in-scope sync set per the **Flags** section above. This replaces "every sync with `include_in_migration: true`" in Step 4 with the wave-resolved subset — the rest of the workflow (topology, translation, decoy mapping, validation, PR sequence) is otherwise unchanged.
 
 ### Step 2: Choose the migration topology
 
@@ -260,7 +355,7 @@ Rollback: re-apply the original `sourceId` via the same endpoint. Keep syncs dis
 
 ### Step 4: Translate models by approach
 
-Load all syncs from the audit with `include_in_migration: true` and group by migration approach. Process repoint first (lowest risk), then rewrite_model, then rebuild. In the default additive path these changes are committed to the working branch and flow through PRs (deployed via GitHub Sync on merge); in the parallel-workspace alternative they are committed to the cloned repo and deployed via GitHub Sync; in the in-place alternative they are applied to the existing models.
+Load the in-scope syncs — the Step 1w-resolved set under `--wave`, otherwise every sync from the audit with `include_in_migration: true` — and group by migration approach. Process repoint first (lowest risk), then rewrite_model, then rebuild. In the default additive path these changes are committed to the working branch and flow through PRs (deployed via GitHub Sync on merge); in the parallel-workspace alternative they are committed to the cloned repo and deployed via GitHub Sync; in the in-place alternative they are applied to the existing models.
 
 Before translating any sync, run the scope gate (Step 4-pre) and the approach re-verification (Step 4-verify) below.
 
@@ -299,7 +394,7 @@ Keep the **reactive downgrade** in the `repoint` bullet below as a backstop — 
 
 Destinations are reused in place (the existing definitions are not re-created), so safety cannot rely on a "disabled" flag — a single mistaken enable would write to a live downstream system. Use a structural decoy mechanic instead.
 
-1. **Build the decoy mapping table** — one row per in-scope sync. Generate or consume `migration/reverse_etl_decoy_mapping.csv` with columns:
+1. **Build the decoy mapping table** — one row per in-scope sync. Generate or consume `migration/reverse_etl_decoy_mapping.csv` (or `_{wave_id}.csv` under `--wave`) with columns:
 
    ```
    sync_id, sync_name, production_destination_id, production_destination_type,
@@ -366,7 +461,7 @@ Note: Hightouch creates the actual tables in these schemas on the first sync run
 
 ### Step 8: Write the runbook
 
-**Output location**: `.wire/releases/$ARGUMENTS/migration/reverse_etl_migration_runbook.md`
+**Output location**: `.wire/releases/$ARGUMENTS/migration/reverse_etl_migration_runbook.md` — or `migration/reverse_etl_migration_runbook_{wave_id}.md` when run with `--wave`.
 
 Structure:
 1. Topology decision (additive PR-gated repo — default — vs parallel workspace vs in-place API re-point) and the rationale
@@ -401,6 +496,8 @@ artifacts:
     deferred_count: N             # syncs excluded by the Step 4-pre scope gate
     drift_adjusted_count: N       # syncs with at least one drift-adjusted column (Step 4c)
     decoy_mapping_file: migration/reverse_etl_decoy_mapping.csv
+    wave: "B01"                   # set only when run with --wave; the wave id just processed
+    waves_complete: ["B01"]       # set only when run with --wave; accumulates across runs
 ```
 
 ### Step 10: Output next command
@@ -411,8 +508,8 @@ artifacts:
 
 ## Output Files
 
-- `.wire/releases/$ARGUMENTS/migration/reverse_etl_migration_runbook.md`
-- `.wire/releases/$ARGUMENTS/migration/reverse_etl_decoy_mapping.csv` — production → decoy destination ID mapping, one row per in-scope sync
+- `.wire/releases/$ARGUMENTS/migration/reverse_etl_migration_runbook.md` (`_{wave_id}` suffix when run with `--wave`)
+- `.wire/releases/$ARGUMENTS/migration/reverse_etl_decoy_mapping.csv` — production → decoy destination ID mapping, one row per in-scope sync (`_{wave_id}` suffix when run with `--wave`)
 - Updated `.wire/releases/$ARGUMENTS/status.md`
 
 
@@ -433,6 +530,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -517,6 +618,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

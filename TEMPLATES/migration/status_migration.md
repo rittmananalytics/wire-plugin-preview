@@ -18,6 +18,44 @@ migration:
                                            # extracted tenant, e.g. "tenant_id = 4815". Consumed by the carve-out
                                            # steps (region-tagging, bulk-copy-migration, logical-access-uat).
                                            # Leave null for full_migration.
+  parent_target_project: null              # tenant_carveout only: the parent migration's target project, used as
+                                           # the comparison source for relocate-origin models (equivalency-validate,
+                                           # Relocate-mode comparison) and as defer-build's fallback defer state.
+                                           # Leave null for full_migration or a carve-out with no landed parent.
+  parent_release: null                     # tenant_carveout only: the parent migration's release folder name
+                                           # (e.g. "05-lift-and-shift"). dbt-carveout-relocate reads the parent's
+                                           # migration_register.csv from it to write the parent_release /
+                                           # parent_model / parent_verdict_ref linkage columns, and refuses to
+                                           # relocate a model whose parent verdict is fail. Leave null when the
+                                           # parent register is not reachable from this checkout.
+  cross_release_triggers: []               # tenant_carveout only: machine-readable parent→carve-out dependencies,
+                                           # checked by migration-drift-generate (Step 5c). One entry per trigger:
+                                           #   - event: "parent_bronze_backfill_complete"   # short id, unique in list
+                                           #     parent_release: "05-lift-and-shift"
+                                           #     condition: "<what to check, e.g. parent register rows X..Y reach
+                                           #                 state=migrated / delivery_stage=production_verified>"
+                                           #     action: "re-verify <models> | re-run /wire:equivalency-validate --models <...>"
+                                           #     status: open                               # open | fired | closed
+                                           # A caveat that "closes when the parent completes X" belongs here,
+                                           # not in a PR comment nobody re-reads.
+  declared_windows: []                     # Optional per-object availability windows (equivalency-validate Step 1e).
+                                           # Auto-derivation from target Bronze MIN(loaded_at) needs no entry here;
+                                           # add one to declare a window explicitly or to add exclusions:
+                                           #   - object: "orders"            # object name or table pattern
+                                           #     floor: "2023-06-01T00:00:00Z"
+                                           #     cap: null                   # null = the run's pinned as-of
+                                           #     exclusions:
+                                           #       - range: "2023-06-01"
+                                           #         reason: "connector initial-load day — bulk backfill row shapes"
+  known_differences_path: null             # Optional path to the engagement's connector-emission known-differences
+                                           # registry (default: migration/known_differences.yaml when present).
+                                           # Loaded by equivalency-validate; a divergence matching an entry
+                                           # classifies pass_qualified with the entry cited. See
+                                           # TEMPLATES/migration/known_differences.yaml.
+  bring_in:                                # bulk-copy-migration-generate --mode bring-in (source-platform-only history)
+    copy_gate:                             # per-table gate between the chunked-copy and export paths
+      max_rows: 10000000                   #   tables at or under both limits are COPYABLE via chunked copy
+      max_gb: 3                            #   over either limit → EXPORT (client-run execute-pack)
   dbt_project_path: "{{DBT_PROJECT_PATH}}" # default: ./dbt
   orchestration_tool: "{{ORCHESTRATION_TOOL}}" # dagster | dbt_cloud | airflow | none
   ingestion_tool: "{{INGESTION_TOOL}}"     # fivetran | rudderstack | coupler-io | segment | airbyte | other
@@ -59,6 +97,24 @@ migration:
                                    #   type_translation_allowlist: []      # expected type changes (VARIANT->JSON/STRING,
                                    #                                       #   TIMESTAMP_NTZ->DATETIME, NUMBER-scale rounding)
                                    # equivalency-validate --baseline reads this per --batch.
+  gate_policy: equivalence_before_pr       # equivalence_before_pr (default) | ship_then_verify.
+                                           # Governs when a translated model may enter a client PR
+                                           # (dbt-migration-batch-raise eligibility rules).
+                                           # ship_then_verify requires a recorded client ruling (note the
+                                           # date and forum in notes below) and makes the pre-raise smoke
+                                           # comparison and post-merge verification run points mandatory.
+  gate_policy_ruling: null                 # ship_then_verify only: who ruled, where, when
+  client_repos: []                         # Repos this migration ships into, one entry per repo:
+                                           #   - role: transformation | orchestration | reverse_etl
+                                           #     url: "git@github.com:org/repo.git"
+                                           #     base_branch: main
+                                           # Consumed by dbt-migration-batch-raise and utils-ci-parity.
+                                           # Empty = batch-raise asks once and persists the answer here.
+  cost_controls:                           # Warehouse spend guardrails for sandbox builds and comparison
+    unit: gb_scanned                       #   gb_scanned (BigQuery) | credits (Snowflake)
+    per_run_budget: null                   #   max estimated cost per build/comparison run; null = warn only
+    daily_budget: null                     #   max cumulative cost per day across all lanes; null = warn only
+    scratch_dataset: wire_sandbox          #   sandbox dataset/schema dbt-migration-defer-build writes to
   status: not_started                      # not_started | in_progress | complete
   completed_date: null
 
@@ -75,6 +131,13 @@ data_safety:
     last_run_date: null
     loop_history: []
     status: null    # null | failing | passing | complete
+
+client_comms:                 # utils-client-watch / utils-ask-list-generate config. Nothing here is hardcoded
+                              # in the commands — an unset slack_channel_id disables the watch tick cleanly.
+  slack_channel_id: null      # required for utils-client-watch; no default
+  ask_list_max: 5             # hard cap on open asks per list (client-ruled ceiling; default 5)
+  answers_ledger: "decisions.md"   # release-relative path to the dated client-answers ledger
+  post_merge_action: "/wire:equivalency-post-merge-verify"   # fired by the watch when an own PR merges
 
 jira:
   project_key: null
@@ -241,6 +304,13 @@ artifacts:
     users_count: null
     rls_policies: null
     masking_policies: null
+    baseline_path: null   # Optional: path to a prior audit/artifact this run builds on or compares
+                          # against (e.g. a previous release's audit/security_audit.md). null = no
+                          # baseline — security-audit-generate skips the baseline check entirely.
+                          # When set, checked by specs/utils/audit_baseline_check.md before generation:
+                          # fails loudly if the path is missing/empty, and warns if any role/PII/user
+                          # count cited in this release's brief/SOW/status.md notes doesn't match what
+                          # the baseline actually contains.
     generated_files: []
     revision_history: []
 

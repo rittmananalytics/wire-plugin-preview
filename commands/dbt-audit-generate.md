@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -102,6 +107,80 @@ with open('.wire/releases/<release_folder>/trace.jsonl', 'a') as f:
 {"ts":"2026-07-05T14:34:47Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"step","step":"5","step_name":"Carry reference pointers forward","result":null,"detail":"account_dim mapped to subscription-commerce's subscriber entity — generation_constraints and reference_implementation pointer carried into data_model_specification.md. subscription_fct mapped to subscription entity, same treatment. contact_identity_map (new, from crm_identity_resolution) added as its own integration model with that pattern's reference_implementation pointer."}
 {"ts":"2026-07-05T14:41:15Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"command_end","step":null,"step_name":null,"result":"complete","detail":"Generated data_model_specification.md — 14 models (5 staging, 4 integration, 5 warehouse), including 2 informed by the accepted registry proposals above."}
 ```
+
+## Automatic Validation (on by default)
+
+---
+description: Internal utility — injected auto-validate section so generate commands run their matching validate step automatically and fold the result into their output
+---
+
+Every `generate` command that has a matching `validate` command for the
+same artifact runs that validate step automatically as part of generate —
+by default, with no separate command to remember. This section only appears
+on commands where that applies; artifacts with no separate validate step at
+all (e.g. mockups, workshops, UAT) never carry this section.
+
+## Step: Check `auto_validate`
+
+Read this command's own `auto_validate` front-matter field, in the Workflow
+Specification below. Two states:
+
+- **Absent, or `true`** (the default — most artifacts): auto-validate runs.
+- **`false`**: this artifact's validate step is expensive — it runs real
+  code, queries a live warehouse or BI tool, or otherwise does IO beyond
+  re-reading local files — so it does not run automatically. Skip to
+  "If `auto_validate: false`" below.
+
+## If `auto_validate` is absent or `true`: run validate automatically
+
+Once this command finishes writing its artifact, before ending:
+
+1. Run this artifact's own `/wire:<artifact-with-dashes>-validate` workflow
+   in full, exactly as if the consultant had typed it themselves — same
+   inputs, same `status.md` write to `artifacts.<artifact>.validate`, same
+   report. This is not optional or an extra step layered on top; it is the
+   default behavior for this artifact.
+2. Fold the result into this command's own closing output rather than
+   presenting it as a separate command run:
+   - **PASS** — add a single closing line: `✅ Auto-validated — PASS`. The
+     full report already went to `status.md`/`execution_log.md`, exactly as
+     it would from a standalone validate run — no need to repeat it here.
+   - **FAIL** — surface the validate command's own failure report in full,
+     exactly as running validate standalone would show it, so the
+     consultant sees what's wrong immediately without running anything
+     else themselves.
+3. This never blocks or undoes generate itself — the artifact is written
+   either way, and its content is never rolled back because validate
+   failed. Auto-validation only means validate has already run and its
+   result is already on record by the time generate finishes, instead of
+   waiting for the consultant to remember to run it separately.
+
+## If `auto_validate` is `false`: state this plainly, don't run it
+
+Do not run validate. End with a line naming why, as specifically as this
+spec's own context makes possible (e.g. "runs `dbt run`/`dbt test`",
+"queries the live target warehouse", "calls the Looker API directly") —
+fall back to "performs live checks against an external system" only if no
+more specific reason is evident from context:
+
+```
+⚠ This artifact's validate step [reason] and does not run automatically.
+Run /wire:<artifact-with-dashes>-validate <release_folder> before
+requesting review — review is blocked until it passes.
+```
+
+## Why this is always safe either way
+
+`review` already requires `validate: PASS` for this same artifact as one of
+its own declared preconditions (see `specs/utils/precondition_gate.md`) —
+this is existing, independent enforcement, not something added by this
+section. So an `auto_validate: false` opt-out never lets an artifact reach
+review unvalidated; it only decides *when* the consultant pays validate's
+cost — automatically on every draft (the default), or once, on their own
+schedule, before requesting review (the opt-out). Auto-validation is a
+convenience that closes the "forgot to run it" gap for the common case; the
+gate that actually prevents unvalidated work from being reviewed was already
+there.
 
 ## Workflow Specification
 
@@ -187,7 +266,23 @@ Walk each resolved project's filesystem directly. The manifest gives dependency 
 
 **Seeds**: List all seed files with row counts.
 
-**Snapshots**: List all snapshots with their strategy (timestamp / check).
+**Snapshots**: Catalog every dbt snapshot as its own object type — a snapshot is an SCD-2 history table, not a model, and if it falls through the model-only scan it is never audited, translated, or tested, which blocks the downstream models that read it and risks silently losing SCD-2 history. Scan the **snapshot-paths**: every `.sql` under each resolved project's `snapshot-paths:` directory (default `snapshots/`) and every `{% snapshot <name> %} … {% endsnapshot %}` block (a project may also define snapshots inside a `models/` tree via the block form — scan for the block, not just the directory). Record one row per snapshot with the **snapshot metadata schema**:
+
+| Field | Meaning |
+|-------|---------|
+| `snapshot_name` | the snapshot name (from the block header or file) |
+| `file_path` | path to the snapshot file within its resolved project |
+| `strategy` | `timestamp` or `check` (from the snapshot config) |
+| `unique_key` | the `unique_key` config value |
+| `updated_at` | the `updated_at` column (timestamp strategy) — else blank |
+| `check_cols` | the `check_cols` value (check strategy): a column list or `all` — else blank |
+| `invalidate_hard_deletes` | `true` / `false` (config; default `false`) |
+| `target_schema` | the physical target relation the snapshot builds to (resolved `target_schema`/`target_database` + name), i.e. the built history table other models read |
+| `upstream` | the `ref()`/`source()` the snapshot's inner SELECT reads from |
+| `downstream_dependents` | comma-separated models/snapshots that `ref()` this snapshot |
+| `feature_tags` | platform-specific SQL feature tags in the inner SELECT (same detection as models, Step 4) |
+
+The SCD meta columns (`dbt_scd_id`, `dbt_updated_at`, `dbt_valid_from`, `dbt_valid_to`) and their per-pair types are declared in the platform pair's **"Snapshot SCD mechanisms"** section — do not restate the types here; the copy/translate/test commands read them from the pair.
 
 **Analyses**: List any files in `analyses/`.
 
@@ -249,6 +344,8 @@ Sort key when multiple valid orderings exist:
 
 Pack into batches of at most 20 models, preserving that order. A parent and its child may share a batch — dbt builds in dependency order within a run, so this is safe; do not fragment into smaller batches just to force strict parent-in-an-earlier-batch.
 
+**Snapshots are buildable nodes in the sort.** A dbt snapshot is a first-class build target with real edges — its `upstream` ref/source is a parent, and every model in its `downstream_dependents` is a child. Include each snapshot as a node in the topological sort with an **upstream→snapshot** edge from its ref/source parent and a **snapshot→dependent** edge to each downstream model, and assign it a `batch_number` like any other buildable node. This guarantees a snapshot sorts after the model it reads and before the models that read it, so no downstream model is ever ordered ahead of the snapshot it depends on. Record the snapshot's `batch_number` in the snapshot catalog.
+
 **Conditional models.** A `conditional:*` model has no dependency edges in the default-var manifest sort — its edges come from `dbt_manifest_parse.md` Step 4's flags-on re-parse (place it in the sort like any other model once its real edges are known) or, when re-parsing wasn't available, the dependency-rule fallback (place it one batch after the highest batch of its in-scope dependencies, or in batch 1 if none of its dependencies are in scope). State in the audit's Notes which mode was used, and that the dependency-rule placement is exact only for single-parent leaf nodes.
 
 Assign each buildable (`true` or `conditional:*`) model a `batch_number` (1-indexed). Only models classified **statically** `false` get a null `batch_number` and are excluded from batching — a `conditional:*` model always gets a real batch number, never null, regardless of what it resolves to under default vars.
@@ -264,6 +361,13 @@ Restrict the macro dependency graph (from Step 2) to the NEEDS-translation set f
 
 `redesign` and `manual-review-out-of-scope` macros are listed in their own buckets and get no tier.
 
+**Assign each entry a `layer` — the lifecycle it belongs to.** The batch-zero pass is two different kinds of work, translated and deployed by two different commands, so every macro entry carries a `layer` field that routes it:
+
+- `layer: "udf"` — the entry emits a warehouse `CREATE FUNCTION` object (deploy-once DDL): its name matches `create_udfs` or the `fn_*` prefix, or its detected category is `fn_-UDF`. These are deployed to the target by `/wire:target-setup-generate` (see that spec's UDF DDL step), tiered `tier 0 → tier 1 → create_udfs`.
+- `layer: "macro"` — every other NEEDS macro: pure Jinja / dispatched SQL-dialect macros (`globalize_id`, `cross_dialect_helpers`, `ensure_*`, the scalar / VARIANT / ILIKE set). These are translated by `/wire:dbt-migration-generate --macros` and validated indirectly when the models that call them compile.
+
+`redesign` and `manual-review-out-of-scope` UDF entries still carry `layer: "udf"` (with a null tier) so `target-setup-generate` can surface them at its safety-gate review as architecture decisions. The `layer` split is the discriminator both consuming commands route on — do not omit it.
+
 Write:
 - `.wire/releases/$ARGUMENTS/audit/batch_zero_plan.json` — from `TEMPLATES/migration/batch_zero_plan.json`
 - `.wire/releases/$ARGUMENTS/audit/batch_zero_macro_plan.md` — from `TEMPLATES/migration/batch_zero_macro_plan.md`
@@ -277,8 +381,13 @@ State the rule in the plan: translate all of tier 0 (any order), then tier 1, th
 **Output locations**:
 - `.wire/releases/$ARGUMENTS/audit/dbt_audit.md` — narrative report with summary statistics
 - `.wire/releases/$ARGUMENTS/audit/dbt_audit.csv` — machine-readable model catalog
+- `.wire/releases/$ARGUMENTS/audit/dbt_snapshots.csv` — machine-readable snapshot catalog (written only when the project defines snapshots)
 
-Use the templates at `TEMPLATES/migration/dbt_audit.md` and `TEMPLATES/migration/dbt_audit.csv`.
+Use the templates at `TEMPLATES/migration/dbt_audit.md`, `TEMPLATES/migration/dbt_audit.csv`, and `TEMPLATES/migration/dbt_snapshots.csv`.
+
+**Snapshot catalog.** If the project defines any snapshots, write `dbt_snapshots.csv` with one row per snapshot in the snapshot metadata schema (Step 3), plus the `batch_number` assigned in Step 7:
+`snapshot_name, file_path, strategy, unique_key, updated_at, check_cols, invalidate_hard_deletes, target_schema, upstream, downstream_dependents, feature_tags, batch_number`
+and add a **Snapshots** section to `dbt_audit.md` — one row per snapshot naming its strategy, `unique_key`, `updated_at`/`check_cols`, `target_schema`, upstream ref/source, and downstream dependents. A snapshot with no downstream dependents is still cataloged (its history still matters); note it rather than dropping it.
 
 The CSV must contain:
 `model_name, file_path, layer, line_count, ref_count, source_count, cte_count, complexity, feature_tags, batch_number, has_tests, migration_notes, enabled, platform_macros`
@@ -308,6 +417,7 @@ artifacts:
     moderate_count: N
     complex_count: N
     batch_count: N
+    snapshot_count: N
     macro_count: N
     macros_needing_translation_count: N
     batch_zero_plan: audit/batch_zero_plan.json
@@ -319,7 +429,7 @@ artifacts:
 
 ### Step 11: Output summary
 
-Print: total models, breakdown by complexity, disabled-model count, conditionally-enabled model count (and list them by name if any), number of batches, macros needing translation, confirmation the batch-zero plan was generated, most common feature tags, and next command:
+Print: total models, breakdown by complexity, disabled-model count, conditionally-enabled model count (and list them by name if any), number of batches, snapshot count (and list them by name if any), macros needing translation, confirmation the batch-zero plan was generated, most common feature tags, and next command:
 
 ```
 /wire:dbt-audit-validate $ARGUMENTS
@@ -329,6 +439,7 @@ Print: total models, breakdown by complexity, disabled-model count, conditionall
 
 - `.wire/releases/$ARGUMENTS/audit/dbt_audit.md`
 - `.wire/releases/$ARGUMENTS/audit/dbt_audit.csv`
+- `.wire/releases/$ARGUMENTS/audit/dbt_snapshots.csv` — snapshot catalog (only when the project defines snapshots)
 - `.wire/releases/$ARGUMENTS/audit/batch_zero_plan.json`
 - `.wire/releases/$ARGUMENTS/audit/batch_zero_macro_plan.md`
 - Updated `.wire/releases/$ARGUMENTS/status.md`
@@ -351,6 +462,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -435,6 +550,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

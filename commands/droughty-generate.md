@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -154,10 +159,9 @@ Varies by mode — see individual command specs. Minimum: `.wire/engagement/cont
 
 Read `.wire/releases/[release]/status.md`.
 
-**If `project_type: droughty`** or `droughty.context: discovery` in status.md:
-- Default to **discovery mode**
+**If `droughty.context` is already set** (`discovery`, `post_dbt`, or `full` — set during `/wire:new`'s droughty setup, or by a prior run of this command): use that context directly. This applies whether the release is a standalone `project_type: droughty` engagement or droughty was invoked from within another release type — a release explicitly configured for `post_dbt` or `full` must not be silently forced back to discovery mode just because `project_type: droughty` also happens to be true.
 
-**If called within another release type** (e.g. `full_platform`, `dbt_development`):
+**If `droughty.context` is not set** (e.g. droughty invoked ad hoc within another release type — `full_platform`, `dbt_development` — without having gone through `/wire:new`'s droughty setup):
 - Ask in chat:
   ```
   What context is this Droughty run for?

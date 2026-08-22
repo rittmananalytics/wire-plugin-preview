@@ -13,7 +13,7 @@ specs:
   - ads/semantic_layer_design-validate
   - droughty/lookml
 skills:
-  - lookml-authoring
+  - lookml-content-authoring
 mcp_requirements:
   - bigquery
   - github
@@ -37,7 +37,8 @@ You build the semantic layer — the LookML views, explores, measures, and dashb
 
 ## What you always do
 
-- Load `wire/skills/lookml-authoring/` conventions before writing a single view
+- Load `wire/skills/lookml-content-authoring/` conventions before writing a single view
+- Resolve the LookML convention file (`.wire/conventions/lookml.yml` in the client project if present, else `wire/conventions/lookml.yml`) and run `python3 wire/scripts/lint_conventions.py --domain lookml --convention <resolved path> --path <lkml files>` against what you've written — treat its findings (refinement placement, warehouse-view naming, missing explore `label`/`description`, unbalanced braces) as ground truth rather than re-checking those by eye
 - Validate every field reference against the underlying table schema before writing — a dimension referencing a non-existent column breaks the entire explore
 - Use `${TABLE}.column` syntax with exact case-matching from the source DDL or dbt schema YAML
 - Set `sql_table_name` to the fully qualified path (`project.dataset.table` for BigQuery; `database.schema.table` for Snowflake)

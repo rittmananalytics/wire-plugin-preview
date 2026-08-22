@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -103,6 +108,80 @@ with open('.wire/releases/<release_folder>/trace.jsonl', 'a') as f:
 {"ts":"2026-07-05T14:41:15Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"command_end","step":null,"step_name":null,"result":"complete","detail":"Generated data_model_specification.md — 14 models (5 staging, 4 integration, 5 warehouse), including 2 informed by the accepted registry proposals above."}
 ```
 
+## Automatic Validation (on by default)
+
+---
+description: Internal utility — injected auto-validate section so generate commands run their matching validate step automatically and fold the result into their output
+---
+
+Every `generate` command that has a matching `validate` command for the
+same artifact runs that validate step automatically as part of generate —
+by default, with no separate command to remember. This section only appears
+on commands where that applies; artifacts with no separate validate step at
+all (e.g. mockups, workshops, UAT) never carry this section.
+
+## Step: Check `auto_validate`
+
+Read this command's own `auto_validate` front-matter field, in the Workflow
+Specification below. Two states:
+
+- **Absent, or `true`** (the default — most artifacts): auto-validate runs.
+- **`false`**: this artifact's validate step is expensive — it runs real
+  code, queries a live warehouse or BI tool, or otherwise does IO beyond
+  re-reading local files — so it does not run automatically. Skip to
+  "If `auto_validate: false`" below.
+
+## If `auto_validate` is absent or `true`: run validate automatically
+
+Once this command finishes writing its artifact, before ending:
+
+1. Run this artifact's own `/wire:<artifact-with-dashes>-validate` workflow
+   in full, exactly as if the consultant had typed it themselves — same
+   inputs, same `status.md` write to `artifacts.<artifact>.validate`, same
+   report. This is not optional or an extra step layered on top; it is the
+   default behavior for this artifact.
+2. Fold the result into this command's own closing output rather than
+   presenting it as a separate command run:
+   - **PASS** — add a single closing line: `✅ Auto-validated — PASS`. The
+     full report already went to `status.md`/`execution_log.md`, exactly as
+     it would from a standalone validate run — no need to repeat it here.
+   - **FAIL** — surface the validate command's own failure report in full,
+     exactly as running validate standalone would show it, so the
+     consultant sees what's wrong immediately without running anything
+     else themselves.
+3. This never blocks or undoes generate itself — the artifact is written
+   either way, and its content is never rolled back because validate
+   failed. Auto-validation only means validate has already run and its
+   result is already on record by the time generate finishes, instead of
+   waiting for the consultant to remember to run it separately.
+
+## If `auto_validate` is `false`: state this plainly, don't run it
+
+Do not run validate. End with a line naming why, as specifically as this
+spec's own context makes possible (e.g. "runs `dbt run`/`dbt test`",
+"queries the live target warehouse", "calls the Looker API directly") —
+fall back to "performs live checks against an external system" only if no
+more specific reason is evident from context:
+
+```
+⚠ This artifact's validate step [reason] and does not run automatically.
+Run /wire:<artifact-with-dashes>-validate <release_folder> before
+requesting review — review is blocked until it passes.
+```
+
+## Why this is always safe either way
+
+`review` already requires `validate: PASS` for this same artifact as one of
+its own declared preconditions (see `specs/utils/precondition_gate.md`) —
+this is existing, independent enforcement, not something added by this
+section. So an `auto_validate: false` opt-out never lets an artifact reach
+review unvalidated; it only decides *when* the consultant pays validate's
+cost — automatically on every draft (the default), or once, on their own
+schedule, before requesting review (the opt-out). Auto-validation is a
+convenience that closes the "forgot to run it" gap for the common case; the
+gate that actually prevents unvalidated work from being reviewed was already
+there.
+
 ## Workflow Specification
 
 ---
@@ -124,6 +203,7 @@ inputs:
     - name: release_folder
       description: "Path to the release folder"
 preconditions: dynamic
+auto_validate: false          # validate runs dbt test (or the dbt Cloud API equivalent) against the real warehouse
 delegates_to:
   - utils/precondition_gate
 description: Generate dbt models following layered architecture (staging → integration → warehouse)
@@ -142,6 +222,8 @@ Follow `specs/utils/precondition_gate.md` before proceeding.
 ## Purpose
 
 Generate dbt models based on the data model design, following best practices for layered architecture. Creates staging, integration, and warehouse models with appropriate tests, documentation, and naming conventions.
+
+> **Per-layer alternative**: For very large dbt projects where you want to review/commit each layer independently rather than generating all three in one pass, use the per-layer commands instead: `/wire:dbt-staging-generate` → `/wire:dbt-staging-validate` → `/wire:dbt-integration-generate` → `/wire:dbt-integration-validate` → `/wire:dbt-warehouse-generate` → `/wire:dbt-warehouse-validate`, run in that order.
 
 ## Prerequisites
 
@@ -241,13 +323,14 @@ All generated models MUST follow these naming conventions:
 
 | Type | Pattern | Example |
 |------|---------|---------|
-| Primary Key | `<object>_pk` | `user_pk`, `transaction_pk` |
-| Foreign Key | `<referenced_object>_fk` | `user_fk`, `account_fk` |
+| Primary Key | `<entity>_pk`, generated via `dbt_utils.generate_surrogate_key(...)` | `user_pk`, `transaction_pk` |
+| Foreign Key | `<referenced_entity>_fk`, generated via `dbt_utils.generate_surrogate_key(...)` | `user_fk`, `account_fk` |
 | Natural Key | `<descriptive_name>_natural_key` | `salesforce_user_natural_key` |
-| Timestamp | `<event>_ts` | `created_ts`, `updated_ts`, `order_placed_ts` |
-| Timestamp (TZ) | `<event>_ts_<tz>` | `created_ts_ct`, `created_ts_pt` |
-| Boolean | `is_<state>` or `has_<thing>` | `is_active`, `has_subscription` |
-| Price/Revenue | Decimal format | `price` (19.99), `price_in_cents` if integer |
+| Date | `<event>_dt` | `user_created_dt` |
+| Timestamp (UTC) | `<event>_ts` — always assumed UTC unless otherwise indicated | `created_ts`, `updated_ts`, `order_placed_ts` |
+| Timestamp (non-UTC) | `<event>_<tz>_ts` — timezone tag inserted before `_ts` | `created_cet_ts`, `created_pt_ts` |
+| Boolean | `is_<state>`, `has_<thing>`, or `was_<event>` | `is_active`, `has_subscription`, `was_refunded` |
+| Revenue / Money | `<entity>_<measure>_amount` — decimal currency, converted from cents at the staging layer | `user_account_balance_amount` (not `price_in_cents`) |
 | Common fields | `<entity>_<field>` | `customer_name`, `carrier_name` (not just `name`) |
 
 **General Rules:**
@@ -258,19 +341,24 @@ All generated models MUST follow these naming conventions:
 - All objects are SINGULAR (e.g., `user` not `users`)
 
 **Key Generation:**
-- Primary keys: Generated using `{{ dbt_utils.surrogate_key(['source_id', 'source_system']) }}`
-- Foreign keys: Generated using `{{ dbt_utils.surrogate_key(['referenced_id', 'source_system']) }}`
+- Primary keys: Generated using `{{ dbt_utils.generate_surrogate_key(['source_id', 'source_system']) }}`
+- Foreign keys: Generated using `{{ dbt_utils.generate_surrogate_key(['referenced_id', 'source_system']) }}`
 - Natural keys: Preserved from source as `<source>_<entity>_natural_key`
+
+**Type Casting:**
+- Always use dbt's type-cast macros, never raw SQL types: `{{ dbt.type_string() }}`, `{{ dbt.type_numeric() }}`, `{{ dbt.type_boolean() }}`, `{{ dbt.type_timestamp() }}`, `{{ type_date() }}` (community macro, no `dbt.` prefix)
+- This keeps models portable across warehouses (BigQuery / Snowflake / Databricks / Postgres)
 
 #### Field Ordering Rules
 
 Fields in all models should follow this ordering:
 
-1. **Keys**: pk, fks, natural keys
-2. **Dates and timestamps**: All `_ts` fields
-3. **Attributes**: Dimensions/slicing fields (alphabetical within)
-4. **Metrics**: Measures/aggregatable values (alphabetical within)
-5. **Metadata**: `insert_ts`, `updated_ts`, `source_updated_ts`, etc.
+1. **Keys** — pk, fks, natural keys
+2. **Attributes** — dimensions, slicing fields, descriptive columns (alphabetical within)
+3. **Indexes / ranks** — `row_number()`, rank columns, sequence positions
+4. **Metrics** — measures, aggregatable values, `_amount` columns (alphabetical within)
+5. **Booleans** — `is_*`, `has_*`, `was_*` flags
+6. **Temporal data types** — `_dt`, `_ts` columns last
 
 #### SQL Style Rules
 
@@ -364,20 +452,20 @@ final as (
         <id_column> as <source>_<table>_natural_key,
         <foreign_key_column> as <referenced_table>_fk,
 
-        -- Dates and timestamps
-        cast(<date_column> as timestamp) as <event>_ts,
-
         -- Attributes (renamed for consistency)
         lower(trim(<source_column>)) as <standard_name>,
 
         -- Metrics
-        cast(<numeric_column> as integer) as <metric_name>,
+        cast(<numeric_column> as {{ dbt.type_numeric() }}) as <metric_name>,
 
-        -- Metadata
+        -- Booleans
         case
             when is_deleted = 'true' then true
             else false
         end as is_deleted,
+
+        -- Temporal data types
+        cast(<date_column> as {{ dbt.type_timestamp() }}) as <event>_ts,
         _fivetran_synced as source_updated_ts,
         current_timestamp() as dbt_loaded_ts
 
@@ -424,13 +512,13 @@ models:
 
 **Types of integration models:**
 
-#### Intermediate Models (`int__<entity>__<description>.sql`)
+#### Intermediate Models (`int_<group>__<entity>__<action>.sql`)
 
-For complex multi-step transformations:
+For complex multi-step transformations (action is a past-tense verb, e.g. `unioned`, `deduped`):
 
-**File**: `dbt/models/integration/intermediate/int__<entity>__<description>.sql`
+**File**: `dbt/models/integration/int_<group>/intermediate/int_<group>__<entity>__<action>.sql`
 
-**Example**: `int__student__extended_data.sql`
+**Example**: `int_core__student__extended_data.sql`
 
 ```sql
 {{
@@ -469,9 +557,9 @@ joined as (
 select * from joined
 ```
 
-#### Final Integration Models (`int__<entity>.sql`)
+#### Final Integration Models (`int_<group>__<entity>.sql`)
 
-**File**: `dbt/models/integration/int__<entity>.sql`
+**File**: `dbt/models/integration/int_<group>/int_<group>__<entity>.sql`
 
 ```sql
 {{
@@ -483,13 +571,13 @@ select * from joined
 
 with student_extended as (
 
-    select * from {{ ref('int__student__extended_data') }}
+    select * from {{ ref('int_core__student__extended_data') }}
 
 ),
 
 demographics as (
 
-    select * from {{ ref('int__student__demographics') }}
+    select * from {{ ref('int_core__student__demographics') }}
 
 ),
 
@@ -525,9 +613,9 @@ select * from final
 
 **Purpose**: Dimensional model ready for BI consumption
 
-#### Dimension Tables (`<entity>_dim.sql`)
+#### Dimension Tables (`wh_<group>__<entity>_dim.sql`)
 
-**File**: `dbt/models/warehouse/core/<entity>_dim.sql`
+**File**: `dbt/models/warehouse/wh_<group>/wh_<group>__<entity>_dim.sql`
 
 **For SCD Type 1 (current state only)**:
 ```sql
@@ -541,25 +629,23 @@ select * from final
 
 with base as (
 
-    select * from {{ ref('int__<entity>') }}
+    select * from {{ ref('int_<group>__<entity>') }}
 
 ),
 
 final as (
 
     select
-        -- Surrogate Key
+        -- Keys
         <entity>_pk,
-
-        -- Natural Key
-        <entity>_id,
+        <entity>_natural_key,
 
         -- Attributes
         <attribute_1>,
         <attribute_2>,
 
-        -- Metadata
-        current_timestamp() as dbt_updated_at
+        -- Temporal data types
+        current_timestamp() as dbt_updated_ts
 
     from base
 
@@ -581,7 +667,7 @@ select * from final
 
 with base as (
 
-    select * from {{ ref('int__<entity>') }}
+    select * from {{ ref('int_<group>__<entity>') }}
 
 ),
 
@@ -590,7 +676,7 @@ add_temporal_columns as (
     select
         *,
         current_timestamp() as valid_from,
-        cast('9999-12-31' as timestamp) as valid_to,
+        cast('9999-12-31' as {{ dbt.type_timestamp() }}) as valid_to,
         true as is_current
 
     from base
@@ -607,9 +693,9 @@ add_temporal_columns as (
 select * from add_temporal_columns
 ```
 
-#### Fact Tables (`<entity>_fct.sql`)
+#### Fact Tables (`wh_<group>__<entity>_fact.sql`)
 
-**File**: `dbt/models/warehouse/core/<entity>_fct.sql`
+**File**: `dbt/models/warehouse/wh_<group>/wh_<group>__<entity>_fact.sql`
 
 ```sql
 {{
@@ -634,9 +720,9 @@ dimension_joins as (
         dim2.dim2_pk
 
     from base
-    left join {{ ref('dim1') }} as dim1
+    left join {{ ref('wh_<group>__dim1_dim') }} as dim1
         on base.dim1_id = dim1.dim1_id
-    left join {{ ref('dim2') }} as dim2
+    left join {{ ref('wh_<group>__dim2_dim') }} as dim2
         on base.dim2_id = dim2.dim2_id
 
 ),
@@ -644,22 +730,20 @@ dimension_joins as (
 final as (
 
     select
-        -- Surrogate Key
+        -- Keys
         {{ dbt_utils.generate_surrogate_key(['<id_columns>']) }} as <fact>_pk,
-
-        -- Foreign Keys
         dim1_pk as dim1_fk,
         dim2_pk as dim2_fk,
 
-        -- Measures
-        <measure_1>,
-        <measure_2>,
+        -- Metrics
+        <measure_1_amount>,
+        <measure_2_amount>,
 
-        -- Derived Measures
-        case when <condition> then 1 else 0 end as <flag>,
+        -- Booleans
+        case when <condition> then true else false end as <flag>,
 
-        -- Metadata
-        current_timestamp() as dbt_updated_at
+        -- Temporal data types
+        current_timestamp() as dbt_updated_ts
 
     from dimension_joins
 
@@ -668,9 +752,9 @@ final as (
 select * from final
 ```
 
-#### Aggregate Tables (`<entity>_agg.sql`)
+#### Aggregate Tables (`wh_<group>__<entity>_agg.sql`)
 
-**File**: `dbt/models/warehouse/analytics/<entity>_agg.sql`
+**File**: `dbt/models/warehouse/wh_<group>/wh_<group>__<entity>_agg.sql`
 
 ```sql
 {{
@@ -683,7 +767,7 @@ select * from final
 
 with fact as (
 
-    select * from {{ ref('<entity>_fct') }}
+    select * from {{ ref('wh_<group>__<entity>_fact') }}
 
 ),
 
@@ -695,8 +779,8 @@ aggregated as (
 
         -- Aggregated Measures
         count(*) as total_count,
-        sum(<measure>) as total_<measure>,
-        avg(<measure>) as avg_<measure>
+        sum(<measure>) as total_<measure>_amount,
+        avg(<measure>) as avg_<measure>_amount
 
     from fact
     group by 1, 2
@@ -705,6 +789,12 @@ aggregated as (
 
 select * from aggregated
 ```
+
+#### Cross-Attribute / Bridge Tables (`wh_<group>__<entity>_xa.sql`)
+
+**File**: `dbt/models/warehouse/wh_<group>/wh_<group>__<entity>_xa.sql`
+
+For bridge / many-to-many / cross-entity attribute models (e.g. user-to-role, product-to-category), joining two or more dimension surrogate keys with no measures of their own.
 
 ### Step 5.5: Multi-Source Framework (If Applicable)
 
@@ -715,14 +805,14 @@ When integrating data from **multiple source systems** where the same entities (
 #### Architecture Overview
 
 ```
-Sources Layer (stg_*) → Integration Layer (int_*) → Warehouse Layer (*_dim/*_fct)
+Sources Layer (stg_*) → Integration Layer (int_<group>__*) → Warehouse Layer (wh_<group>__*_dim/*_fact)
 ```
 
 | Layer | Purpose | Naming | Materialization |
 |-------|---------|--------|-----------------|
 | **Sources** | Source-specific transformations, column standardization, ID prefixing | `stg_<source>__<object>.sql` | view |
-| **Integration** | Cross-source entity resolution, deduplication, merging | `int__<object>.sql` | view or table |
-| **Warehouse** | Final dimensional models with surrogate keys | `<object>_dim.sql`, `<object>_fct.sql` | table |
+| **Integration** | Cross-source entity resolution, deduplication, merging | `int_<group>__<object>.sql` | view or table |
+| **Warehouse** | Final dimensional models with surrogate keys | `wh_<group>__<object>_dim.sql`, `wh_<group>__<object>_fact.sql` | table |
 
 #### Configuration-Driven Source Management
 
@@ -778,7 +868,7 @@ renamed as (
         -- PRIMARY KEY: Prefixed with source identifier
         concat(
             '{{ var("stg_hubspot_crm_id-prefix") }}',
-            cast(companyid as string)
+            cast(companyid as {{ dbt.type_string() }})
         ) as company_id,
 
         -- BUSINESS KEY: Standardized for matching across sources
@@ -796,8 +886,9 @@ renamed as (
         properties_phone as company_phone,
 
         -- TIMESTAMPS
-        cast(properties_createdate as timestamp) as company_created_ts,
-        cast(properties_hs_lastmodifieddate as timestamp)
+        cast(properties_createdate as {{ dbt.type_timestamp() }})
+            as company_created_ts,
+        cast(properties_hs_lastmodifieddate as {{ dbt.type_timestamp() }})
             as company_last_modified_ts,
 
         -- SOURCE METADATA
@@ -838,7 +929,7 @@ select * from renamed
 #### Step 3: Integration Layer — Entity Deduplication and Merging
 
 ```sql
--- models/integration/int__company.sql
+-- models/integration/int_crm/int_crm__company.sql
 
 {% if var('crm_warehouse_company_sources') %}
 
@@ -892,14 +983,14 @@ select * from final
 #### Step 4: Warehouse Layer — Dimension with Surrogate Key
 
 ```sql
--- models/warehouse/core/company_dim.sql
+-- models/warehouse/wh_crm/wh_crm__company_dim.sql
 
 {% if var("crm_warehouse_company_sources") %}
 
 {{ config(materialized='table', unique_key='company_pk') }}
 
 with companies as (
-    select * from {{ ref('int__company') }}
+    select * from {{ ref('int_crm__company') }}
 ),
 
 final as (
@@ -928,11 +1019,11 @@ select * from final
 -- Join fact tables to dimensions using the array of source IDs:
 
 with invoices as (
-    select * from {{ ref('int__invoice') }}
+    select * from {{ ref('int_finance__invoice') }}
 ),
 
 companies_dim as (
-    select * from {{ ref('company_dim') }}
+    select * from {{ ref('wh_crm__company_dim') }}
 ),
 
 final as (
@@ -969,16 +1060,17 @@ models/
 │       ├── _harvest_projects__sources.yml
 │       └── stg_harvest_projects__company.sql
 ├── integration/
-│   ├── _integration__schema.yml
-│   ├── int__company.sql
-│   └── int__contact.sql
+│   └── int_crm/
+│       ├── _integration__schema.yml
+│       ├── int_crm__company.sql
+│       └── int_crm__contact.sql
 └── warehouse/
-    ├── core/
-    │   ├── _core__schema.yml
-    │   └── company_dim.sql
-    └── finance/
-        ├── _finance__schema.yml
-        └── invoice_fct.sql
+    ├── wh_crm/
+    │   ├── _wh_crm__schema.yml
+    │   └── wh_crm__company_dim.sql
+    └── wh_finance/
+        ├── _wh_finance__schema.yml
+        └── wh_finance__invoice_fact.sql
 
 macros/
 └── merge_sources.sql
@@ -1046,15 +1138,15 @@ data/
 
 **Schema.yml Location:**
 - Every subdirectory should contain a `.yml` file
-- Named after directory: `stg_<source>.yml`, `integration.yml`, `core.yml`
+- Named after directory: `stg_<group>.yml`, `int_<group>/integration.yml`, `wh_<group>.yml`
 
-**File**: `dbt/models/warehouse/core/core.yml`
+**File**: `dbt/models/warehouse/wh_<group>/wh_<group>.yml`
 
 ```yaml
 version: 2
 
 models:
-  - name: <entity>_dim
+  - name: wh_<group>__<entity>_dim
     description: "Dimension table for <entity>"
     columns:
       - name: <entity>_pk
@@ -1062,12 +1154,12 @@ models:
         tests:
           - not_null
           - unique
-      - name: <entity>_id
+      - name: <entity>_natural_key
         description: "Natural key"
         tests:
           - not_null
 
-  - name: <entity>_fct
+  - name: wh_<group>__<entity>_fact
     description: "Fact table for <entity> at <grain> grain"
     columns:
       - name: <entity>_pk
@@ -1076,11 +1168,11 @@ models:
           - not_null
           - unique
       - name: <dimension>_fk
-        description: "Foreign key to <dimension>_dim"
+        description: "Foreign key to wh_<group>__<dimension>_dim"
         tests:
           - not_null
           - relationships:
-              to: ref('<dimension>_dim')
+              to: ref('wh_<group>__<dimension>_dim')
               field: <dimension>_pk
 ```
 
@@ -1225,6 +1317,16 @@ capitalisation_policy = lower
    ```
 3. Write updated status.md
 
+### Step 10.5: Sync to Document Store (Optional)
+
+If a document store is configured for this project, follow the workflow in `specs/utils/docstore_sync.md`:
+- `artifact_id`: `dbt`
+- `artifact_name`: `dbt Models Summary`
+- `file_path`: `.wire/<project_id>/dev/dbt_models_summary.md`
+- `project_id`: the release folder path
+
+If docstore sync fails, log the error and continue — do not block the generate command.
+
 ### Step 11: Sync to Jira (Optional)
 
 Follow the Jira sync workflow in `specs/utils/jira_sync.md`:
@@ -1251,22 +1353,22 @@ Follow the Jira sync workflow in `specs/utils/jira_sync.md`:
 ```
 dbt/models/
 ├── staging/
-│   └── <source>/
-│       ├── stg_<source>__<table>.sql (x[count])
-│       └── stg_<source>.yml
+│   └── <group>/
+│       ├── stg_<group>__<entity>.sql (x[count])
+│       └── stg_<group>.yml
 ├── integration/
-│   ├── intermediate/
-│   │   └── int__<entity>__<desc>.sql (x[count])
-│   ├── int__<entity>.sql (x[count])
-│   └── integration.yml
+│   └── int_<group>/
+│       ├── intermediate/
+│       │   └── int_<group>__<entity>__<action>.sql (x[count])
+│       ├── int_<group>__<entity>.sql (x[count])
+│       └── integration.yml
 └── warehouse/
-    ├── core/
-    │   ├── <entity>_dim.sql (x[count])
-    │   ├── <entity>_fct.sql (x[count])
-    │   └── core.yml
-    └── analytics/
-        ├── <entity>_agg.sql (x[count])
-        └── analytics.yml
+    └── wh_<group>/
+        ├── wh_<group>__<entity>_dim.sql (x[count])
+        ├── wh_<group>__<entity>_fact.sql (x[count])
+        ├── wh_<group>__<entity>_xa.sql (x[count])
+        ├── wh_<group>__<entity>_agg.sql (x[count])
+        └── wh_<group>.yml
 ```
 
 ### Next Steps
@@ -1310,15 +1412,10 @@ s_salesforce_contact as (
 final as (
     select
         -- Keys
-        {{ dbt_utils.surrogate_key(['id', "'salesforce'"]) }}
+        {{ dbt_utils.generate_surrogate_key(['id', "'salesforce'"]) }}
             as contact_pk,
         id as salesforce_contact_natural_key,
         account_id as salesforce_account_natural_key,
-
-        -- Dates and timestamps
-        cast(created_date as timestamp) as created_ts,
-        cast(last_modified_date as timestamp) as updated_ts,
-        cast(last_activity_date as date) as last_activity_date,
 
         -- Attributes
         lower(trim(email)) as email,
@@ -1331,14 +1428,19 @@ final as (
         trim(mailing_country) as country,
 
         -- Metrics
-        cast(number_of_employees as integer) as employee_count,
+        cast(number_of_employees as {{ dbt.type_numeric() }}) as employee_count,
 
-        -- Metadata
+        -- Booleans
         case
             when is_deleted = 'true' then true
             else false
         end as is_deleted,
-        cast(system_modstamp as timestamp) as source_updated_ts
+
+        -- Temporal data types
+        cast(created_date as {{ dbt.type_timestamp() }}) as created_ts,
+        cast(last_modified_date as {{ dbt.type_timestamp() }}) as updated_ts,
+        cast(last_activity_date as {{ type_date() }}) as last_activity_dt,
+        cast(system_modstamp as {{ dbt.type_timestamp() }}) as source_updated_ts
 
     from s_salesforce_contact
     where is_deleted = 'false'
@@ -1350,7 +1452,7 @@ select * from final
 ### Integration Model Example
 
 ```sql
--- int__contact.sql
+-- int_core__contact.sql
 with
 
 s_salesforce_contact as (
@@ -1419,7 +1521,7 @@ select * from final
 ### Warehouse Dimension Example
 
 ```sql
--- contact_dim.sql
+-- wh_core__contact_dim.sql
 {{
   config(
     materialized = 'table',
@@ -1431,11 +1533,11 @@ select * from final
 with
 
 s_contact as (
-    select * from {{ ref('int__contact') }}
+    select * from {{ ref('int_core__contact') }}
 ),
 
 s_account as (
-    select * from {{ ref('int__account') }}
+    select * from {{ ref('int_core__account') }}
 ),
 
 final as (
@@ -1444,25 +1546,23 @@ final as (
         s_contact.contact_pk,
         s_account.account_pk as account_fk,
 
-        -- Timestamps
-        s_contact.created_ts,
-        s_contact.updated_ts,
-
-        -- Contact attributes
+        -- Attributes
         s_contact.email as contact_email,
         concat(s_contact.first_name, ' ', s_contact.last_name)
             as contact_full_name,
-
-        -- Account attributes (denormalized)
         s_account.account_name,
         s_account.account_industry,
 
-        -- Flags
+        -- Booleans
         s_contact.has_email as is_emailable,
         case
             when s_contact.source_system = 'salesforce' then true
             else false
-        end as is_salesforce_contact
+        end as is_salesforce_contact,
+
+        -- Temporal data types
+        s_contact.created_ts,
+        s_contact.updated_ts
 
     from s_contact
     left join s_account
@@ -1485,8 +1585,8 @@ models:
     columns:
       - name: contact_pk
         description: |
-          Primary key for contact. Generated using surrogate_key from
-          Salesforce ID and source system name.
+          Primary key for contact. Generated using generate_surrogate_key
+          from Salesforce ID and source system name.
         tests:
           - unique
           - not_null
@@ -1508,7 +1608,7 @@ models:
           - accepted_values:
               values: ['web', 'referral', 'partner', 'event', 'other']
 
-  - name: contact_dim
+  - name: wh_core__contact_dim
     description: |
       Contact dimension for BI consumption. Contains unified contact
       information from all sources.
@@ -1523,7 +1623,7 @@ models:
         description: Foreign key to account dimension
         tests:
           - relationships:
-              to: ref('account_dim')
+              to: ref('wh_core__account_dim')
               field: account_pk
 ```
 
@@ -1531,18 +1631,20 @@ models:
 
 Before committing a dbt model:
 
-- [ ] Filename follows naming convention (`stg_`, `int__`, `_dim`, `_fct`)
-- [ ] File in correct directory (`staging/`, `integration/`, `warehouse/`)
+- [ ] Filename follows the `<layer>_<group>__<entity>(_dim|_fact|_agg|_xa).sql` naming pattern (`stg_`, `int_<group>__`, `wh_<group>__`)
+- [ ] File in the correct entity-group subfolder (`stg_<group>/`, `int_<group>/`, `warehouse/wh_<group>/`)
 - [ ] All refs/sources in CTEs at top (prefixed with `s_`)
 - [ ] Final CTE exists and is selected from
 - [ ] 4-space indentation, < 80 char lines
 - [ ] All fields lowercase
-- [ ] Primary key: `<object>_pk` with `surrogate_key`
-- [ ] Foreign keys: `<object>_fk` with `surrogate_key`
-- [ ] Timestamps: `<event>_ts`
-- [ ] Booleans: `is_` or `has_` prefix
+- [ ] Primary key: `<entity>_pk` generated via `dbt_utils.generate_surrogate_key` (not `surrogate_key`)
+- [ ] Foreign keys: `<entity>_fk` generated via `dbt_utils.generate_surrogate_key`
+- [ ] Dates: `_dt`. Timestamps: `_ts` (UTC) or `_<tz>_ts` (non-UTC, timezone before `_ts`)
+- [ ] Booleans: `is_`, `has_`, or `was_` prefix
+- [ ] Revenue / money columns: `_amount` suffix
+- [ ] Type casts use `{{ dbt.type_*() }}` / `{{ type_date() }}` macros, not raw SQL types
 - [ ] Explicit joins (`inner join`, `left join`)
-- [ ] Field ordering correct (keys, dates, attributes, metrics, metadata)
+- [ ] Field ordering correct: keys → attributes → indexes/ranks → metrics → booleans → temporal data types
 - [ ] Configuration appropriate for layer
 - [ ] Schema.yml entry exists
 - [ ] Primary key has `unique` + `not_null` tests
@@ -1617,6 +1719,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -1701,6 +1807,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

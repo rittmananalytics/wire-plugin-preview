@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -156,7 +161,7 @@ Resolve release folder. Read both documents.
 
 #### Point estimation checks
 - [ ] **No 13-point stories**: Scan all stories — flag any with 13+ points as requiring breakdown
-- [ ] **Points sum to a reasonable total**: Total points ÷ daily velocity ≤ appetite in working days (+ 20% buffer is acceptable)
+- [ ] **Points sum to a reasonable total**: see "Appetite budget check" below — total points must fit within the velocity-derived capacity for the confirmed batch size, after holding back the buffer for unknowns and rework
 - [ ] **No 0-point stories**: Every story has a non-zero point estimate
 - [ ] **Epic subtotals correct**: Each epic's subtotal matches the sum of its story points
 
@@ -169,11 +174,14 @@ Resolve release folder. Read both documents.
 - [ ] **Stories have owners**: At least 80% of stories have an assigned owner (or "TBD" with a plan to assign)
 - [ ] **Definition of Done present**: The sprint plan includes a definition of done
 
+#### Reference legibility
+- [ ] **reference_legibility**: Every release-brief deliverable code cited (D-n) is paired with its plain-language name at first mention or resolved in the Reference key table — run the check per `specs/utils/reference_legibility.md`
+
 #### Appetite budget check
-- [ ] **Total points vs appetite**:
-  - Small batch (1–2 weeks): total points should be ≤ 40 (8 hours × 5 points × 10 days, with buffer)
-  - Big batch (6 weeks): total points should be ≤ 120 (5 points × 5 days × 6 weeks, with buffer)
-  - Flag if total exceeds the appetite budget by >20%
+- [ ] **Total points vs appetite**: capacity = velocity (5 points/day, per generate.md's velocity assumption) × working days in the appetite, minus the buffer held back for unknowns and rework (20% by default — see the sprint plan's own "Buffer" line for the confirmed %)
+  - Small batch (1–2 weeks = 10 working days): total points should be ≤ 40 (5 × 10 × 0.8)
+  - Big batch (6 weeks = 30 working days): total points should be ≤ 120 (5 × 30 × 0.8)
+  - PASS if total points ≤ budget; WARNING if total points ≤ budget × 1.2 (over budget but within a 20% tolerance); FAIL beyond that
 
 ### Step 3: Produce Validation Report
 
@@ -199,6 +207,7 @@ Resolve release folder. Read both documents.
 | All deliverables covered | ✅ PASS | |
 | Sprint goals defined | ✅ PASS | |
 | Definition of done present | ✅ PASS | |
+| reference_legibility | ✅ PASS | all 6 codes defined at first use or in the Reference key |
 
 ## Issues to Resolve
 
@@ -229,6 +238,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -313,6 +326,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

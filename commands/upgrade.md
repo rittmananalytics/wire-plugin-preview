@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -228,7 +233,7 @@ If the template file cannot be found, surface a clear error:
 Template not found for release_type: <type>
 Expected: <path>
 
-If this is a custom release type, run /wire:custom/define <release-folder> to update it.
+If this is a custom release type, run /wire:custom-define <release-folder> to update it.
 ```
 
 Read and parse the template YAML frontmatter as `template_schema`.
@@ -291,12 +296,53 @@ If the write fails, surface the error and leave the original file unchanged.
 
 ---
 
+### Step 6a: Backfill the tenant predicate registry (v3.11.3, carve-out releases only)
+
+Applies only when `release_type` is a migration type and `migration.scope == tenant_carveout`. Skip silently otherwise.
+
+If `migration/tenant_predicate_registry.csv` is absent and `migration/region_tags.csv` (or `region_tags_adjudicated.csv`, preferred when present) exists, create the registry by applying the seed table in `specs/utils/tenant_predicate_registry.md` to the existing buckets — the same seed `region-tagging-generate` Step 5b would have written. Set `provenance` to `backfilled by /wire:upgrade from region_tags` and leave `verified_date` empty: a backfilled row is a seed, not a verified mechanism. Write the backfilled rows with a CSV writer under the write contract in `specs/utils/tenant_predicate_registry.md` (comma-bearing expressions double-quoted, internal quotes doubled, #200).
+
+Under `--dry-run`, report the row count that would be created and the resulting `unresolved` count, and write nothing. Never overwrite an existing registry file, and never invent a mechanism for an item the region tags do not cover — an item with no bucket seeds `unresolved`, which is the correct answer and the one that keeps it out of an unfiltered comparison.
+
+Report in the summary: `Registry backfilled: N rows (M unresolved — resolve via /wire:dbt-carveout-relocate-generate or a ruling at region-tagging-review).`
+
+---
+
+### Step 6b: Add the cross-release linkage columns to the migration register (#180, migration releases only)
+
+Applies only when `release_type` is a migration type and `migration/migration_register.csv` exists. Skip silently otherwise.
+
+If the register header lacks any of `parent_release`, `parent_model`, `parent_verdict_ref`, insert the missing columns between `pr_url` and `notes` (matching `TEMPLATES/migration/migration_register.csv`) with every existing row's new cells blank. Blank is the correct backfill: linkage is written by `dbt-carveout-relocate-generate` at relocate time, and inventing it retroactively would fabricate evidence references. For a carve-out release whose relocated rows predate the columns (`origin: relocate` in `notes`, blank `parent_release`), report them so the consultant can backfill from the parent register deliberately: `N relocated row(s) have no parent linkage — re-run /wire:dbt-carveout-relocate-generate for their waves, or backfill parent_release/parent_model by hand from the parent register.`
+
+Under `--dry-run`, report the columns that would be added and the unlinked relocated-row count, and write nothing.
+
+---
+
+### Step 6c: Re-resolve legacy dbt-relative `bq_target` values (#201, migration releases only)
+
+Applies only when `release_type` is a migration type and `migration/migration_register.csv` exists. Skip silently otherwise.
+
+Registers written before #201 carry `bq_target` as a dbt-relative two-segment value (e.g. `de_source_project.orders`); from #201 it is the fully qualified physical relation (`project.dataset.table`), the form `equivalency-validate` Step 1g and `equivalency-post-merge-verify` resolve against. For every `object_type` `model` or `snapshot` row whose `bq_target` is non-blank with exactly two dot-separated segments, re-resolve the physical path from the target-side dbt manifest: parse the project that builds the translated models via `specs/utils/dbt_manifest_parse.md` (the client repo's dbt project where models have merged; else the release's delivery tree under `migration/dbt/` where it parses), look up the row's model by name, and write `<database/project>.<schema>.<alias>` (the model name only when no alias is set, dbt's own fallback).
+
+Never overwrite a three-segment value, and never compose a path from the model name when the manifest has no node for it: leave the legacy value in place and report the row; consumers classify it `unresolved_target` until it is resolved. Rows of `object_type` `metabase_card`/`metabase_dashboard` are exempt (their `bq_target` is a connection + database reference, not a warehouse relation).
+
+Under `--dry-run`, report the counts (rows that would be re-resolved, rows with no manifest node) and write nothing.
+
+Report in the summary: `bq_target backfilled: N rows re-resolved from the manifest (M unresolved: re-run /wire:dbt-migration-generate for those models, or resolve by hand).`
+
+---
+
 ### Step 7: Surface New Commands
 
 Based on `release_type` and the detected additions, report any commands that are now available but were not present in the installed version when the release was created. Use the following known command introductions as the reference:
 
 | Added in | Commands | Relevant release types |
 |---|---|---|
+| v3.11.3 | (schema, not commands) per-item tenant predicate registry `migration/tenant_predicate_registry.csv`, read by equivalency-validate, bulk-copy, carveout-relocate and defer-build; carve-out predicate resolution ladder in `dbt-carveout-relocate-generate`; sibling-naming cross-check in region tagging | `platform_migration` with `migration.scope: tenant_carveout` — see the registry backfill in Step 6a |
+| v3.11.2 | (packaging and process, no new commands) shared specs ship in both packages; `dbt-migration-batch-raise --allow-stack-depth` with stacked batches refused by default | `platform_migration`, `data_warehouse_migration` |
+| v3.11.1 | (carve-out adaptation, no new commands) relocate-mode equivalency via `migration.parent_target_project`; relocate register writes + gate chain; defer-build tenant guard; residency-gated `ship_then_verify`; `utils-ci-parity --scaffold-from`; region-tagging roles rule | `platform_migration` with `migration.scope: tenant_carveout` |
+| v3.11.0 | `/wire:dbt-migration-defer-build`, `/wire:dbt-migration-batch-raise`, `/wire:equivalency-post-merge-verify`, `/wire:utils-ci-parity` | `platform_migration`, `data_warehouse_migration` — the ship-and-verify pipeline beyond "migrated": cost-guarded sandbox builds, register-driven PR batches, client CI parity, post-merge production verification |
+| v3.11.0 | (schema, not commands) register columns `delivery_stage`/`pr_url`; append-only verdict log `migration/migration_verdict_log.csv`; verdict taxonomy replacing pass/fail; `migration.gate_policy`/`client_repos`/`cost_controls` status keys | `platform_migration`, `data_warehouse_migration` — the upgrade adds missing keys/columns with defaults; existing `pass`/`fail` verdicts stay valid, legacy `info` reads as `pass_qualified` |
 | v3.10.3 | `/wire:migration-batching-generate\|validate\|review` | `platform_migration`, `data_warehouse_migration` — domain-batch scheduling, checked against the real dependency graph; distinct from `dbt_audit`'s translation batches |
 | v3.10.2 | `/wire:migration-register-generate\|validate`, `/wire:migration-drift-generate\|validate` | `platform_migration`, `data_warehouse_migration` — per-model state store and scheduled drift gate for a migration running against a moving source |
 | v3.10.1 | `/wire:region-tagging-*`, `/wire:data-residency-assessment-*`, `/wire:bulk-copy-migration-*`, `/wire:logical-access-uat-*` | `platform_migration` with `migration.scope: tenant_carveout` only |
@@ -306,8 +352,8 @@ Based on `release_type` and the detected additions, report any commands that are
 | v3.9.0 | `/wire:delegate` | all — batch dispatch to specialist local subagents for pending artifact work |
 | v3.8.0 | `/wire:droughty-*` (9 commands) | all — can be added to any release as an optional phase |
 | v3.8.1 | `/wire:dbt-migration-lint` | `platform_migration`, `data_warehouse_migration`, `dbt_development` |
-| v3.7.x | `/wire:utils/delivery-forecast` | all |
-| v3.5.x | `/wire:utils/doc-analyze`, `/wire:custom/define` | all |
+| v3.7.x | `/wire:utils-delivery-forecast` | all |
+| v3.5.x | `/wire:utils-doc-analyze`, `/wire:custom-define` | all |
 
 Only surface commands where the release's `wire_plugin_version` (before this upgrade) is older than the version in which the command was added. If `wire_plugin_version` was absent (first upgrade), surface all commands not already reflected in the status.md structure.
 
@@ -370,6 +416,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -454,6 +504,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

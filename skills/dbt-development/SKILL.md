@@ -36,7 +36,7 @@ This skill should activate when users:
 **Keywords to watch for:**
 - "dbt model", "staging", "integration", "warehouse", "intermediate"
 - "refactor", "review", "validate", "check conventions"
-- "stg_", "int_", "_dim", "_fct"
+- "stg_", "int_", "_dim", "_fact"
 - "schema.yml", "tests", "dbt test"
 - "multi-source", "entity resolution", "deduplication", "merge sources"
 - "enable source", "disable source", "add source", "remove source"
@@ -49,7 +49,7 @@ This skill should activate when users:
 - You detect .sql files in a models/ directory structure
 - User asks to "write SQL" in a dbt project context
 - You're reviewing changes in a dbt project
-- Working with files that match dbt patterns (stg_, int_, _dim, _fct)
+- Working with files that match dbt patterns (stg_, int_, _dim, _fact)
 
 **Example internal triggers:**
 - "I'll create a staging model for..." → Activate skill first
@@ -58,9 +58,9 @@ This skill should activate when users:
 
 ## Instructions
 
-### 0. Load Convention Source
+### 0. Load Convention Source and Run the Deterministic Lint
 
-**Priority Order (2-tier system):**
+**Priority order (3-tier system) for the narrative conventions you apply by judgment:**
 1. **Project-specific conventions** (highest priority)
    - Check for `.dbt-conventions.md` in project root
    - Check for `dbt_coding_conventions.md` in project root
@@ -75,6 +75,37 @@ This skill should activate when users:
 - If found, use `Read` to load project conventions
 - If not found, read `conventions-reference.md` and `testing-reference.md` from this skill's directory
 - Note which source is being used in validation output
+
+**Machine-checkable rules — run the linter, don't re-derive it by eye.**
+Naming patterns, forbidden constructs, and the other mechanical checks in
+this skill also live in a machine-readable convention file, checked by a
+script rather than your own semantic read of the model. Resolve which
+convention file applies (client override wins, same precedence idea as
+above):
+
+1. `.wire/conventions/dbt.yml` in the client project, if present (client
+   house style always wins).
+2. `wire/conventions/dbt.yml` next to this skill's framework installation
+   (synced from the private `wire-process-registry` — see
+   `wire/schemas/convention-schema.md`).
+
+Run it against the model(s) you're about to validate or have just written:
+
+```
+python3 wire/scripts/lint_conventions.py --domain dbt \
+  --convention <resolved dbt.yml path> --path <model file or models/ dir> \
+  --format json
+```
+
+Treat its findings as ground truth for the rules it covers (filename
+patterns, column-alias suffixes tied to type-cast macros, bare `join`,
+`union distinct`, the `final` CTE, layer boundary violations, missing
+primary-key tests) — don't re-argue a pass/fail the linter already gave you.
+Everything the linter doesn't cover (documented in the YAML as advisory —
+grain choice, CTE quality, whether a join direction makes sense) is still
+your call, applied through Steps 1–5 below. If the linter isn't available
+(no Python/PyYAML in the environment), fall back to the fully manual review
+below and say so in your output.
 
 ---
 
@@ -105,6 +136,12 @@ When working with a dbt model, determine:
 ---
 
 ### 2. Validate Naming Conventions
+
+File naming, column-suffix, and layer-boundary violations are already
+reported by the Step 0 lint run (`file_naming`, `naming`, `layer_rules` in
+`dbt.yml`) — pull those findings in rather than re-deriving them here. What
+follows is the full convention for context and for anything the lint
+couldn't check (e.g. singular/plural entity names).
 
 **Check the following:**
 
@@ -394,6 +431,11 @@ Use `{# keys #}`, `{# attributes #}`, `{# metrics #}`, `{# booleans #}`, `{# tem
 
 ### 6. Validate Testing Coverage
 
+Primary-key test coverage and warehouse-column documentation gaps are
+already reported by the Step 0 lint run against the model's `schema.yml`
+(`testing` / `documentation` in `dbt.yml`) — check those findings before
+re-scanning by hand.
+
 **Minimum Testing Requirements:**
 
 **Every Model:**
@@ -609,7 +651,7 @@ Sources Layer (stg_*) → Integration Layer (int_*) → Warehouse Layer (wh_*)
 |-------|---------|--------|-----------------|
 | **Sources** | Source-specific transformations, column standardization, ID prefixing | `stg_<source>__<object>.sql` | view |
 | **Integration** | Cross-source entity resolution, deduplication, merging | `int__<object>.sql` | view or table |
-| **Warehouse** | Final dimensional models with surrogate keys | `<object>_dim.sql`, `<object>_fct.sql` | table |
+| **Warehouse** | Final dimensional models with surrogate keys | `<object>_dim.sql`, `<object>_fact.sql` | table |
 
 ### Configuration-Driven Source Management
 
@@ -925,7 +967,7 @@ select * from final
 Join fact tables to dimensions using the array of source IDs:
 
 ```sql
--- models/warehouse/finance/invoice_fct.sql
+-- models/warehouse/finance/invoice_fact.sql
 
 {% if var("finance_warehouse_invoice_sources") %}
 
@@ -1037,8 +1079,8 @@ models/
     │   └── contact_dim.sql
     └── finance/
         ├── _finance__schema.yml
-        ├── invoice_fct.sql
-        └── payment_fct.sql
+        ├── invoice_fact.sql
+        └── payment_fact.sql
 
 macros/
 └── merge_sources.sql

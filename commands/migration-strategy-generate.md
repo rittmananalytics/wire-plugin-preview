@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -102,6 +107,80 @@ with open('.wire/releases/<release_folder>/trace.jsonl', 'a') as f:
 {"ts":"2026-07-05T14:34:47Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"step","step":"5","step_name":"Carry reference pointers forward","result":null,"detail":"account_dim mapped to subscription-commerce's subscriber entity — generation_constraints and reference_implementation pointer carried into data_model_specification.md. subscription_fct mapped to subscription entity, same treatment. contact_identity_map (new, from crm_identity_resolution) added as its own integration model with that pattern's reference_implementation pointer."}
 {"ts":"2026-07-05T14:41:15Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"command_end","step":null,"step_name":null,"result":"complete","detail":"Generated data_model_specification.md — 14 models (5 staging, 4 integration, 5 warehouse), including 2 informed by the accepted registry proposals above."}
 ```
+
+## Automatic Validation (on by default)
+
+---
+description: Internal utility — injected auto-validate section so generate commands run their matching validate step automatically and fold the result into their output
+---
+
+Every `generate` command that has a matching `validate` command for the
+same artifact runs that validate step automatically as part of generate —
+by default, with no separate command to remember. This section only appears
+on commands where that applies; artifacts with no separate validate step at
+all (e.g. mockups, workshops, UAT) never carry this section.
+
+## Step: Check `auto_validate`
+
+Read this command's own `auto_validate` front-matter field, in the Workflow
+Specification below. Two states:
+
+- **Absent, or `true`** (the default — most artifacts): auto-validate runs.
+- **`false`**: this artifact's validate step is expensive — it runs real
+  code, queries a live warehouse or BI tool, or otherwise does IO beyond
+  re-reading local files — so it does not run automatically. Skip to
+  "If `auto_validate: false`" below.
+
+## If `auto_validate` is absent or `true`: run validate automatically
+
+Once this command finishes writing its artifact, before ending:
+
+1. Run this artifact's own `/wire:<artifact-with-dashes>-validate` workflow
+   in full, exactly as if the consultant had typed it themselves — same
+   inputs, same `status.md` write to `artifacts.<artifact>.validate`, same
+   report. This is not optional or an extra step layered on top; it is the
+   default behavior for this artifact.
+2. Fold the result into this command's own closing output rather than
+   presenting it as a separate command run:
+   - **PASS** — add a single closing line: `✅ Auto-validated — PASS`. The
+     full report already went to `status.md`/`execution_log.md`, exactly as
+     it would from a standalone validate run — no need to repeat it here.
+   - **FAIL** — surface the validate command's own failure report in full,
+     exactly as running validate standalone would show it, so the
+     consultant sees what's wrong immediately without running anything
+     else themselves.
+3. This never blocks or undoes generate itself — the artifact is written
+   either way, and its content is never rolled back because validate
+   failed. Auto-validation only means validate has already run and its
+   result is already on record by the time generate finishes, instead of
+   waiting for the consultant to remember to run it separately.
+
+## If `auto_validate` is `false`: state this plainly, don't run it
+
+Do not run validate. End with a line naming why, as specifically as this
+spec's own context makes possible (e.g. "runs `dbt run`/`dbt test`",
+"queries the live target warehouse", "calls the Looker API directly") —
+fall back to "performs live checks against an external system" only if no
+more specific reason is evident from context:
+
+```
+⚠ This artifact's validate step [reason] and does not run automatically.
+Run /wire:<artifact-with-dashes>-validate <release_folder> before
+requesting review — review is blocked until it passes.
+```
+
+## Why this is always safe either way
+
+`review` already requires `validate: PASS` for this same artifact as one of
+its own declared preconditions (see `specs/utils/precondition_gate.md`) —
+this is existing, independent enforcement, not something added by this
+section. So an `auto_validate: false` opt-out never lets an artifact reach
+review unvalidated; it only decides *when* the consultant pays validate's
+cost — automatically on every draft (the default), or once, on their own
+schedule, before requesting review (the opt-out). Auto-validation is a
+convenience that closes the "forgot to run it" gap for the common case; the
+gate that actually prevents unvalidated work from being reviewed was already
+there.
 
 ## Workflow Specification
 
@@ -191,6 +270,13 @@ For **snowflake → bigquery** only, decide per layer whether to use the BigQuer
 - **Materialisation**: the default is **faithful preservation** — `dbt-migration-generate` carries each model's resolved materialisation across unchanged (incremental stays incremental with its strategy/partition/cluster, table stays table). Do not set a blanket materialisation default. If this engagement needs to *diverge* from the source — force a materialisation a model didn't have on the source — declare it as policy in a YAML file and point `migration.materialization_overrides_path` (in `status.md`) at it. The file's schema is `default: preserve` plus an `overrides` list of `select` / `exclude` / `force_materialized` rules (see the dbt-migration generate spec). Divergence is an opt-in optimisation, so it lives in engagement policy, never as a Wire default. Record each override rule and its rationale here. Client-specific rule *values* and the file live in the engagement (e.g. `.wire/engagement/<file>.yml`), not in the framework spec.
 - Partition/cluster configuration equivalents
 
+**Snapshot migration approach**: For every snapshot in the inventory (the `snapshot` object type), assign a per-snapshot migration strategy. A dbt snapshot is an SCD-2 history table whose closed versions cannot be regenerated from the current source — re-running the snapshot from empty on the target loses all history and breaks any downstream model that reads `dbt_valid_from`/`dbt_valid_to`. Two strategies:
+
+- **`copy_and_continue`** (default, every snapshot unless explicitly overridden): copy the built snapshot table source→target preserving payload + SCD meta columns (`bulk-copy-migration-generate` in carve-out, or the copy path in a full migration), then run `dbt snapshot --select <snap>` once on the target to adopt and continue the history. This preserves every closed version. It is the default because it is the only strategy that keeps history, and it must not require a sign-off.
+- **`rebuild_from_T`** (opt-in, requires a recorded data-owner sign-off): abandon the source history and start the target snapshot fresh from the baseline instant `T`. Only legitimate when the data owner has signed off that pre-`T` history is not required (e.g. the snapshot only ever feeds a "current state" consumer, or history is being deliberately reset). Record the signing data owner and date. **Never assign `rebuild_from_T` without a recorded sign-off** — absent a sign-off, the snapshot stays `copy_and_continue`.
+
+Record each snapshot's assigned strategy, and for `rebuild_from_T` the sign-off reference, in this section and in the migration register (`migration-register-generate`). Read the SCD meta-column set and the `dbt_scd_id` continuation invariant from the active pair's **"Snapshot SCD mechanisms"** section — do not hardcode the meta-column types.
+
 **Connector migration**: Whether Fivetran connectors will be cloned to new destinations or new connectors created from scratch on the target.
 
 **Security migration**: How source roles/policies translate to target IAM/roles using the security audit's `translate` and `evaluate` objects.
@@ -232,6 +318,8 @@ For each in-scope table and dbt model, define the equivalency checks that must p
 - **Row-level checksum**: hashed row content matches over the same row set (catches drift that statistical sampling passes — see equivalency validate spec)
 - **Business invariants**: define the engagement-specific control totals that must reconcile exactly (or near-exactly) — e.g. total revenue, active customer count, orders per key dimension. List each invariant with its query and tolerance here; the equivalency loop runs them against both platforms.
 
+**Snapshot equivalency (three-layer gate, not row equivalence).** For every snapshot, a SELECT-only row-equivalence check is **not** a sufficient pass criterion — it cannot see SCD-2 continuity. Each snapshot must pass all three layers (defined and enforced in `dbt-migration-validate` / `equivalency-validate`): (a) **copy-parity at `T`** — schema including the SCD meta columns and their ordinal order, row count, and row-level checksum match at the baseline; (b) **continuation behaviour** — after the target `dbt snapshot` run, unchanged rows stay unchanged, changed rows open exactly one new version, hard-deletes are invalidated (when `invalidate_hard_deletes: true`), and a second run is idempotent; (c) **SCD integrity** — `dbt_scd_id` unique, `unique_key` and `dbt_valid_from` not null, no overlapping open versions per key. State this per-snapshot gate here so the equivalency loop knows a snapshot is judged on all three layers, never on row equivalence alone.
+
 Specify the overall success threshold: cutover is unblocked when `checks_failing == 0` across all in-scope objects. Define how partial failures are handled (per-table hold vs full stop).
 
 #### Define the frozen equivalency baseline
@@ -255,6 +343,7 @@ Specify:
 Use the template at `TEMPLATES/migration/migration_strategy.md`. Include:
 - Platform pair summary
 - Translation approach by category
+- **Snapshot migration** object-type section: one row per snapshot with its assigned strategy (`copy_and_continue` / `rebuild_from_T`), and for every `rebuild_from_T` the recorded data-owner sign-off (name + date). State the default (`copy_and_continue`) and that `rebuild_from_T` never appears without a sign-off.
 - Phase plan with timelines and rollback procedures
 - Equivalency success criteria
 - Risk register (top 5 risks with likelihood, impact, mitigation)
@@ -363,6 +452,10 @@ Execute the complete workflow as specified above.
 
 After completing the workflow, append a log entry to the project's execution_log.md:
 
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
+
 # Execution Log — Command and Skill Logging
 
 ## Purpose
@@ -446,6 +539,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

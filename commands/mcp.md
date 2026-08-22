@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -118,8 +123,7 @@ inputs:
     - name: release_folder
       description: "Path to the release folder"
 description: Manage and configure MCP server connections for the Wire Framework
-argument-hint: [list/view/check] [server-name or release-folder]
-
+argument-hint: "[list/view/check] [server-name or release-folder]"
 ---
 
 # Wire MCP Command
@@ -283,6 +287,8 @@ Build the required server list using this mapping:
 | Any `review` step in use | Fathom MCP | `mcp__claude_ai_Fathom__get_identity` |
 
 If no release folder is provided, check the union of required servers across all releases in `.wire/releases/`. If `status.md` cannot be read, probe all servers Wire ever uses.
+
+**BigQuery MCP showing `UNAVAILABLE`/`NOT_CONFIGURED` is not necessarily a blocker.** The migration commands that read/write BigQuery (`dbt-migration-generate`, `target-setup-generate`, `equivalency-validate`) fall back to the `bq` CLI automatically per `specs/utils/bigquery_mcp_fallback.md` — this pre-flight check surfaces the MCP's own status, not whether those commands can actually proceed.
 
 **Step 4.2 — Probe each required server**
 

@@ -1,0 +1,348 @@
+---
+description: Post-merge production verification: wait for the client pipeline to materialise merged models, compare at the full verdict bar, advance the register to production_verified
+argument-hint: <release-folder> [--models list] [--no-wait]
+---
+
+# Post-merge production verification: wait for the client pipeline to materialise merged models, compare at the full verdict bar, advance the register to production_verified
+
+## User Input
+
+```text
+$ARGUMENTS
+```
+
+## Path Configuration
+
+- **Projects**: `.wire` (project data and status files)
+
+When following the workflow specification below, resolve paths as follows:
+- `.wire/` in specs refers to the `.wire/` directory in the current repository
+- `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
+
+## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
+
+# Tracing — Detailed, Opt-In, Step-Level Execution Trace
+
+## Purpose
+
+`execution_log.md` records one terse row per whole command (timestamp, command, result, a detail string capped at 120 characters). That's enough for a normal audit trail, but it can't answer "what actually happened inside that command, step by step" — which specific files it read, what it inferred, what it proposed, what a consultant decided, why. Tracing exists for engagements that want that depth: a complete, structured, append-only record of every step of every command, scoped to the release and release type it ran under.
+
+**Off by default.** Tracing never runs unless `WIRE_TRACE=true` is set in the shell environment. If it isn't, skip this entire section — do nothing, check nothing further, proceed straight to the Workflow Specification exactly as if this section didn't exist. This is the common case and must add zero overhead.
+
+## Where it writes
+
+`.wire/releases/<release_folder>/trace.jsonl` — one JSON object per line (JSON Lines), append-only, alongside that release's `status.md` and `execution_log.md`.
+
+For commands not scoped to a specific release (cross-cutting utilities with `release_types: []` in their own front-matter, or any command whose argument isn't a release folder), write to `.wire/trace.jsonl` at the engagement level instead, with `release` and `release_type` fields set to `null`.
+
+This file is **local only** — nothing in it is ever sent anywhere, unlike the anonymous Segment telemetry event described elsewhere. It stays on the consultant's machine, inside the engagement's own repo, exactly like `execution_log.md`.
+
+## What to log, and when
+
+If `WIRE_TRACE=true`:
+
+1. **Resolve context once, before anything else**: the release folder (from this command's own argument, if it has one) and `release_type` (read `.wire/releases/<release_folder>/status.md`'s `project_type` or `release_type` field). If this command has no release-folder argument, both are `null`.
+2. **Emit a `command_start` event** before beginning the Workflow Specification below.
+3. **As you work through the Workflow Specification's own numbered steps, emit a `step` event after completing each one** — and where a step itself has meaningfully distinct numbered sub-parts (e.g. "check location A, then location B, then infer a match, then propose it"), treat each of those as its own step event too rather than collapsing them into one. The `detail` field has no length limit and is not a summary — write what actually happened: values found, files read, decisions made and why, what was proposed and what the consultant chose. If this step involved the data model registry or any other external/optional resource, log it explicitly: whether it was reached, what was searched, what matched (or didn't, and why not), and whether/how the result was used downstream.
+4. **Emit a `command_end` event** when the workflow finishes, with the same `result` value this command would write to `execution_log.md` (`complete`, `pass`, `fail`, `approved`, etc.).
+
+## How to emit an event
+
+Use this pattern for every event (adjust the heredoc body and the Python literals per call — this is a template, not a fixed script):
+
+```bash
+[ "${WIRE_TRACE:-false}" = "true" ] && {
+  mkdir -p ".wire/releases/<release_folder>" 2>/dev/null
+  cat > "/tmp/wire_trace_detail_$$.txt" << 'WIRE_TRACE_DETAIL_EOF'
+<the full, untruncated detail text for this event — safe to include quotes,
+newlines, code snippets, anything; this heredoc is not shell-interpreted>
+WIRE_TRACE_DETAIL_EOF
+  python3 -c "
+import json, datetime
+detail = open('/tmp/wire_trace_detail_$$.txt').read().rstrip('\n')
+event = {
+    'ts': datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
+    'release': '<release_folder_or_null>',
+    'release_type': '<release_type_or_null>',
+    'command': 'equivalency-post-merge-verify',
+    'event': '<command_start|step|command_end>',
+    'step': '<step_number_or_null>',
+    'step_name': '<step_heading_or_null>',
+    'result': '<result_value_or_null>',
+    'detail': detail,
+}
+with open('.wire/releases/<release_folder>/trace.jsonl', 'a') as f:
+    f.write(json.dumps(event) + chr(10))
+"
+  rm -f "/tmp/wire_trace_detail_$$.txt"
+}
+```
+
+- `<release_folder_or_null>` / `<release_type_or_null>`: from Step 1 above; write the literal JSON `null` (no quotes) if either doesn't apply, or a quoted string if it does.
+- `event`: `command_start`, `step`, or `command_end`.
+- `step` / `step_name`: `null` for `command_start`/`command_end`; the step's own number (e.g. `"1.5"`) and heading (e.g. `"Check for a Canonical Vertical Match"`) for a `step` event.
+- `result`: `null` except on `command_end`.
+- Adjust the file path in the final `open(...)` call to `.wire/trace.jsonl` for engagement-level (non-release-scoped) commands.
+
+## Rules
+
+1. **Never block or fail the workflow.** If a trace write fails for any reason (disk full, permissions), continue the workflow regardless — trace failures are never surfaced to the user and never stop anything.
+2. **Append only** — never rewrite or delete existing lines in `trace.jsonl`.
+3. **This is additive to `execution_log.md` and Telemetry, not a replacement for either.** All three continue exactly as documented elsewhere; tracing is a separate, optional, much finer-grained record for engagements that opt in.
+4. **Don't summarize into brevity.** The entire point of this mechanism over `execution_log.md` is that it isn't limited to a 120-character line — write the real detail.
+
+## Example
+
+```json
+{"ts":"2026-07-05T14:20:03Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"command_start","step":null,"step_name":null,"result":null,"detail":"Invoked for release 20260705_acme (full_platform)"}
+{"ts":"2026-07-05T14:20:11Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"step","step":"1.5.1","step_name":"Resolve the registry location","result":null,"detail":"Checked wire/data-model-registry/ (not found — not the Wire source repo). Checked ~/.wire/data-model-registry/ (found — cloned via /wire:utils-data-model-registry-setup on 2026-07-01)."}
+{"ts":"2026-07-05T14:20:19Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"step","step":"1.5.2","step_name":"Resolve the vertical","result":null,"detail":"No confident vertical match for Acme (B2B SaaS, no dedicated saas vertical in the registry). Adjacent match found: subscription-commerce — entity shape (subscriber, subscription, subscription_event, monthly_retention, subscription_revenue) proposed as a structural analogue for Acme's MRR/NRR model."}
+{"ts":"2026-07-05T14:20:34Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"step","step":"1.5.3","step_name":"Check cross-vertical patterns","result":null,"detail":"crm_identity_resolution flagged as relevant — requirements FR-12 describes reconciling Salesforce and HubSpot contact records, a 12% mismatch rate noted in discovery. Proposed alongside the subscription-commerce adjacent match."}
+{"ts":"2026-07-05T14:21:02Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"step","step":"1.5.4","step_name":"Propose and record decision","result":null,"detail":"Presented both proposals. Consultant chose 'adapt' on subscription-commerce (kept subscriber/subscription/subscription_revenue, dropped monthly_retention as out of scope for this phase, renamed subscription_event to billing_event to match client terminology) and 'yes' on crm_identity_resolution as-is. Recorded data_model_registry.vertical: subscription-commerce and cross_vertical_schemas: [crm_identity_resolution] in .wire/engagement/context.md."}
+{"ts":"2026-07-05T14:34:47Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"step","step":"5","step_name":"Carry reference pointers forward","result":null,"detail":"account_dim mapped to subscription-commerce's subscriber entity — generation_constraints and reference_implementation pointer carried into data_model_specification.md. subscription_fct mapped to subscription entity, same treatment. contact_identity_map (new, from crm_identity_resolution) added as its own integration model with that pattern's reference_implementation pointer."}
+{"ts":"2026-07-05T14:41:15Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"command_end","step":null,"step_name":null,"result":"complete","detail":"Generated data_model_specification.md — 14 models (5 staging, 4 integration, 5 warehouse), including 2 informed by the accepted registry proposals above."}
+```
+
+## Workflow Specification
+
+---
+wire_schema: "1.0"
+command: utility
+artifact: equivalency
+domain: migration
+release_types:
+  - platform_migration
+action_type: utility
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions:
+  - artifact: orchestration_migration
+    action: review
+    outcome: approved
+delegates_to:
+  - utils/precondition_gate
+description: Post-merge production verification — wait for the client pipeline to materialise merged models, compare production tables at the full verdict bar, advance the register to production_verified
+argument-hint: <release-folder> [--models list] [--no-wait] [--wait-timeout minutes]
+
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
+---
+
+# Equivalency — Post-Merge Verify
+
+## Purpose
+
+The assurance state the register's `merged` stage deliberately is not: a merged model has been accepted by the client, but nothing yet proves the production build of that model produces equivalent rows. This command closes that gap per merged model set. It is a **thin orchestrator**: the waiting and the register stage advance live here; every comparison runs through `equivalency-validate --run-point post_merge_prod`, so there is exactly one comparison engine.
+
+## Scope
+
+Default scope: every register row with `delivery_stage = merged` and no `run_point = post_merge_prod` row with verdict `pass`/`pass_qualified` in `migration/migration_verdict_log.csv`. `--models` restricts to named models within that set.
+
+## Workflow
+
+### Step 1 — Resolve physical targets, then wait for materialisation (target metadata, not the scheduler)
+First resolve each in-scope model's production relation exactly, per `equivalency-validate` Step 1g (#201): the register row's fully qualified `bq_target`, the manifest for a legacy two-segment row, and an existence check, never a name-equality or single-candidate guess. A model whose target cannot be resolved exactly is reported **`unresolved_target`** immediately: no wait, no comparison, never a `pass`, never a silent skip. Report it with what failed to resolve and the fix (run `/wire:upgrade` to re-resolve a legacy register; re-run `/wire:dbt-migration-generate` for a model with no register path).
+
+Then, for each resolved model, poll the resolved relation's table metadata (BigQuery: `INFORMATION_SCHEMA.TABLES` / `__TABLES__` last-modified; Snowflake: `INFORMATION_SCHEMA.TABLES.LAST_ALTERED`) until the object's last-modified instant is later than its PR merge time (from `gh pr view` on the row's `pr_url`). This is deliberately orchestration-tool-agnostic: no scheduler API, whatever runs the client's DAG. Poll at a low cadence (every 10 minutes, `--wait-timeout` default 240). `--no-wait` skips the wait and compares whatever is materialised now, flagging not-yet-rebuilt models `stale_materialisation` and excluding them from verdicts. On timeout, report the unmaterialised set and proceed with the rest.
+
+### Step 2 — Compare in production
+Invoke `equivalency-validate $ARGUMENTS --run-point post_merge_prod --models <materialised set>` (the resolved, materialised models; `unresolved_target` models are already out). The target side is the **production** dataset (the merged models' real relations), not the scratch dataset; the source side and every check, pin, and taxonomy rule are exactly as that command specifies. The full verdict bar applies — this run point exists to catch what a sandbox cannot (production partitioning, prod-only data, the client's own build), so it is never run at a reduced bar.
+
+### Step 3 — Advance the register
+The merge step of `equivalency-validate` (rules in `specs/migration/equivalency/verdict_schema.md`) records the `post_merge_prod` verdicts in the verdict log and advances `delivery_stage` to `production_verified` for `pass`/`pass_qualified`. Divergent models keep `delivery_stage: merged`; each divergence is drilled to a named mechanism, and any `fail` (a translation defect that reached production) is escalated immediately: report it, reference `equivalency-investigate`, and flag it for the defect-class flywheel (sweep the estate for the same class).
+
+### Step 4 — Update status and report
+
+```yaml
+artifacts:
+  equivalency:
+    post_merge_verify:
+      last_run_date: "{{TODAY}}"
+      models_verified: <n>
+      models_divergent: <n>
+      models_unmaterialised: <n>
+      models_unresolved_target: <n>
+```
+
+Output: the verified/divergent/unmaterialised/unresolved counts, each divergence with its mechanism, each `unresolved_target` model with what failed to resolve and its fix, and, when divergent, unmaterialised, or unresolved models remain, the re-run line:
+
+```
+/wire:equivalency-post-merge-verify $ARGUMENTS
+```
+
+## Tenant carve-out (v3.11.1)
+
+Nothing changes structurally — the comparison runs through `equivalency-validate`, which under `tenant_carveout` scope already applies the tenant predicate to the source side (the target side, a single-tenant project, is whole by construction) and the relocate-mode comparator for `origin: relocate` models. Verdict rows carry `scope` and the predicate hash, so a carve-out's production verification is never mistakable for a full-estate one.
+
+## Notes for the implementer
+
+- Keep this command free of comparison logic. If a check needs to differ at this run point, the change belongs in `equivalency-validate`, keyed off `--run-point`, not here.
+- A `post_merge_prod` divergence with a benign mechanism (e.g. prod partition filter semantics) is a `diff_*` verdict, not a silent pass — the named-mechanism discipline applies with extra force in production.
+
+## Post-Execution Hooks
+
+After updating `status.md`, run these in sequence:
+
+1. **Execution log** — Append one row to `.wire/releases/$ARGUMENTS/execution_log.md` following `specs/utils/execution_log.md`.
+2. **Jira sync** — Follow `specs/utils/jira_sync.md`. Pass `$ARGUMENTS` as project_folder, `equivalency` as artifact, `post_merge_verify` as action.
+3. **Auto-commit** — Follow `specs/utils/commit.md`. Pass `$ARGUMENTS` as release_folder, `equivalency` as artifact, `post_merge_verify` as action.
+
+Execute the complete workflow as specified above.
+
+## Execution Logging
+
+After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
+
+# Execution Log — Command and Skill Logging
+
+## Purpose
+
+After completing any generate, validate, or review workflow (or a project management command that changes state), append a single log entry to the project's execution log file. Skills also append an entry on activation, making the log a unified trace of all agent activity — both explicit commands and auto-activated skills.
+
+## Log File Location
+
+```
+<DP_PROJECTS_PATH>/<project_folder>/execution_log.md
+```
+
+Where `<project_folder>` is the project directory passed as an argument (e.g., `20260222_acme_platform`).
+
+## Format
+
+If the file does not exist, create it with the header:
+
+```markdown
+# Execution Log
+
+| Timestamp | Command | Result | Detail |
+|-----------|---------|--------|--------|
+```
+
+Then append one row per execution:
+
+```markdown
+| YYYY-MM-DD HH:MM | /wire:<command> | <result> | <detail> |
+```
+
+### Field Definitions
+
+- **Timestamp**: Current date and time in `YYYY-MM-DD HH:MM` format (24-hour, local time)
+- **Command**: Either the `/wire:*` command invoked, or `skill` for a skill activation entry
+- **Result / Skill name**: For commands, the outcome; for skills, the skill identifier. Use one of:
+  - `complete` — generate command finished successfully
+  - `pass` — validate command passed all checks
+  - `fail` — validate command found failures
+  - `approved` — review command: stakeholder approved
+  - `changes_requested` — review command: stakeholder requested changes
+  - `created` — `/wire:new` created a new project
+  - `archived` — `/wire:archive` archived a project
+  - `removed` — `/wire:remove` deleted a project
+  - `activated` — a skill was auto-activated (used with `skill` in the Command column)
+  - `override` — `specs/utils/precondition_gate.md` recorded a consultant overriding an unmet precondition
+- **Detail**: A concise one-line summary of what happened. Include:
+  - For generate: number of files created or key output filename
+  - For validate: number of checks passed/failed
+  - For review: reviewer name and brief feedback if changes requested
+  - For new: project type and client name
+  - For archive/remove: project name
+  - For skill activations: brief description of what triggered the skill
+  - For override: the unmet precondition, who overrode it, and their reason
+
+## Skill Activation Entries
+
+When a skill activates, it appends a row in the same format as commands, using `skill` in the Command column and the skill identifier in the Result column:
+
+```markdown
+| YYYY-MM-DD HH:MM | skill | <skill-identifier> | activated | <brief trigger description> |
+```
+
+Skill identifiers:
+
+| Skill | Identifier |
+|-------|-----------|
+| Engagement Context | `engagement-context` |
+| Research Persistence | `research-persistence` |
+| dbt Development | `dbt-development` |
+| LookML Content Authoring | `lookml-authoring` |
+| dbt Analytics QA | `dbt-analytics-qa` |
+| dbt Migration | `dbt-migration` |
+| dbt Troubleshooting | `dbt-troubleshooting` |
+| dbt Semantic Layer | `dbt-semantic-layer` |
+| dbt Unit Testing | `dbt-unit-testing` |
+| dbt DAG | `dbt-dag` |
+| Dagster | `dagster` |
+| Fivetran | `fivetran` |
+| Project Review | `project-review` |
+| Looker Dashboard Mockup | `looker-dashboard-mockup` |
+
+This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
+
+## Rules
+
+1. **Append only** — never modify or delete existing log entries
+2. **One row per command execution** — even if a command is re-run, add a new row (this creates the revision history)
+3. **Always log after status.md is updated** — the log entry should reflect the final state
+4. **Pipe characters in detail** — if the detail text contains `|`, replace with `—` to preserve table formatting
+5. **Keep detail under 120 characters** — be concise
+
+## Example
+
+```markdown
+# Execution Log
+
+| Timestamp | Command | Result | Detail |
+|-----------|---------|--------|--------|
+| 2026-02-22 14:30 | skill | engagement-context | activated | Context loaded for new conversation |
+| 2026-02-22 14:35 | /wire:new | created | Project created (type: full_platform, client: Acme Corp) |
+| 2026-02-22 14:40 | /wire:requirements-generate | complete | Generated requirements specification (3 files) |
+| 2026-02-22 15:12 | /wire:requirements-validate | pass | 14 checks passed, 0 failed |
+| 2026-02-22 16:00 | /wire:requirements-review | approved | Reviewed by Jane Smith |
+| 2026-02-23 09:15 | /wire:conceptual_model-generate | complete | Generated entity model with 8 entities |
+| 2026-02-23 10:30 | /wire:conceptual_model-validate | fail | 2 issues: missing relationship, orphaned entity |
+| 2026-02-23 11:00 | /wire:conceptual_model-generate | complete | Regenerated entity model (fixed 2 issues, 8 entities) |
+| 2026-02-23 11:15 | /wire:conceptual_model-validate | pass | 12 checks passed, 0 failed |
+| 2026-02-23 14:00 | /wire:conceptual_model-review | changes_requested | Reviewed by John Doe — add Customer entity |
+| 2026-02-23 15:30 | /wire:conceptual_model-generate | complete | Regenerated entity model (9 entities, added Customer) |
+| 2026-02-23 15:45 | /wire:conceptual_model-validate | pass | 14 checks passed, 0 failed |
+| 2026-02-23 16:00 | /wire:conceptual_model-review | approved | Reviewed by John Doe |
+| 2026-02-24 09:05 | /wire:migration-strategy-generate | override | migration_inventory.review required approved, was not_started — overridden by Jane Smith: client demo tomorrow, inventory sign-off deferred to Monday |
+```

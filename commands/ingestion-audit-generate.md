@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -103,6 +108,80 @@ with open('.wire/releases/<release_folder>/trace.jsonl', 'a') as f:
 {"ts":"2026-07-05T14:41:15Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"command_end","step":null,"step_name":null,"result":"complete","detail":"Generated data_model_specification.md — 14 models (5 staging, 4 integration, 5 warehouse), including 2 informed by the accepted registry proposals above."}
 ```
 
+## Automatic Validation (on by default)
+
+---
+description: Internal utility — injected auto-validate section so generate commands run their matching validate step automatically and fold the result into their output
+---
+
+Every `generate` command that has a matching `validate` command for the
+same artifact runs that validate step automatically as part of generate —
+by default, with no separate command to remember. This section only appears
+on commands where that applies; artifacts with no separate validate step at
+all (e.g. mockups, workshops, UAT) never carry this section.
+
+## Step: Check `auto_validate`
+
+Read this command's own `auto_validate` front-matter field, in the Workflow
+Specification below. Two states:
+
+- **Absent, or `true`** (the default — most artifacts): auto-validate runs.
+- **`false`**: this artifact's validate step is expensive — it runs real
+  code, queries a live warehouse or BI tool, or otherwise does IO beyond
+  re-reading local files — so it does not run automatically. Skip to
+  "If `auto_validate: false`" below.
+
+## If `auto_validate` is absent or `true`: run validate automatically
+
+Once this command finishes writing its artifact, before ending:
+
+1. Run this artifact's own `/wire:<artifact-with-dashes>-validate` workflow
+   in full, exactly as if the consultant had typed it themselves — same
+   inputs, same `status.md` write to `artifacts.<artifact>.validate`, same
+   report. This is not optional or an extra step layered on top; it is the
+   default behavior for this artifact.
+2. Fold the result into this command's own closing output rather than
+   presenting it as a separate command run:
+   - **PASS** — add a single closing line: `✅ Auto-validated — PASS`. The
+     full report already went to `status.md`/`execution_log.md`, exactly as
+     it would from a standalone validate run — no need to repeat it here.
+   - **FAIL** — surface the validate command's own failure report in full,
+     exactly as running validate standalone would show it, so the
+     consultant sees what's wrong immediately without running anything
+     else themselves.
+3. This never blocks or undoes generate itself — the artifact is written
+   either way, and its content is never rolled back because validate
+   failed. Auto-validation only means validate has already run and its
+   result is already on record by the time generate finishes, instead of
+   waiting for the consultant to remember to run it separately.
+
+## If `auto_validate` is `false`: state this plainly, don't run it
+
+Do not run validate. End with a line naming why, as specifically as this
+spec's own context makes possible (e.g. "runs `dbt run`/`dbt test`",
+"queries the live target warehouse", "calls the Looker API directly") —
+fall back to "performs live checks against an external system" only if no
+more specific reason is evident from context:
+
+```
+⚠ This artifact's validate step [reason] and does not run automatically.
+Run /wire:<artifact-with-dashes>-validate <release_folder> before
+requesting review — review is blocked until it passes.
+```
+
+## Why this is always safe either way
+
+`review` already requires `validate: PASS` for this same artifact as one of
+its own declared preconditions (see `specs/utils/precondition_gate.md`) —
+this is existing, independent enforcement, not something added by this
+section. So an `auto_validate: false` opt-out never lets an artifact reach
+review unvalidated; it only decides *when* the consultant pays validate's
+cost — automatically on every draft (the default), or once, on their own
+schedule, before requesting review (the opt-out). Auto-validation is a
+convenience that closes the "forgot to run it" gap for the common case; the
+gate that actually prevents unvalidated work from being reviewed was already
+there.
+
 ## Workflow Specification
 
 ---
@@ -134,7 +213,7 @@ valid_next:
 delegates_to:
   - utils/migration_agent_delegate
   - utils/stale_artifact_check
-description: Catalog all ingestion sources for the migration — Fivetran connectors, RudderStack sources/destinations, Coupler.io dataflows, or Segment sources — with MCP or API/CSV fallback
+description: Catalog all ingestion sources for the migration — Fivetran connectors, RudderStack sources/destinations, Coupler.io dataflows, Segment sources, Airbyte connections, Kleene/Funnel marketing-data connections, or Amplitude exports — with MCP or API/CSV fallback
 ---
 
 ## Auto-Delegation
@@ -150,7 +229,7 @@ Follow `specs/utils/stale_artifact_check.md` with `artifact_id: ingestion_audit`
 
 Catalogs every active ingestion source on the platform being migrated, capturing source type, destination schema, sync frequency, row volumes, and a migration readiness flag. The output is the primary input to the migration inventory and determines which sources need new destinations configured on the target platform.
 
-Supports four ingestion tool branches; each follows the same output shape but uses the tool's own concepts:
+Supports eight ingestion tool branches; each follows the same output shape but uses the tool's own concepts:
 
 | `migration.ingestion_tool` value | Concept mapping | Skill |
 |---|---|---|
@@ -159,7 +238,12 @@ Supports four ingestion tool branches; each follows the same output shape but us
 | `coupler-io` | Dataflow (source integration + destination + schedule) | `coupler-io` |
 | `segment` | Source → tracking plan → connected destinations | `segment` |
 | `airbyte` | Workspace → source / destination / connection / sync (Airbyte API; Agent MCP optional) | `airbyte` |
+| `kleene` | Connection (marketing/e-commerce source → destination + schedule) | n/a |
+| `funnel` | Connector (ad-platform source → data destination + schedule) | n/a |
+| `amplitude` | Export / data destination (event source → warehouse-bound export) | n/a |
 | `other` | Connector → destination (CSV import only) | n/a |
+
+**Coverage note**: every ingestion tool actually in use on the source platform must have a branch here — a source that isn't cataloged is invisible to migration planning, and any dbt models or dashboards that depend on it cannot pass equivalency testing (see `wire/specs/migration/equivalency/investigate.md` and `wire/specs/migration/equivalency/validate.md`) because their upstream data was never brought into scope. Whenever a new ingestion source is added to this audit (including a first-time run of one of the branches below), re-run `/wire:migration-inventory-generate $ARGUMENTS` afterwards so the dependency graph and effort estimate pick it up — the inventory does not auto-refresh from a re-run of this audit alone.
 
 ## Prerequisites
 
@@ -172,6 +256,9 @@ Supports four ingestion tool branches; each follows the same output shape but us
   - **Coupler.io**: MCP server (`coupler-io` in `.claude/settings.json`, personal access token)
   - **Segment**: Public API token (`SEGMENT_TOKEN` env var) — no MCP server available
   - **Airbyte**: Airbyte API token (`AIRBYTE_TOKEN` env var pointing at `api.airbyte.com/v1` or self-hosted endpoint). The Agent MCP at `mcp.airbyte.ai/mcp` is also available but designed for agent-driven data fetching rather than deployment inspection
+  - **Kleene**: no MCP server exists in Wire's catalog today — API token (`KLEENE_API_TOKEN`) if the client has one, otherwise CSV import at `audit/kleene_connections_input.csv`
+  - **Funnel**: no MCP server exists in Wire's catalog today — API token (`FUNNEL_API_TOKEN`) if the client has one, otherwise CSV import at `audit/funnel_connectors_input.csv`
+  - **Amplitude**: the `amplitude` MCP server (`https://mcp.amplitude.com/mcp`) is configured in `.claude/settings.json`, but its tools are scoped to product analytics (charts, dashboards, experiments, taxonomy) and do not expose warehouse-export/destination inventory — treat it as unavailable for this audit. Use the Amplitude Export/Data Destinations API (`AMPLITUDE_API_KEY` / `AMPLITUDE_SECRET_KEY`) if configured, otherwise CSV import at `audit/amplitude_exports_input.csv`
   - **Other** (Stitch, Estuary, custom): CSV import only at `audit/ingestion_sources_input.csv`
 
 ## Inputs
@@ -296,6 +383,43 @@ Then re-run.
 CSV import only. Ask the user to export the source list to `.wire/releases/$ARGUMENTS/audit/ingestion_sources_input.csv` with columns:
 `source_id, source_name, source_type, destination_schema, destination_table_prefix, sync_frequency_minutes, status, row_count_estimate, last_synced_at, include_in_migration, migration_notes`.
 
+#### Step 2g — `kleene`
+
+Kleene.ai (ELT for marketing/e-commerce data into a warehouse). **No MCP server for Kleene exists in Wire's catalog today** (`wire/specs/mcp.md`) — this branch is fallback-path only until one is added.
+
+**If a `kleene` MCP server is later added to `.claude/settings.json`**: prefer it, following the same list-connections / get-connection-schema pattern used for Coupler.io in Step 2c.
+
+**API/manual fallback (the practical path today)**: if `KLEENE_API_TOKEN` is set, use the Kleene REST API to enumerate connections (source integration, destination, schedule) and per-connection sync history. Confirm current endpoint paths against Kleene's own API documentation — none are hardcoded here.
+
+**If no API token**: fall back to CSV import at `.wire/releases/$ARGUMENTS/audit/kleene_connections_input.csv` with columns:
+`connection_id, connection_name, source_type, destination_schema, destination_table_prefix, sync_frequency_minutes, status, row_count_estimate, last_synced_at, include_in_migration, migration_notes`.
+
+Concept mapping: connection→connector, destination→destination_schema, dataset→destination_table_prefix.
+
+#### Step 2h — `funnel`
+
+Funnel.io (consolidates ad-platform and marketing data into a warehouse or BI destination). **No MCP server for Funnel exists in Wire's catalog today** — this branch is fallback-path only until one is added.
+
+**If a `funnel` MCP server is later added**: prefer it, following the same pattern as Step 2c/2g.
+
+**API/manual fallback (the practical path today)**: if `FUNNEL_API_TOKEN` is set, use the Funnel API to list connectors and data destinations, and their schedules. Confirm current endpoint paths against Funnel's own API documentation — none are hardcoded here.
+
+**If no API token**: fall back to CSV import at `.wire/releases/$ARGUMENTS/audit/funnel_connectors_input.csv` with columns:
+`connector_id, connector_name, source_type, destination_schema, destination_table_prefix, sync_frequency_minutes, status, row_count_estimate, last_synced_at, include_in_migration, migration_notes`.
+
+Concept mapping: connector→connector, data destination→destination_schema, dataset→destination_table_prefix.
+
+#### Step 2i — `amplitude`
+
+Amplitude as a data source syncing event data into the warehouse (via Amplitude's Export API / Data Destinations feature — distinct from Amplitude as a product-analytics tool). **The `amplitude` MCP server is configured in Wire's catalog (`https://mcp.amplitude.com/mcp`)**, but its documented tool surface is scoped to product analytics — charts, dashboards, experiments, session replay, instrumentation, taxonomy — not to enumerating warehouse-bound exports or destinations. Do not assume it exposes connector/sync inventory; treat it as unavailable for this audit unless/until it ships an Export or Data Destinations tool.
+
+**API/manual fallback (the practical path today)**: if `AMPLITUDE_API_KEY` and `AMPLITUDE_SECRET_KEY` are set, use the Amplitude Export API / Data Destinations API to enumerate warehouse-bound exports (destination schema, table prefix, sync cadence). Confirm current endpoint paths against Amplitude's own API documentation — none are hardcoded here.
+
+**If no API access**: fall back to CSV import at `.wire/releases/$ARGUMENTS/audit/amplitude_exports_input.csv` with columns:
+`export_id, export_name, source_type, destination_schema, destination_table_prefix, sync_frequency_minutes, status, row_count_estimate, last_synced_at, include_in_migration, migration_notes`.
+
+Concept mapping: export→connector, data destination→destination_schema, dataset→destination_table_prefix.
+
 ### Step 3: Build the connector catalog
 
 For each connector, capture:
@@ -378,6 +502,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -462,6 +590,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

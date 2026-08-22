@@ -298,8 +298,8 @@ Snowflake's `INSERT ALL / INSERT FIRST` into multiple tables has no BigQuery equ
 | Snowflake | BigQuery | Notes |
 |---|---|---|
 | `a / b` | `a / b` | Snowflake returns NUMBER with extended scale; BigQuery integer division returns FLOAT64. **⚠** downstream NUMERIC vs FLOAT64 typing can change rounding; cast explicitly where money is involved |
-| `DIV0(a, b)` | `IFNULL(SAFE_DIVIDE(a, b), 0)` | SAFE_DIVIDE returns NULL on divide-by-zero |
-| `DIV0NULL(a, b)` | `SAFE_DIVIDE(a, b)` | Also handles NULL divisor the same way |
+| `DIV0(a, b)` | `IF(b = 0, 0, SAFE_DIVIDE(a, b))` | `DIV0` zeroes a zero **divisor** but propagates NULL inputs. Do **not** use `IFNULL(SAFE_DIVIDE(a, b), 0)` **or** the semantically identical `COALESCE(SAFE_DIVIDE(a, b), 0)` — both coerce NULL inputs to 0, which `DIV0` never does; nor bare `SAFE_DIVIDE(a, b)` — it returns NULL on a zero divisor |
+| `DIV0NULL(a, b)` | `IF(b = 0 OR b IS NULL, 0, SAFE_DIVIDE(a, b))` | `DIV0NULL` returns 0 on a zero **or NULL** divisor (a NULL numerator still propagates). Do **not** use `IFNULL(SAFE_DIVIDE(a, b), 0)` or `COALESCE(SAFE_DIVIDE(a, b), 0)` — they coerce the propagated NULL numerator to 0; nor bare `SAFE_DIVIDE(a, b)` — it returns NULL on a zero divisor rather than 0 |
 | `MOD(a, b)` / `a % b` | `MOD(a, b)` | No `%` operator in BigQuery |
 | `ROUND(x, n)` | `ROUND(x, n)` | **⚠** both round halves away from zero for NUMERIC, but FLOAT64 rounding in BigQuery follows IEEE and Snowflake FLOAT behaves similarly; differences appear at the representation edge. For financial rounding keep values NUMERIC throughout |
 | `TRUNC(x, n)` (numeric) | `TRUNC(x, n)` | |
@@ -725,6 +725,8 @@ A `partition_by` worth copying as the default shape:
 ) }}
 ```
 
+**`cluster_by` rejects a trailing `ORDER BY` on the build query — BigQuery errors, it doesn't just ignore it.** Any model with `cluster_by` set that also ends its outermost `SELECT` in a top-level `ORDER BY` fails the `CREATE TABLE ... CLUSTER BY (...) AS (...)` DDL outright: `Result of ORDER BY queries cannot be clustered`. This hits `materialized = 'table'` directly, and `materialized = 'incremental'` on its first run (no existing table yet, so it issues the same CTAS shape) — a model that built fine on its second incremental run can still be carrying this defect, dormant until the next full-refresh. A Snowflake model translated with a source-preserved trailing `ORDER BY` (common on a "just show me the latest rows" staging pattern) plus a newly-added `cluster_by` is the typical way this lands. The fix is simply to drop the outer `ORDER BY` — clustering doesn't preserve physical row order in the first place, so the clause was never doing anything on a clustered table even before it started erroring. Don't confuse this with an `ORDER BY` inside a window function (`... OVER (PARTITION BY ... ORDER BY ...)`), `QUALIFY`, or an ordered aggregate (`ARRAY_AGG(x ORDER BY y)`) — those are unrelated and completely legal alongside `cluster_by`. See §11.26 and `dbt-migration-lint`'s `CLUSTER_BY_ORDER_BY_CONFLICT` rule, which catches this statically before any build is attempted.
+
 ### Validation approach that works
 
 1. Run both warehouses in parallel for the cutover window with the same sources.
@@ -762,6 +764,8 @@ The compressed list to pin next to the code review checklist. Everything here co
 23. **CONTAINS_SUBSTR is case-insensitive**; it is not a drop-in for Snowflake CONTAINS. Use STRPOS for exact matching.
 24. **ARRAY_TO_STRING drops NULL elements** in BigQuery where Snowflake rendered empties; concatenated-key columns built this way will diverge.
 25. **CURRENT_ROLE()-based masking and RLS logic doesn't translate**; rebuild on IAM principals and policy tags (section 16).
+26. **CLUSTER BY rejects a trailing top-level ORDER BY** — BigQuery errors the CTAS outright (`Result of ORDER BY queries cannot be clustered`), on `materialized = 'table'` directly and on `incremental`'s first-run CTAS. Drop the outer ORDER BY; it did nothing on a clustered table anyway. Doesn't apply to an ORDER BY nested inside a window function, QUALIFY, or an ordered aggregate like ARRAY_AGG(x ORDER BY y).
+27. **The output projection must be an explicit, source-ordered column list — never an unpinned `SELECT *`.** In a lift-and-shift the target model's output schema is a contract: column set *and* ordinal order must match the source. `SELECT *`, `SELECT <alias>.*`, and `SELECT * EXCEPT(...)` on the **final** projection are all unpinned — the emitted columns depend on the upstream shape at run time, so a column added, dropped, or reordered upstream silently changes this model's output while the rows still match (no row-level equivalency check sees it). Import/staging CTEs may `SELECT *` internally; only the outermost, model-producing projection is constrained. Write the columns out in **source ordinal order**, then append any migration-added columns (audit/load-timestamp columns, then region/surrogate globalize keys) at the tail — the pair's declared allow-list. `dbt-migration-lint`'s `UNPINNED_SELECT_STAR` catches the star statically; the schema-equivalence check's `column_order_drift` (see §schema-parity) verifies the resulting order against the source, allowing the declared tail columns and a per-model `column_order_waived` waiver for an intentional, signed-off reorder.
 
 ---
 

@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -103,6 +108,80 @@ with open('.wire/releases/<release_folder>/trace.jsonl', 'a') as f:
 {"ts":"2026-07-05T14:41:15Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"command_end","step":null,"step_name":null,"result":"complete","detail":"Generated data_model_specification.md — 14 models (5 staging, 4 integration, 5 warehouse), including 2 informed by the accepted registry proposals above."}
 ```
 
+## Automatic Validation (on by default)
+
+---
+description: Internal utility — injected auto-validate section so generate commands run their matching validate step automatically and fold the result into their output
+---
+
+Every `generate` command that has a matching `validate` command for the
+same artifact runs that validate step automatically as part of generate —
+by default, with no separate command to remember. This section only appears
+on commands where that applies; artifacts with no separate validate step at
+all (e.g. mockups, workshops, UAT) never carry this section.
+
+## Step: Check `auto_validate`
+
+Read this command's own `auto_validate` front-matter field, in the Workflow
+Specification below. Two states:
+
+- **Absent, or `true`** (the default — most artifacts): auto-validate runs.
+- **`false`**: this artifact's validate step is expensive — it runs real
+  code, queries a live warehouse or BI tool, or otherwise does IO beyond
+  re-reading local files — so it does not run automatically. Skip to
+  "If `auto_validate: false`" below.
+
+## If `auto_validate` is absent or `true`: run validate automatically
+
+Once this command finishes writing its artifact, before ending:
+
+1. Run this artifact's own `/wire:<artifact-with-dashes>-validate` workflow
+   in full, exactly as if the consultant had typed it themselves — same
+   inputs, same `status.md` write to `artifacts.<artifact>.validate`, same
+   report. This is not optional or an extra step layered on top; it is the
+   default behavior for this artifact.
+2. Fold the result into this command's own closing output rather than
+   presenting it as a separate command run:
+   - **PASS** — add a single closing line: `✅ Auto-validated — PASS`. The
+     full report already went to `status.md`/`execution_log.md`, exactly as
+     it would from a standalone validate run — no need to repeat it here.
+   - **FAIL** — surface the validate command's own failure report in full,
+     exactly as running validate standalone would show it, so the
+     consultant sees what's wrong immediately without running anything
+     else themselves.
+3. This never blocks or undoes generate itself — the artifact is written
+   either way, and its content is never rolled back because validate
+   failed. Auto-validation only means validate has already run and its
+   result is already on record by the time generate finishes, instead of
+   waiting for the consultant to remember to run it separately.
+
+## If `auto_validate` is `false`: state this plainly, don't run it
+
+Do not run validate. End with a line naming why, as specifically as this
+spec's own context makes possible (e.g. "runs `dbt run`/`dbt test`",
+"queries the live target warehouse", "calls the Looker API directly") —
+fall back to "performs live checks against an external system" only if no
+more specific reason is evident from context:
+
+```
+⚠ This artifact's validate step [reason] and does not run automatically.
+Run /wire:<artifact-with-dashes>-validate <release_folder> before
+requesting review — review is blocked until it passes.
+```
+
+## Why this is always safe either way
+
+`review` already requires `validate: PASS` for this same artifact as one of
+its own declared preconditions (see `specs/utils/precondition_gate.md`) —
+this is existing, independent enforcement, not something added by this
+section. So an `auto_validate: false` opt-out never lets an artifact reach
+review unvalidated; it only decides *when* the consultant pays validate's
+cost — automatically on every draft (the default), or once, on their own
+schedule, before requesting review (the opt-out). Auto-validation is a
+convenience that closes the "forgot to run it" gap for the common case; the
+gate that actually prevents unvalidated work from being reviewed was already
+there.
+
 ## Workflow Specification
 
 ---
@@ -145,6 +224,13 @@ Generates the post-migration report summarising what was migrated, the final equ
 
 - `cutover review: approved`
 - Cutover runbook executed (manual confirmation required)
+
+## Flags
+
+- `--lens defects` — produce the **defect-provenance lens** (see below) instead of the default post-migration summary. Reads the per-wave structured findings the migration gates already wrote and aggregates them; it does not re-run any gate. Writes a separate file (`migration/migration_report_defects.md`), leaving the default report untouched.
+- `--client-caught <path>` — optional. A client-PR-review findings file (or a manual `client_caught` tally) logged back against a wave, feeding the client-caught count in the defects lens. When absent, client leakage is reported as "not tracked", never as 0. Ignored without `--lens defects`.
+
+With no `--lens` flag the command behaves exactly as the Workflow below describes — the default post-migration report is unchanged.
 
 ## Workflow
 
@@ -217,6 +303,58 @@ migration:
 ```
 
 
+## Defect-provenance lens (`--lens defects`)
+
+Runs instead of Steps 2–3 above when `--lens defects` is supplied (Steps 1, 4, 5 and the hooks still apply). It answers one question across the migration: **where in the pipeline was each defect caught, and is the point of capture shifting left over successive waves?** It is a read-only aggregation over findings the gates already emit — it runs no gate and makes no fix/rule decisions.
+
+### Inputs (whatever exists — a gate that never ran contributes nothing)
+
+Per wave, read the structured findings each gate writes:
+- `dbt-migration-lint` results — `migration/lint/wave_{id}_lint.md` / `.json` (rule-id findings).
+- `dbt-migration-validate` Check 5 coverage report — the per-model all-code-path coverage table; an unchecked surface is a coverage gap, not a clean pass.
+- `equivalency-validate` results — failing objects and their reason (`column_order_drift`, `governance_regression`, `deployment_type_divergence`, value/checksum drift, …).
+- `dbt-migration-pre-pr-review` findings — `migration/pre_pr_review/wave_{id}_pre_pr_review.json` (Checks 1–6).
+- `dbt-migration-fix` applied-fix summaries — `migration/pre_pr_review/{scope}_fix_report.md` (auto-fixed / escalated-propose / escalated-decision counts).
+- **generate-inline** findings — defects `dbt-migration-generate` caught and resolved inline (Check B column-order, materialisation-hook drift, `-- MANUAL REVIEW REQUIRED` flags it raised), where recorded against the wave.
+- **Optional** — the `--client-caught` input (a client-PR-review findings file logged back to the migration register, or a manual `client_caught` tally).
+
+Pattern ids (`UNGUARDED_JSON_PARSE`, `DIV0_NULL_COERCION`, `COLUMN_ORDER_DRIFT`, …) and defect classes come from the **active platform pair** — treat them as data. Never hardcode a dialect's pattern list here; the lens aggregates whatever the gates emitted, so a new pair works unchanged.
+
+### Aggregation (per wave)
+
+1. **Stage-of-capture breakdown.** Attribute every distinct defect to the **earliest** gate that caught it, in pipeline order:
+
+   `generate_inline < lint < validate < equivalency < pre_pr_review`
+
+   A defect is identified by its `defect_id` if a gate emitted one, else by `model` + pattern id. The same defect legitimately recurs in several gates' outputs (a later gate re-detecting what an earlier one could have caught) — count it **once**, at its earliest sighting, so the breakdown measures where defects are actually being caught rather than double-counting. Break the counts down by defect class / pattern id. The subset attributed to `pre_pr_review` is the count that survived every earlier gate — the "reached the last internal gate" figure.
+
+2. **Auto-fixed vs escalated split.** From the wave's `dbt-migration-fix` summary: `auto_fixed`, `escalated_propose`, `escalated_decision` (and their `escalated_total`).
+
+3. **Client-caught count.** From the optional `--client-caught` input: the count of findings recorded against the wave **after our gates passed**. If the input is absent, record it as **"not tracked"** — never a silent 0. Leakage-to-client is stated explicitly, so a wave with no tracking is never mistaken for a wave with zero leakage.
+
+4. **Wave-over-wave trend.** Emit the per-wave figures in wave order (total defects, reached-pre_pr_review, auto-fixed, escalated-total, client-caught) so the leftward shift — more caught at generate-inline/lint, fewer surviving to pre-PR review, zero reaching the client — or a regression is visible at a glance.
+
+**Rule candidates (surface only).** A pattern that leaks to the client across two or more waves is listed as a rule candidate — a prompt for a human to consider a new gate rule. The lens never decides that a new defect class warrants a rule; that stays a human decision. It only surfaces the pattern and its wave history.
+
+### Output
+
+Write `.wire/releases/$ARGUMENTS/migration/migration_report_defects.md`. Structure:
+- **Header**: the pipeline order used for earliest-gate attribution, the waves covered, and the note that this aggregates existing gate findings — it runs no gate.
+- **Per-wave section**: the stage-of-capture table (by stage, broken down by pattern id / defect class), the auto-fixed vs escalated split, and the client-caught figure (integer or "not tracked").
+- **Trend**: the wave-ordered rollup table.
+- **Rule candidates**: patterns reaching the client in ≥2 waves, with their wave history — flagged for human review, not auto-actioned.
+- **Coverage gaps**: any gate whose findings were unavailable for a wave — recorded as "not checked", never folded into a clean count.
+
+### Status (defects lens)
+
+```yaml
+artifacts:
+  migration_report:
+    generate_defects: complete
+    file_defects: migration/migration_report_defects.md
+    generated_date: "{{TODAY}}"
+```
+
 ## Post-Execution Hooks
 
 After updating `status.md`, run these in sequence:
@@ -234,6 +372,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -318,6 +460,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 

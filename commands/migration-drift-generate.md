@@ -18,8 +18,13 @@ $ARGUMENTS
 When following the workflow specification below, resolve paths as follows:
 - `.wire/` in specs refers to the `.wire/` directory in the current repository
 - `TEMPLATES/` references refer to the templates section embedded at the end of this command
+- `specs/<path>.md` references are shared workflow docs shipped with this plugin — read them from `${CLAUDE_PLUGIN_ROOT}/specs/<path>.md`. If the path matches a Wire command (e.g. `specs/requirements/generate.md`), it means that command (`/wire:requirements-generate`) and its spec is already embedded in the command file.
 
 ## Tracing (opt-in, off by default)
+
+---
+description: Internal utility — opt-in step-level execution tracing to .wire/releases/<release>/trace.jsonl when WIRE_TRACE=true
+---
 
 # Tracing — Detailed, Opt-In, Step-Level Execution Trace
 
@@ -103,6 +108,80 @@ with open('.wire/releases/<release_folder>/trace.jsonl', 'a') as f:
 {"ts":"2026-07-05T14:41:15Z","release":"20260705_acme","release_type":"full_platform","command":"data_model-generate","event":"command_end","step":null,"step_name":null,"result":"complete","detail":"Generated data_model_specification.md — 14 models (5 staging, 4 integration, 5 warehouse), including 2 informed by the accepted registry proposals above."}
 ```
 
+## Automatic Validation (on by default)
+
+---
+description: Internal utility — injected auto-validate section so generate commands run their matching validate step automatically and fold the result into their output
+---
+
+Every `generate` command that has a matching `validate` command for the
+same artifact runs that validate step automatically as part of generate —
+by default, with no separate command to remember. This section only appears
+on commands where that applies; artifacts with no separate validate step at
+all (e.g. mockups, workshops, UAT) never carry this section.
+
+## Step: Check `auto_validate`
+
+Read this command's own `auto_validate` front-matter field, in the Workflow
+Specification below. Two states:
+
+- **Absent, or `true`** (the default — most artifacts): auto-validate runs.
+- **`false`**: this artifact's validate step is expensive — it runs real
+  code, queries a live warehouse or BI tool, or otherwise does IO beyond
+  re-reading local files — so it does not run automatically. Skip to
+  "If `auto_validate: false`" below.
+
+## If `auto_validate` is absent or `true`: run validate automatically
+
+Once this command finishes writing its artifact, before ending:
+
+1. Run this artifact's own `/wire:<artifact-with-dashes>-validate` workflow
+   in full, exactly as if the consultant had typed it themselves — same
+   inputs, same `status.md` write to `artifacts.<artifact>.validate`, same
+   report. This is not optional or an extra step layered on top; it is the
+   default behavior for this artifact.
+2. Fold the result into this command's own closing output rather than
+   presenting it as a separate command run:
+   - **PASS** — add a single closing line: `✅ Auto-validated — PASS`. The
+     full report already went to `status.md`/`execution_log.md`, exactly as
+     it would from a standalone validate run — no need to repeat it here.
+   - **FAIL** — surface the validate command's own failure report in full,
+     exactly as running validate standalone would show it, so the
+     consultant sees what's wrong immediately without running anything
+     else themselves.
+3. This never blocks or undoes generate itself — the artifact is written
+   either way, and its content is never rolled back because validate
+   failed. Auto-validation only means validate has already run and its
+   result is already on record by the time generate finishes, instead of
+   waiting for the consultant to remember to run it separately.
+
+## If `auto_validate` is `false`: state this plainly, don't run it
+
+Do not run validate. End with a line naming why, as specifically as this
+spec's own context makes possible (e.g. "runs `dbt run`/`dbt test`",
+"queries the live target warehouse", "calls the Looker API directly") —
+fall back to "performs live checks against an external system" only if no
+more specific reason is evident from context:
+
+```
+⚠ This artifact's validate step [reason] and does not run automatically.
+Run /wire:<artifact-with-dashes>-validate <release_folder> before
+requesting review — review is blocked until it passes.
+```
+
+## Why this is always safe either way
+
+`review` already requires `validate: PASS` for this same artifact as one of
+its own declared preconditions (see `specs/utils/precondition_gate.md`) —
+this is existing, independent enforcement, not something added by this
+section. So an `auto_validate: false` opt-out never lets an artifact reach
+review unvalidated; it only decides *when* the consultant pays validate's
+cost — automatically on every draft (the default), or once, on their own
+schedule, before requesting review (the opt-out). Auto-validation is a
+convenience that closes the "forgot to run it" gap for the common case; the
+gate that actually prevents unvalidated work from being reviewed was already
+there.
+
 ## Workflow Specification
 
 ---
@@ -156,6 +235,8 @@ It is designed to run on a schedule (see "Scheduling" below) and as a CI gate on
 - `audit/lineage/model_sync_map.json` (from `lineage-generate`) — Gold→Hightouch edges (which syncs read each warehouse model)
 - `audit/reverse_etl_audit.md` — the Hightouch sync inventory and config references
 - Source model `meta.masking_policy` declarations (schema/properties YAML)
+- Translated model SQL under `migration/dbt/` — scanned for `-- MARKET GAP:` NULL-pad markers (Step 5b)
+- Active platform pair `translation_guide.md` — the **"Deployment-integration / provenance defect patterns"** section (rule 4, `STALE_NULL_PAD_BRONZE_PRESENT`)
 
 ## Workflow
 
@@ -193,11 +274,33 @@ For each flagged sync, produce a **Hightouch config diff**: compare the sync's c
 
 For each **modified** model, diff its source `meta.masking_policy` (in the model's schema/properties YAML) between `last_migrated_commit` and `drift_head`. If `meta.masking_policy` was **added, changed, or removed** on any column, flag a **masking change** and trigger the policy-tag generator: re-run the `target-setup` security step (`04_security.sql` policy-tag taxonomy / data policies) for the affected objects so the BigQuery policy tags match the new source masking. Record which columns changed and that the policy-tag regeneration is required (do not silently let masking drift — a dropped masking policy that isn't re-applied is a data-exposure risk; a new one that isn't applied breaks the consuming role).
 
+### Step 5b: Stale NULL-pad restore hook (`STALE_NULL_PAD_BRONZE_PRESENT`)
+
+Read the pair's **"Deployment-integration / provenance defect patterns"** section (rule 4) — this is the one rule of that set that belongs in drift, because the column it watches for lands *after* generation, and only a gate that runs against the moving source can see it.
+
+At translation time, `dbt-migration-generate` Step 3.1 item b substitutes `CAST(NULL AS <type>) /* -- MARKET GAP: <col> not present in <markets> ... */` for a source column absent in one or more markets. The connector can later catch up and the column can start carrying real data. For every `state = migrated`/`drifted` model whose translated SQL carries a `-- MARKET GAP:` NULL-pad, re-check the named source column against the **live** source warehouse (the same schema introspection Step 2's diff uses) for the previously-missing market(s):
+
+- If the column is now **present and populated** in the live source for any of the affected markets, flag a **stale NULL-pad** finding: name the model, the column, the market(s) that now carry it, and the synthesized type from the marker. This is **flag-for-restore only** — never auto-rewritten here. Restoring the real column mapping and type is a re-translation decision (`/wire:dbt-migration-generate $ARGUMENTS --select <model>`), not a mechanical edit; note that in the finding.
+- If the column is still absent in every affected market, leave the NULL-pad as-is (no finding).
+
+Record each stale NULL-pad in the drift report (Step 6) and set the model's register `state = drifted` (its translation no longer matches the source) with a `notes` entry naming the restored column. Do not silently leave a column synthesizing NULL once the source carries real data — that is a widening, invisible data gap.
+
+### Step 5c: Cross-release triggers (tenant carve-out, #180)
+
+Applies only when `migration.cross_release_triggers` in status.md is non-empty (a carve-out tracking a live parent release). A carve-out inherits the parent's translations, backfills, and defects, and the dependencies between the two releases go stale exactly like blocker notes do — "closes when the parent completes its Bronze backfill" is a caveat nobody re-tests unless a gate does.
+
+For each trigger with `status: open`:
+
+1. **Evaluate the condition** against the parent release's current state — read the parent register at `.wire/releases/<trigger.parent_release>/migration/migration_register.csv` (and, where the condition names them, the parent's verdict log or drift report). A condition is met only by evidence read this run, never by the trigger's age.
+2. **When met**, set `status: fired` in status.md and surface the trigger's `action` in the drift report: the dependent carve-out models to re-verify (resolved via the register's `parent_release` / `parent_model` linkage columns), the command to run, and the event that fired.
+3. **Parent defect-class propagation.** When the parent release records a defect-class sweep (`equivalency-sweep`) whose pattern hits models this carve-out relocated, mark each relocated copy **re-verify-owed**: append a `notes` entry naming the parent sweep and pattern id, and list the models in the drift report. Their standing verdicts are stale evidence — the parent's fix does not re-prove the copy.
+4. A trigger stays `fired` until the surfaced re-verifications complete (the drift report lists it every run); the consultant closes it (`status: closed`) once the dependent register rows carry fresh verdicts.
+
 ### Step 6: Write the drift report
 
 **Output location**: `.wire/releases/$ARGUMENTS/migration/migration_drift_report.md`
 
-Use `TEMPLATES/migration/migration_drift_report.md`. Include: `drift_head` and the run timestamp; counts (modified / removed / new / unchanged); the per-model drift table (model, classification, change summary, prior equivalence state); the flagged downstream syncs with their config diffs; and the masking changes with the policy-tag regeneration actions. Re-write the affected register rows (Step 2).
+Use `TEMPLATES/migration/migration_drift_report.md`. Include: `drift_head` and the run timestamp; counts (modified / removed / new / unchanged); the per-model drift table (model, classification, change summary, prior equivalence state); the flagged downstream syncs with their config diffs; the masking changes with the policy-tag regeneration actions; the **stale NULL-pad restores** (Step 5b) — each flagged model, column, now-present market(s), and synthesized type, marked flag-for-restore; and the **cross-release triggers** (Step 5c) — each fired trigger with its event, the dependent re-verifications, and the re-verify-owed relocated models. Re-write the affected register rows (Step 2, Step 5b, and Step 5c item 3).
 
 ### Step 7: Update status
 
@@ -213,6 +316,8 @@ artifacts:
     new: N
     syncs_flagged: N
     masking_changes: N
+    stale_null_pads: N        # STALE_NULL_PAD_BRONZE_PRESENT — MARKET GAP columns now present in the live source, flagged for restore
+    cross_release_triggers_fired: N   # carve-out only — triggers whose condition was met this run (Step 5c)
 ```
 
 ### Step 8: Output next command
@@ -254,6 +359,10 @@ Execute the complete workflow as specified above.
 ## Execution Logging
 
 After completing the workflow, append a log entry to the project's execution_log.md:
+
+---
+description: Internal utility — appends a log entry to the project's execution log after any generate/validate/review workflow or skill activation
+---
 
 # Execution Log — Command and Skill Logging
 
@@ -338,6 +447,29 @@ Skill identifiers:
 | Looker Dashboard Mockup | `looker-dashboard-mockup` |
 
 This makes skill activations visible in the same log that captures command invocations, enabling full activity tracing across both explicit commands and automatic skill triggers.
+
+## Stale Status Check
+
+Immediately after appending a **command** row (this does not apply to skill activation entries), perform a quick freshness check against the project's `status.md`. This is additive to the logging behavior above — it never blocks the calling command and never modifies `status.md`.
+
+**Process**:
+1. Derive `artifact_id` from the command just logged: strip the `/wire:` prefix and the trailing `-generate`, `-validate`, or `-review` suffix (e.g. `/wire:migration-inventory-generate` → `migration_inventory`). If the command doesn't map to a recognizable artifact (e.g. `/wire:new`, `/wire:status`, `/wire:archive`), skip this check entirely.
+2. Read the artifact's own block in `status.md`: `artifacts.<artifact_id>`.
+3. Check whether that artifact has already passed its review/approval gate — its `review` field (or equivalent approval field) shows `pass`, `approved`, or `complete`.
+4. If the gate has passed, scan every field in the `artifacts.<artifact_id>` block for a value that is still the literal string `TBD`, or an empty list (`[]`) / `null` where the artifact's own template expects a populated value (i.e. the field is not legitimately optional).
+5. For each stale field found, emit a one-line warning in the command's output:
+   ```
+   ⚠ status.md still shows `<field>: TBD` for `<artifact_id>` despite review: pass — status may be stale
+   ```
+   Emit one warning per stale field — do not suppress after the first.
+6. After the last warning (only when at least one was emitted), add one closing line offering the repair path:
+   ```
+   Run /wire:status-sync <release-folder> to reconcile the record (see specs/utils/status_sync.md).
+   ```
+   The offer is informational only — never block the calling command and never run the sync automatically.
+7. If no stale fields are found, the review/approval gate has not yet passed, or `artifact_id` could not be derived: no output, proceed silently.
+
+This check is self-contained within this utility, so every caller gets it automatically without any caller-side changes.
 
 ## Rules
 
