@@ -11,6 +11,7 @@ const sidebars = {
         'getting-started/engagements-releases',
         'getting-started/release-types',
         'getting-started/installation',
+        'getting-started/upgrading-from-3x',
         'getting-started/core-concepts',
         'getting-started/how-wire-works',
       ],
