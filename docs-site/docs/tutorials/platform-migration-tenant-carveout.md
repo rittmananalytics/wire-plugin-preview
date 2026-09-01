@@ -25,6 +25,25 @@ Stage 1 deliverables (gated, part-paid): region tagging, and the GDPR /
 data-residency assessment including a legal review of the historical window.
 ```
 
+
+:::info New in 4.0 — business rules discovery
+
+`/wire:business-rules-generate` is an optional first phase, available on
+`platform_migration` and so on a tenant carve-out. It records what each number
+means before the batches start: every competing definition with the file it came
+from, what they disagree on, the decision, and who approved it.
+
+On a migration the legacy system *is* the reference, so every rule with a legacy
+variant gets a reconciliation query — the same comparison equivalency validation
+would run later. Running it first turns a definition dispute from a cutover
+blocker into a day-one finding.
+
+The gate on `migration-inventory-generate` is advisory: it warns, takes a reason,
+records the skip and proceeds. This walkthrough does not use it.
+
+Reference: [Business rules discovery](../advanced/business-rules.md).
+:::
+
 ## Setting up the carve-out
 
 At [`/wire:new`](../reference/commands#session-and-management-commands), choose **Platform Migration**, then answer the scope question:

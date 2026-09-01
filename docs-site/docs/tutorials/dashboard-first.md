@@ -119,6 +119,19 @@ proceeds.
 Reference: [Business rules discovery](../advanced/business-rules.md).
 :::
 
+
+:::info New in 4.0 — reading an existing Modality model
+
+Where the client already models their data in Modality,
+`/wire:utils-modality-link` points the release at it and `conceptual_model-generate` reads entities,
+sources and cardinality from the `.mml` files rather than deriving them, still
+reading the requirements so the difference between the two becomes a finding.
+
+This walkthrough does not use it.
+
+Reference: [Modality models as an input](../advanced/modality-models.md).
+:::
+
 ## Scenario
 
 | | |

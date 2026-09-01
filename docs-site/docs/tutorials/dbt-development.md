@@ -99,6 +99,11 @@ points the release at it and the design commands read the entities, sources and
 cardinality from the `.mml` files rather than deriving them, still reading the
 requirements so the difference between the two becomes a finding.
 
+The commands that read a model are `conceptual_model`, `logical_model` and
+`pipeline_design`. A `dbt_development` release's design phase is `data_model`,
+which has no Modality path, so this applies here only if you also run the
+conceptual model step.
+
 Reference: [Modality models as an input](../advanced/modality-models.md).
 :::
 

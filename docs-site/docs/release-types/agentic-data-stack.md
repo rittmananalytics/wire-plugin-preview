@@ -131,3 +131,26 @@ At engagement end, the client has:
 4. An installable Wire skill (`agentic-data-stack-SKILL.md`) their data team runs in Claude Code
 5. A per-domain eval suite wired into CI with accuracy baselines
 6. User training documentation and a data team maintenance guide
+
+## Business rules and the metric audit
+
+New in 4.0. `ads_metric-audit` keeps everything it did — the coverage-gap scoring
+against `query_audit`'s real questions, and the semantic-layer promotion
+recommendations — but the half it shares with the new
+[business rules register](../advanced/business-rules.md) now lives in one place.
+
+`specs/utils/definition_extract.md` holds the enumeration across the dbt Semantic
+Layer, LookML and `schema.yml`, and the conflict taxonomy (filter, aggregation,
+grain, name collision). Both commands call it, so the algorithm cannot drift
+between them. It also adds an `--import` path for definitions in systems Wire
+cannot read, such as SAP BW, Hana or SAC, with the export date and the person who
+took it recorded.
+
+Where a release also carries `artifacts/business_rules.yaml`, the metric audit
+reads the agreed decisions from it rather than re-deriving a settled conflict as
+open. A rule with a decision and a named approver is settled; putting a second,
+weaker recommendation next to a signed-off one helps nobody.
+
+`business_rules` itself is not part of this release type. `agentic_data_stack`
+already splits find-conflicts from decide-conflicts between `metric_audit` and
+`ads_governance-design`.

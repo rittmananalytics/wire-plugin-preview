@@ -7,6 +7,24 @@ title: "Tutorial: Agentic Data Stack"
 
 This walkthrough traces an `agentic_data_stack` release for a boutique analytics consultancy with an existing, well-built dbt platform. The problem is not the platform — it is the size of the semantic layer, and what that does to an AI agent's ability to answer questions accurately.
 
+
+:::info New in 4.0 — the metric audit shares its extraction step
+
+`ads_metric-audit` is unchanged in what it produces. The half it shares with the
+new [business rules register](../advanced/business-rules.md) — enumerating
+definitions across the semantic layer, the BI tool and ad-hoc SQL, and
+classifying the conflicts between them — now lives in
+`specs/utils/definition_extract.md`, which both commands call so the algorithm
+cannot drift.
+
+That also brings an `--import` path for definitions in systems Wire cannot read,
+such as SAP BW, Hana or SAC. And where a release carries
+`artifacts/business_rules.yaml`, the metric audit reads the agreed decisions from
+it rather than re-deriving a settled conflict as open.
+
+The steps below are unaffected.
+:::
+
 ## Statement of Work
 
 ```

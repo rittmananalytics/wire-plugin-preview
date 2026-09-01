@@ -170,3 +170,21 @@ Source definitions (grain, keys, fields, owner) live here rather than in their o
 - `delivery_roadmap` carries owner and priority per deliverable, plus an optional leadership `now` / `next` / `later` view and an optional data team recommendation.
 - `stakeholder-interview-generate --workshop <slug>` writes up a group session, with attendee attribution and explicit Agreed and Unresolved sections. A write-up with neither fails validate.
 - `pipeline_design-generate --depth discovery` produces the data flow and the target platform architecture without the operational detail a discovery has not gathered.
+
+## Reading an existing Modality model
+
+New in 4.0. Where the client already models their data in Modality,
+`/wire:utils-modality-link <release-folder>` points the release at it and sets
+`model_source: modality`. `conceptual_model-generate`, `logical_model-generate` and `pipeline_design-generate` then read entities, sources and cardinality from
+the `.mml` files rather than deriving them.
+
+The requirements are still read. An entity in the model but not the requirements
+is excluded with a reason; one in the requirements but not the model becomes an
+open question. Every value taken from the model cites the file it came from, and
+the matching validate commands gain a two-direction `modality_coverage` check.
+
+Full reference: [Modality models as an input](../advanced/modality-models.md).
+
+Under the `modelling_led` profile this is the common case: the client has a model
+and wants it turned into a platform, so the conceptual and logical models are read
+rather than rebuilt.

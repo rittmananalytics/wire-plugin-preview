@@ -97,3 +97,20 @@ reviewed, asks for a one-line reason, records it as an `advisory_skip`, and
 proceeds. Skipping is a real choice; what matters is that the choice is visible.
 
 Full reference: [Business rules discovery](../advanced/business-rules.md).
+
+## Reading an existing Modality model
+
+New in 4.0. Where the client already models their data in Modality,
+`/wire:utils-modality-link <release-folder>` points the release at it and sets
+`model_source: modality`. `pipeline_design-generate` then read entities, sources and cardinality from
+the `.mml` files rather than deriving them.
+
+The requirements are still read. An entity in the model but not the requirements
+is excluded with a reason; one in the requirements but not the model becomes an
+open question. Every value taken from the model cites the file it came from, and
+the matching validate commands gain a two-direction `modality_coverage` check.
+
+Full reference: [Modality models as an input](../advanced/modality-models.md).
+
+The source list and the per-entity landing tables come from `sources.mml`. The
+replication tool and the schedule are not in MML and are still asked for.
