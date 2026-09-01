@@ -185,8 +185,28 @@ there.
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: utility
+artifact: dbt
+domain: development
+release_types:
+  - full_platform
+  - dbt_development
+  - dashboard_first
+  - pipeline_only
+  - dashboard_extension
+  - enablement
+action_type: utility
+logs_execution: true
+preconditions: dynamic
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: Generate dbt warehouse models (_dim/_fact/_agg/_xa) ready for BI consumption
 argument-hint: <project-folder>
+delegates_to:
+  - utils/precondition_gate
 ---
 
 # dbt Warehouse Models — Generate

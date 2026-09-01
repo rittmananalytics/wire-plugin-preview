@@ -111,8 +111,34 @@ with open('.wire/releases/<release_folder>/trace.jsonl', 'a') as f:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: utility
+artifact: dbt
+domain: development
+release_types:
+  - full_platform
+  - dbt_development
+  - dashboard_first
+  - pipeline_only
+  - dashboard_extension
+  - enablement
+action_type: utility
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
+preconditions: dynamic
+delegates_to:
+  - utils/precondition_gate
 description: Validate dbt warehouse models — compile, test referential integrity, and check dimensional conventions (_dim/_fact/_agg/_xa)
 argument-hint: <project-folder>
+---
+
+## Auto-Delegation
+
+Follow `specs/utils/precondition_gate.md` before proceeding.
+
 ---
 
 # dbt Warehouse Models — Validate

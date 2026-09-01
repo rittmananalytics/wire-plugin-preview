@@ -111,8 +111,20 @@ with open('.wire/releases/<release_folder>/trace.jsonl', 'a') as f:
 ## Workflow Specification
 
 ---
+wire_schema: "1.0"
+command: lifecycle
+artifact: delegate
+domain: delegate
+release_types: []
+action_type: lifecycle
+logs_execution: true
+inputs:
+  required:
+    - name: release_folder
+      description: "Path to the release folder"
 description: Decompose a release's pending work into typed tasks and dispatch to specialist local subagents
 argument-hint: <release-folder>
+
 ---
 
 # Wire Delegate Command
