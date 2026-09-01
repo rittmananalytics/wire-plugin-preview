@@ -122,6 +122,7 @@ release_types:
   - pipeline_only
   - dashboard_extension
   - enablement
+  - sop_discovery
 action_type: artifact
 logs_execution: true
 inputs:
@@ -134,9 +135,9 @@ preconditions:
     outcome: complete
 delegates_to:
   - utils/precondition_gate
+  - utils/mml_import
 description: Validate pipeline design and data flow diagram against best practices
 argument-hint: <project-folder>
-
 ---
 
 ## Auto-Delegation
@@ -298,6 +299,33 @@ If the pipeline design presents multiple scenarios (A/B/C) but no recommendation
 
 - Validation report (displayed to user)
 - Updates `.wire/<project_id>/status.md` with validate result and date
+
+
+---
+
+## Check: `modality_coverage`
+
+Runs only when `status.md` has `model_source: modality`. Skipped with the reason
+recorded otherwise, never reported as PASS.
+
+Both directions, per `specs/utils/mml_import.md`, "The `modality_coverage` check":
+
+1. Every conceptual entity in the `.mml` files appears in this document or in its
+   explicitly-excluded list with a reason. Unaccounted entities are FAIL, named.
+2. Every entity in this document maps to an MML entity or to a requirement. An
+   entity in neither is FAIL, named.
+
+Entities with `type = metric` are outside direction 1: they are semantic-layer
+measure candidates, not conceptual entities.
+
+**A missing `entity_resolutions.mml` is never a failure of this check.** The
+Modality specification does not define that block, so a model written to the
+specification never has one. Treating its absence as a gap would fail every
+hand-authored model.
+
+The same applies to a missing `logical_relationships.mml`: cardinality falls
+through to the `relationship` block and then the inline verb, and only a
+relationship that yields nothing in all three places is `undetermined`.
 
 Execute the complete workflow as specified above.
 

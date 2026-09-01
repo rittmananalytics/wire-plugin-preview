@@ -204,7 +204,7 @@ preconditions:
 delegates_to:
   - utils/precondition_gate
 description: Generate a stakeholder interview write-up with the mandatory four-tag template
-argument-hint: "[release-folder] --stakeholder <slug>"
+argument-hint: "[release-folder] --stakeholder <slug> | --workshop <slug>"
 
 ---
 
@@ -365,6 +365,54 @@ Show: the file path, the count of theme bullets, the count of themes with uncert
 
 - `.wire/releases/$ARGUMENTS/planning/interviews/<slug>.md`
 - Updated `.wire/releases/$ARGUMENTS/status.md`
+
+
+---
+
+## `--workshop <slug>` mode
+
+A modelling-led discovery gathers most of its material in group workshops rather
+than one-to-one interviews: a domain session with six people in a room, or a
+model walkthrough with the data team. The four-tag discipline still applies, but
+the write-up needs a different shape, because attribution and agreement work
+differently in a group.
+
+Invoked as `/wire:stakeholder-interview-generate <release> --workshop <slug>`.
+Writes `interviews/workshop_<slug>.md`.
+
+### What changes
+
+| | `--stakeholder` | `--workshop` |
+|---|---|---|
+| Attendees | One person | A list, each with role, and each marked present or apologised |
+| Tagged findings | Attributed to the interviewee | Attributed to the named speaker. A finding nobody will own is recorded as `attributed: room` |
+| Agreement | Not applicable | An explicit Agreed list, each with who agreed and who was in the room |
+| Disagreement | Not applicable | An explicit Unresolved list, with both positions and both names |
+| Open items | Follow-ups for that person | Follow-ups with a named owner and a date |
+
+### Required sections
+
+1. **Attendees** — name, role, present or apologised. An apologised invitee whose
+   domain was discussed anyway is flagged, because their absence is a risk to
+   anything agreed about their area.
+2. **Tagged findings** — the same four mandatory tags, each attributed to a named
+   speaker or to `room`.
+3. **Agreed** — one line per decision, with who agreed. This is the section that
+   makes a workshop write-up worth writing: a decision taken in a room and never
+   recorded is the most expensive kind of lost work.
+4. **Unresolved** — one line per disagreement, both positions, both names, and who
+   will settle it.
+5. **Open items** — owner and date each.
+
+### What `validate` checks in this mode
+
+The four-tag rule applies unchanged. Additionally: every attendee marked present
+appears at least once as an attributor or is explicitly noted as having not
+spoken to the record; every Unresolved entry has two attributed positions and a
+named settler; every Open item has an owner and a date. A workshop write-up with
+an empty Agreed list and an empty Unresolved list is FAIL, reason
+`no_outcomes_recorded` — a session that produced neither agreement nor
+disagreement did not happen as recorded.
 
 Execute the complete workflow as specified above.
 

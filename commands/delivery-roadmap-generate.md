@@ -197,14 +197,10 @@ inputs:
   required:
     - name: release_folder
       description: "Path to the release folder"
-preconditions:
-  - artifact: findings_playback
-    action: review
-    outcome: approved
+preconditions: dynamic
 delegates_to:
   - utils/precondition_gate
 description: Generate the delivery roadmap with Build / Pair / Coach options
-
 ---
 
 ## Auto-Delegation
@@ -399,6 +395,60 @@ Show: Release 1 row count, preferred delivery option, top three Phase 1 risks.
 
 - `.wire/releases/$ARGUMENTS/planning/delivery_roadmap.md`
 - Updated `.wire/releases/$ARGUMENTS/status.md`
+
+
+---
+
+## Per-deliverable owner and priority
+
+Every deliverable in the Release 1 breakdown carries two more columns:
+
+| Column | Values | Rule |
+|---|---|---|
+| `owner` | A named person, or `RA` / `client` / `joint` | Never blank. `unassigned` is allowed and appears in the review as a question |
+| `priority` | `must` / `should` / `could` | Taken from the requirements matrix MoSCoW value where the deliverable traces to a matrix row; asked where it does not |
+
+A deliverable whose priority disagrees with the matrix row it traces to is
+flagged, not silently overridden: the roadmap is where a sponsor changes their
+mind about priority, and that change should be visible as a change.
+
+## Optional section: leadership view
+
+Off by default, on for the `modelling_led` profile. A one-page view for an
+audience that will not read the deliverable breakdown: initiatives grouped as
+`now` / `next` / `later`, each with its business value, its indicative cost, and
+the capability it unlocks.
+
+Rules:
+
+- An initiative groups deliverables; it is not a rename of one deliverable.
+- `now` must be deliverable within the appetite the engagement brief states. An
+  overloaded `now` is the most common failure of this view, and `validate` checks
+  the count against the brief's stated capacity.
+- Cost is indicative and labelled as such, carrying the assumption it rests on.
+- Every initiative traces to at least one matrix row. An initiative with no
+  requirement behind it is a proposal, and belongs in the target platform
+  architecture rather than the roadmap.
+
+## Optional section: data team recommendation
+
+Off by default, on for the `modelling_led` profile. What the client's own team
+needs to run the platform after RA leaves: roles, the skills each needs, whether
+each is a hire, a reallocation or training, and the order to fill them in.
+
+Written as a recommendation with reasons, not an org chart. Where the People axis
+diagnosis exists (`diagnostic` profile), it cites it. Under `modelling_led` it
+cites the appraisal's governance and ownership section instead.
+
+## Free sections
+
+Engagement-specific roadmap material goes in its own section, added with
+`--section "<title>"`. Sizing a migration and its exposure, an acquisition
+integration programme, a regulatory deadline: each matters to one engagement and
+is noise everywhere else, so the framework does not name them.
+
+A free section carries the same discipline as the standing ones: every claim
+traces to a matrix row, an appraisal finding, or a named person.
 
 Execute the complete workflow as specified above.
 

@@ -191,20 +191,17 @@ artifact: sprint_plan
 domain: discovery
 release_types:
   - discovery_shape_up
+  - sop_discovery
 action_type: artifact
 logs_execution: true
 inputs:
   required:
     - name: release_folder
       description: "Path to the release folder"
-preconditions:
-  - artifact: release_brief
-    action: review
-    outcome: approved
+preconditions: dynamic
 delegates_to:
   - utils/precondition_gate
 description: Generate sprint plan with epics, stories, and point estimates from the release brief
-
 ---
 
 ## Auto-Delegation

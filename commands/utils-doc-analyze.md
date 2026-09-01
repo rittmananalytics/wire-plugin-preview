@@ -221,6 +221,14 @@ For each extracted deliverable, score it against the Wire artifact keyword table
 | deployment, release, CI/CD, cloud run, infrastructure | `deployment` | deployment-generate, deployment-validate, deployment-review |
 | training, enablement, knowledge transfer, documentation, runbook | `training` / `documentation` | training-generate, training-validate, training-review |
 | mockup, wireframe, prototype, Figma, screen design | `mockups` | mockups-generate, mockups-review |
+| conceptual model, entity model, domain model, enterprise data model | `conceptual_model` | conceptual_model-generate, conceptual_model-validate, conceptual_model-review |
+| logical model, cardinality, identity resolution, golden record, normalisation, attribution rules, source definitions, grain | `logical_model` | logical_model-generate, logical_model-validate, logical_model-review |
+| current state, as-is, appraisal, platform audit, landscape review, source inventory | `current_state_appraisal` | current-state-appraisal-generate, current-state-appraisal-validate, current-state-appraisal-review |
+| roadmap, phasing, now next later, delivery plan, initiative prioritisation | `delivery_roadmap` | delivery-roadmap-generate, delivery-roadmap-validate, delivery-roadmap-review |
+| findings, playback, readout, discovery deck, sponsor presentation, sign-off session | `findings_playback` | findings-playback-generate, findings-playback-validate, findings-playback-review |
+| requirements matrix, MoSCoW, business questions, requirement traceability | `requirements_matrix` | requirements-matrix-generate, requirements-matrix-validate, requirements-matrix-review |
+| build plan, sprint plan, capacity, appetite, release schedule | `sprint_plan` | sprint-plan-generate, sprint-plan-validate, sprint-plan-review |
+| mml, modality, existing model, model repository, `.mml` | `modality_link` | utils-modality-link |
 
 **Scoring method**:
 - Count keyword matches between the deliverable name + description and each cluster

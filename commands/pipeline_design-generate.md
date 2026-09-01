@@ -196,18 +196,22 @@ release_types:
   - pipeline_only
   - dashboard_extension
   - enablement
+  - sop_discovery
 action_type: artifact
 logs_execution: true
 inputs:
+  optional:
+    - name: depth
+      description: "--depth discovery limits the document to sources, stages, landing entities and the target platform architecture, omitting error handling, scheduling and monitoring. Default full."
   required:
     - name: release_folder
       description: "Path to the release folder"
 preconditions: dynamic
 delegates_to:
   - utils/precondition_gate
+  - utils/mml_import
 description: Design data pipeline architecture including data flow diagram
-argument-hint: <project-folder>
-
+argument-hint: <project-folder> [--depth discovery|full]
 ---
 
 ## Auto-Delegation
@@ -569,6 +573,89 @@ If the client already has a pipeline (e.g. Fivetran partially configured):
 This command creates:
 - `.wire/<project_id>/design/pipeline_architecture.md` (includes DFD)
 - Updates `.wire/<project_id>/status.md`
+
+
+---
+
+## Depth: `discovery` versus `full`
+
+`--depth full` (the default) is the standing behaviour: the complete pipeline
+architecture, including error handling, retry policy, scheduling, alerting and
+monitoring.
+
+`--depth discovery` produces a lighter document for a discovery engagement, where
+the deliverable is the shape of the platform rather than its operational detail.
+It emits:
+
+- Section 1, sources and their landing entities
+- The data flow diagram
+- Section A below, the target platform architecture
+
+and omits error handling, retry policy, scheduling, alerting and monitoring. Those
+sections are stubbed with one line naming the release that will produce them, so a
+reader knows they are deliberately absent rather than forgotten.
+
+A `sop_discovery` release under the `modelling_led` profile runs at
+`--depth discovery`. Running `--depth full` there is allowed and produces a
+document the discovery has not gathered the inputs for, so it warns first.
+
+## Section A: Target platform architecture
+
+The one place Wire writes down *what we propose the platform should be*. In the
+`diagnostic` profile this lives in the Solution Initiatives section of
+`discovery_analyses`, and the `modelling_led` profile switches that document off,
+so it needs a home here.
+
+Not a vendor shortlist and not a cost model. One subsection per layer, each
+stating the proposed approach, the reason, and what it rules out:
+
+| Layer | What the subsection settles |
+|---|---|
+| Ingestion | Managed connectors, code-first, or both, and which sources go which way |
+| Storage | Warehouse or lakehouse, and the region and residency constraint that drives it |
+| Transformation | The modelling tool and the layering convention it will follow |
+| Orchestration | What triggers what, and where dependency and failure are handled |
+| Semantic layer | Whether metrics are defined once centrally, in the BI tool, or both, and who owns them |
+| Agentic analytics | Whether conversational or agent access is in scope, and what would have to be true first |
+| Access and governance | How access is granted, by role or by row, and who administers it |
+
+Each subsection carries a `Constrained by` line naming the appraisal finding
+(`CS-n`) or requirement that constrains it, and a `Ruled out` line naming what the
+choice forecloses. A layer with no constraint and nothing ruled out has not been
+decided, it has been described, and `validate` reports it as
+`undecided_layer`.
+
+Where the client has already committed to a component, record it as a given with
+who committed and when, rather than presenting it as a choice.
+
+
+---
+
+## `model_source: modality`
+
+When `status.md` has `model_source: modality`, read the client's existing Modality
+model as the input to the sections named below.
+
+What this command takes from the model: Section 1's source list and per-entity landing tables from `sources.mml`. Replication tool and schedule are not in MML and are still asked for. Follow
+`specs/utils/mml_import.md` first: it carries the block grammar, the two
+vocabularies the specification and the application disagree on, and the
+cardinality resolution order.
+
+The model does not replace the requirements. Both are read, and the difference
+between them is itself a finding:
+
+- An entity in the model and not in the requirements goes in the excluded list
+  with the reason "in the Modality model, not in requirements scope". It is not
+  silently carried into scope.
+- An entity in the requirements and not in the model goes in the open questions.
+  It is not silently added to the model's entity set.
+
+Every value taken from the model cites the `.mml` file it came from. A reader
+comparing the Wire document against the model needs to know which claims came from
+where, and a later write-back needs to know which claims are new.
+
+`validate` runs the `modality_coverage` check in both directions. Its rules,
+including the ones about what absence means, are in `specs/utils/mml_import.md`.
 
 Execute the complete workflow as specified above.
 

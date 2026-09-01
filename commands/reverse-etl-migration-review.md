@@ -143,7 +143,7 @@ Follow `specs/utils/precondition_gate.md` before proceeding.
 
 ## Purpose
 
-Internal RA review of the reverse ETL migration runbook before execution. Confirms SQL translations are correct, rebuild plans are feasible, the decoy destination mapping is sound, and the PR-gated cutover sequence (two client-merged PRs) is agreed.
+Internal RA review of the reverse ETL migration runbook before execution. Confirms SQL translations are correct, rebuild plans are feasible, the destination mapping is sound (decoy rows, and gate evidence for any `destination_mode: dedicated` rows), and the PR-gated cutover sequence is agreed (two client-merged PRs, or one under the `additive_dedicated_destination` topology).
 
 
 The `migration_approach` vocabulary is the closed set in `specs/utils/reverse_etl_approach.md` (normative): `repoint`, `rewrite_model`, `rebuild`, `decommission`. There is no `retire` value.
@@ -170,16 +170,16 @@ Summary to present:
 - Any SQL translations with non-trivial changes, and any drift-adjusted columns
 - Customer Studio rebuilds and their estimated effort
 - Lightning schema requirements and service account permissions
-- Decoy destination mapping (production → decoy IDs) and the scoped credential
-- The two-PR cutover plan (PR B disable source-origin, PR C enable target-origin, merged together by the client)
+- Destination mapping (production → decoy IDs per decoy-mode sync; gate evidence per dedicated-mode sync) and the scoped credential
+- The cutover plan: two PRs for decoy-mode syncs (PR B disable source-origin, PR C enable target-origin, merged together by the client), or one PR for dedicated-mode syncs (add new paused syncs + disable old, together)
 
 ### Step 3: Gather reviewer feedback
 
 1. Are the SQL translations correct and do they preserve business logic — including any drift-adjusted columns?
 2. Are the Customer Studio rebuild plans complete — are there any trait definitions, related models, or Journey steps that are missing?
 3. Is the warehouse service account scoped correctly, and is the decoy-destination credential restricted to decoy targets only (no production-destination grant)?
-4. Is the decoy mapping complete — one decoy of the same destination type per in-scope sync — and are production destination IDs confirmed absent from the test syncs?
-5. Is the two-PR cutover sequence agreed (PR B disable source-origin, PR C enable target-origin, merged together), and who on the client side owns the merge?
+4. Is the destination mapping complete — one decoy of the same destination type per in-scope decoy-mode sync, and per dedicated-mode sync the gate evidence that the destination exists and no existing sync writes to it — and are production destination IDs confirmed absent from the decoy-mode test syncs?
+5. Is the cutover sequence agreed (two PRs for decoy-mode syncs: PR B disable source-origin, PR C enable target-origin, merged together; one PR for dedicated-mode syncs), and who on the client side owns the merge?
 
 ### Step 4: Apply feedback and record decision
 

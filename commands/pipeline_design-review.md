@@ -122,6 +122,7 @@ release_types:
   - pipeline_only
   - dashboard_extension
   - enablement
+  - sop_discovery
 action_type: artifact
 logs_execution: true
 inputs:
@@ -136,7 +137,6 @@ delegates_to:
   - utils/precondition_gate
 description: Record stakeholder review feedback on pipeline design
 argument-hint: <project-folder>
-
 ---
 
 ## Auto-Delegation

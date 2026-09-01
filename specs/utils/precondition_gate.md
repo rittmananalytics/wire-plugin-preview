@@ -53,9 +53,45 @@ If `preconditions` is the literal string `dynamic`:
 4. If this artifact doesn't appear in that YAML at all, treat it the same as
    an empty list — proceed with no gate. (Not every release type uses every
    shared artifact — e.g. `dbt_development` has no `mockups` phase at all.)
+5. **Apply the active profile's overrides, if the release type declares any.**
+   Some release types offer more than one route through the same pillars, and
+   the routes disagree on order — `sop_discovery`'s `modelling_led` profile
+   signs the roadmap off *at* the playback, where `diagnostic` produces it
+   *after*. A release type expresses that with a `profiles:` block and a
+   `default_profile`, and a release records its choice in `status.md`.
+
+   Resolve it in this order:
+
+   a. Read the profile field named by the release type's `profile_field`
+      (`sop_discovery` uses `discovery_profile`) from `status.md`
+      front-matter. If the field is absent or blank, use `default_profile`.
+   b. If the resolved profile id is not in `profiles[]`, stop and report the
+      mismatch naming the valid ids. Do not fall back to the default: a
+      release recording a profile the release type does not define is a
+      status-file error, and guessing hides it.
+   c. If that profile has a `phase_overrides[]` entry whose `id` matches the
+      phase this artifact sits in, and that entry names this artifact under
+      `artifacts[]`, use the override's `depends_on` **in place of** the list
+      from step 3. An override replaces the gate; it does not merge with it.
+   d. A phase in the profile's `disable_phases[]` is not applicable to this
+      release. If the artifact being gated sits in a disabled phase, stop and
+      report that the artifact is not part of the active profile, naming the
+      profile and the phase. This is not a precondition failure and it is not
+      overridable — running it would produce an artifact nothing downstream
+      reads.
+   e. A phase in `enable_phases[]` is applicable even though its YAML entry
+      says `required: false`. `required` describes the default; the profile
+      decides applicability.
 
 Then continue to Step 1 using the resolved list in place of the front-matter
 value.
+
+**Phases that are off, versus artifacts that are merely optional.** An
+optional artifact (`required: false`) that the active profile has not enabled
+is skippable and not an error — `/wire:status` reports it as not applicable
+rather than not started, and nothing downstream gates on it. A *disabled*
+phase is stronger: the profile has ruled it out, so the command refuses in
+step (d) above.
 
 ### Step 1: Check each precondition against status.md
 
@@ -73,6 +109,21 @@ outcome}` entry in the (possibly Step-0-resolved) `preconditions`:
 
 If every precondition is met, return to the calling spec immediately with no
 output — this gate adds no friction to the compliant path.
+
+### Step 1b: Separate blocking preconditions from advisory ones
+
+A `depends_on` entry may carry `enforcement: blocking` (the default, and the value
+assumed when the key is absent) or `enforcement: advisory`.
+
+An advisory precondition is one where running without it is a real choice a
+consultant may legitimately make, and where blocking would produce a skipped gate
+rather than a met one. `business_rules` is the case that introduced it: agreeing
+what the numbers mean before design is right, and making it a hard gate on a team
+that already skips gates yields a bypass, not a register.
+
+Sort the unmet preconditions into two lists. If every unmet precondition is
+advisory, go to Step 2b. If any unmet precondition is blocking, go to Step 2 and
+report the advisory ones alongside as context.
 
 ### Step 2: Block by default
 
@@ -95,6 +146,39 @@ Override and proceed anyway? (yes / no)
 - **no** — output `Stopping — clear the blocker(s) above, then re-run.` and do
   not proceed with the calling spec's workflow.
 - **yes** — continue to Step 3.
+
+### Step 2b: Advisory — warn, ask for a reason, proceed
+
+Where every unmet precondition is advisory, do not block. Output:
+
+```
+⚠️  Advisory precondition not met
+
+  business_rules review: not_started
+    Recommended before conceptual_model, so a definition is agreed before the
+    design bakes one in.
+
+  Proceeding without it is allowed. Skipping is recorded, not assumed.
+
+  Reason for proceeding (one line):
+```
+
+Take the consultant's one-line reason. Then record the skip in `status.md` under
+`advisory_skips`, and write an `advisory_skip` entry to `execution_log.md` naming
+the artifact, the unmet precondition, the reason and the date.
+
+A blank reason is not accepted. Ask once more, and if it is blank again, record
+`reason: none given` rather than looping — the record of the skip matters more
+than the quality of the reason, and a consultant in a hurry should not be trapped
+by a prompt.
+
+Then proceed to the calling spec's workflow.
+
+**Why a reason at all.** Recommendation R6 in the Hunkemöller usage review found
+seven releases with no recorded review and a reverted change that had gone in
+without one, and concluded that a deliberate skip should be visible rather than
+absent. An advisory gate that logged nothing would be indistinguishable from a
+gate nobody had thought about.
 
 ### Step 3: Capture the override
 

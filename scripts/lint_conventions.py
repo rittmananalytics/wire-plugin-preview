@@ -150,6 +150,20 @@ def check_file_content_rules(conv, filepath, text, layer=None):
                 pat = re.compile(rule["required_pattern"], re.IGNORECASE | re.MULTILINE)
                 if not pat.search(text):
                     findings.append(Finding(rid, severity, filepath, f"{desc} — not found in file"))
+            # A conditional check: only applies where a marker is present, so it
+            # never fires on a project that has not opted into the convention.
+            # Used by the wire_business_rule citation rules (wire#229): a model is
+            # not required to cite a business rule, but one that does must cite it
+            # in the form the register can be matched against.
+            if "marker_pattern" in rule and "required_pattern_if_present" in rule:
+                marker = re.compile(rule["marker_pattern"], re.IGNORECASE)
+                if marker.search(text):
+                    pat = re.compile(rule["required_pattern_if_present"],
+                                     re.IGNORECASE | re.MULTILINE)
+                    if not pat.search(text):
+                        findings.append(Finding(
+                            rid, severity, filepath,
+                            f"{desc} — marker present but the required form is not"))
     return findings
 
 

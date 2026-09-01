@@ -12,6 +12,11 @@ jira:
   structure: subtasks       # subtasks (default — one Task + 3 Sub-tasks per artifact) | single_issue (one Task per artifact, status transitions)
   epic_key: null
   artifacts:
+    business_rules:
+      task_key: null
+      generate_key: null
+      validate_key: null
+      review_key: null
     requirements:
       task_key: null
       generate_key: null
@@ -290,7 +295,31 @@ docstore:
         page_url: null
         last_synced: null
 
+# Where the data model comes from. `derived` builds it from the approved
+# requirements. Any other value names an external model that already holds
+# entities, keys and cardinality, which logical_model reads rather than restates.
+model_source: derived
+# Set by /wire:utils-modality-link when model_source is modality. The directory
+# holding modality_project.yaml, relative to the repo root, or absolute for a
+# client-owned repository.
+modality_path: null
+
+# Advisory preconditions the consultant chose to proceed without, recorded by
+# specs/utils/precondition_gate.md Step 2b. Each entry: artifact, unmet
+# precondition, reason, date. A skip that is logged is visible; an omitted gate
+# is not.
+advisory_skips: []
+
 artifacts:
+  # Optional first phase. Discover, define and agree what the numbers mean before
+  # design bakes a definition in. Warning-level gate, not blocking.
+  business_rules:
+    generate: not_started
+    validate: not_started
+    review: not_started
+    file: null
+    domains_covered: []
+    generated_date: null
   requirements:
     generate: not_started
     validate: not_started
@@ -322,6 +351,14 @@ artifacts:
     generated_date: null
     generated_files: []
     revision_history: []
+  # Optional. Worth running when identity resolution, cardinality or attribution
+  # is contested, so those decisions get reviewed before they arrive as dbt models.
+  logical_model:
+    generate: not_started
+    validate: not_started
+    review: not_started
+    file: null
+    generated_date: null
   data_model:
     generate: not_started
     validate: not_started

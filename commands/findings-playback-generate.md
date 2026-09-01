@@ -197,14 +197,10 @@ inputs:
   required:
     - name: release_folder
       description: "Path to the release folder"
-preconditions:
-  - artifact: discovery_analyses
-    action: review
-    outcome: approved
+preconditions: dynamic
 delegates_to:
   - utils/precondition_gate
 description: Generate the Findings Playback slide deck — the canonical sponsor-facing exit deliverable
-
 ---
 
 ## Auto-Delegation
@@ -370,6 +366,82 @@ Show:
 - `.wire/releases/$ARGUMENTS/playback/deck-stage.js`
 - `.wire/releases/$ARGUMENTS/playback/fonts/...`
 - Updated `.wire/releases/$ARGUMENTS/status.md`
+
+
+---
+
+## Profile-aware deck
+
+The standing deck's spine is the three analyses: the Hierarchy of Needs chart, the
+People–Process–Technology chart, the per-axis quote slides and the maturity pin.
+The `modelling_led` profile switches those analyses off, so that deck has no
+content to carry and a show/hide switch on four sections cannot fix it.
+
+Read `discovery_profile` from `status.md` and build from the matching template:
+
+| Profile | Template | Spine |
+|---|---|---|
+| `diagnostic` | `decks/findings_playback/` | Three analyses, maturity pin, vision, solution initiatives, roadmap |
+| `modelling_led` | `decks/findings_playback_modelling_led/` | Current state, conceptual model, logical model, data flow and target architecture, roadmap |
+
+### The `modelling_led` deck
+
+Follows the three pillars, in order, and every substantive slide renders content
+from an approved artifact rather than restating it:
+
+1. **Context and process** — the engagement question, who was spoken to, how many
+   interviews and workshops. From the engagement brief and the interview set.
+2. **Current state** — the platform as it is, the sources, and the gaps found.
+   From `current_state_appraisal.md` Sections 1 to 9. The Gaps list from Section 10
+   appears in full: a sponsor should see what we could not establish.
+3. **Business questions** — the `#question` rows from the requirements matrix, with
+   value where recorded. This is the bridge from current state to target.
+4. **Conceptual model** — the entity and domain diagram, plus the entities that
+   were explicitly excluded and why.
+5. **Logical model** — the decisions, not the diagram: source precedence per
+   contested entity, the attribution rules with their remainders, and the open
+   questions. These are the slides that generate discussion, so they carry the
+   consequence in plain words rather than the rule in notation.
+6. **Data flow and target architecture** — the discovery-depth data flow, then one
+   slide per platform layer from `pipeline_design.md` Section A, each with its
+   `Constrained by` and `Ruled out` lines.
+7. **Roadmap** — the leadership `now` / `next` / `later` view, then the Release 1
+   breakdown with owners and priorities.
+8. **What we are asking you to sign off** — the five items in Step: Sign-off
+   below, each with its document link.
+
+A slide with no backing artifact is not generated. Where an optional artifact was
+not run, its section is omitted and the omission is listed on the sign-off slide,
+so nobody signs off something that was never produced.
+
+## Sign-off, in the profile's own deliverables
+
+The `sponsor_validation` checklist is written in the canonical playbook's
+vocabulary: maturity pin confirmed, hierarchy diagnosis accepted, PPT diagnosis
+accepted, vision statement agreed, solution initiatives prioritised. A
+modelling-led discovery produces none of those, so nothing can be ticked.
+
+Read `discovery_profile` and use the matching checklist.
+
+**`diagnostic`** — the standing checklist, unchanged.
+
+**`modelling_led`** — five items, each naming the artifact it signs off:
+
+| Item | Artifact | What the sponsor is accepting |
+|---|---|---|
+| Current state accepted | `current_state_appraisal.md` | This is what we have, including the gaps |
+| Conceptual model signed off | `conceptual_model.md` | These are our entities and how they relate |
+| Logical model signed off | `logical_model.md` | These source precedence and attribution rules are correct |
+| Data flow accepted | `pipeline_design.md` | This is the shape of the platform we are proposing |
+| Roadmap agreed | `delivery_roadmap.md` | This is the order and the split of work |
+
+Because the roadmap is one of the five, `delivery-roadmap-generate` runs **before**
+the playback under this profile, not after it. The release type's
+`modelling_led` profile carries that ordering as a `phase_overrides` entry, so the
+precondition gate enforces it.
+
+An item whose artifact was not run is recorded `not applicable` with the reason,
+never ticked and never silently dropped.
 
 Execute the complete workflow as specified above.
 

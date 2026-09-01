@@ -353,6 +353,43 @@ Show: total requirements after de-dup, breakdown by Hierarchy tier and PPT axis,
 - `.wire/releases/$ARGUMENTS/planning/requirements_matrix.md`
 - Updated `.wire/releases/$ARGUMENTS/status.md`
 
+
+---
+
+## Optional columns: business value and ROI measure
+
+Off by default. Enabled by `requirements_matrix.optional_columns` in `status.md`,
+or asked for at generate time. A modelling-led discovery normally wants them,
+because its roadmap is presented to a sponsor who is choosing between initiatives.
+
+| Column | Content | Rule |
+|---|---|---|
+| `business_value` | What the business gets, in its own words, with a figure where the stakeholder gave one | Never invented. A row whose stakeholder gave no value statement reads `not stated`, not a guess |
+| `roi_measure` | The measure that would show the value landed, and where it is read from today | Must name a measure that exists or state that it does not exist yet |
+
+`not stated` is a legitimate value and appears in the review as a question for the
+sponsor. A fabricated value figure is worse than a blank, because the roadmap is
+prioritised against it.
+
+## Optional type tag: `#question`
+
+The four mandatory tags (`#pain`, `#goal`, `#constraint`, `#opportunity`) classify
+what a stakeholder said. A modelling-led discovery also gathers the business
+questions the platform must answer, which are not any of the four: "what is our
+gross margin by channel by week" is neither a pain nor a goal.
+
+`#question` marks a row as a business question. A `#question` row:
+
+- states the question as the business asks it, not as a metric name
+- names the entities it needs, which become a coverage check against the
+  conceptual model
+- carries its `business_value` and `roi_measure` when those columns are on
+
+`logical_model-validate` and `conceptual_model-validate` do not fail on a
+`#question` row whose entities are missing; `delivery_roadmap-generate` reads them
+as candidate Release 1 scope. The tag is additive: it does not replace the four,
+and a row may carry `#question` alongside `#pain`.
+
 Execute the complete workflow as specified above.
 
 ## Execution Logging

@@ -211,6 +211,19 @@ testing:
 # ----------------------------------------------------------------------
 # Documentation requirements
 # ----------------------------------------------------------------------
+# ----------------------------------------------------------------------
+# Business-rule citation — links a model back to the register that agreed its
+# definition (wire#229). Advisory: only releases that ran business_rules have a
+# register to cite, so this never fails a project that has not opted in.
+# ----------------------------------------------------------------------
+business_rules:
+  - id: business_rule_id_format
+    description: "A model citing a business rule uses meta.wire_business_rule: BR-<n>, matching an id in artifacts/business_rules.yaml"
+    scope: file_content
+    marker_pattern: 'wire_business_rule'
+    required_pattern_if_present: 'wire_business_rule:\s*BR-\d+\s*$'
+    severity: warning
+
 documentation:
   - id: warehouse_columns_documented
     description: "Every warehouse-layer column has a description (via field_descriptions.md doc blocks)"

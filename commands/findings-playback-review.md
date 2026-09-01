@@ -351,6 +351,36 @@ This is checked by `/wire:status` and surfaced as a hard gate before `/wire:rele
 - `.wire/releases/$ARGUMENTS/playback/playback_meeting_notes.md`
 - Updated `.wire/releases/$ARGUMENTS/status.md`
 
+
+---
+
+## Recording the sign-off under `modelling_led`
+
+The playback is the sign-off gate, and under this profile it signs off five
+artifacts at once. Record the outcome per item, not once for the deck:
+
+```yaml
+sponsor_validation:
+  profile: modelling_led
+  held_date: YYYY-MM-DD
+  sponsor: <name>
+  items:
+    current_state_accepted:     accepted | accepted_with_changes | rejected | not_applicable
+    conceptual_model_signed_off: ...
+    logical_model_signed_off:    ...
+    data_flow_accepted:          ...
+    roadmap_agreed:              ...
+```
+
+An item recorded `accepted_with_changes` names the changes and the artifact they
+land in, and that artifact returns to `review: changes_requested`. The playback
+itself is `approved` only when every item is `accepted`, `accepted_with_changes`
+with the changes recorded, or `not_applicable` with a reason.
+
+A rejected item blocks the playback. The roadmap that follows a rejected
+conceptual or logical model would be costed against a model the client does not
+accept.
+
 Execute the complete workflow as specified above.
 
 ## Execution Logging

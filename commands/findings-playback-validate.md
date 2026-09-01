@@ -295,6 +295,47 @@ Show: critical-unfilled count, TODO count, top issue.
 - `.wire/releases/$ARGUMENTS/playback/findings_playback_validation.md`
 - Updated `.wire/releases/$ARGUMENTS/status.md`
 
+
+---
+
+## Profile-aware checks
+
+Read `discovery_profile` from `status.md` before running the checks below.
+
+**Check: the right deck was built**
+The deck's template matches the profile. A `modelling_led` release carrying the
+diagnostic deck is FAIL, reason `wrong_deck_template` — it is the failure mode
+this profile exists to prevent, and it produces a deck of empty analysis slides.
+
+**Check: every substantive slide has a backing artifact**
+For each content slide, the artifact it renders from exists and is
+`review: approved`. A slide rendering from an unapproved artifact is FAIL, naming
+both. A slide rendering from nothing is FAIL, reason `unbacked_slide`.
+
+**Check: the sign-off checklist matches the profile**
+Under `modelling_led`, the checklist has the five items in the generate spec's
+table and no items from the canonical vocabulary. A maturity pin or PPT item
+present under this profile is FAIL, reason `checklist_profile_mismatch`.
+
+**Check: omissions are declared**
+Every optional artifact the release did not run appears on the sign-off slide as
+`not applicable` with a reason. An omitted section with no declaration is FAIL:
+the sponsor must be able to see what was not produced.
+
+**Check: roadmap precedes the playback under `modelling_led`**
+`artifacts.delivery_roadmap.review` is `approved`. Under this profile the roadmap
+is part of what is being signed off, so a playback built without it is FAIL,
+reason `roadmap_not_ready`.
+
+Under `diagnostic` this check is SKIP with the reason, since the ordering is
+reversed there by design.
+
+**Check: appraisal gaps are carried, not filtered**
+Every entry in `current_state_appraisal.md` Section 10's first list appears on the
+current-state slides. A gap present in the appraisal and absent from the deck is
+FAIL, named. A deck that quietly drops what we do not know is the one output that
+would make the appraisal's honesty pointless.
+
 Execute the complete workflow as specified above.
 
 ## Execution Logging

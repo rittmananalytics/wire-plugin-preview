@@ -201,6 +201,8 @@ preconditions: []
 description: Inventory existing metric definitions, identify conflicts and coverage gaps
 argument-hint: <release-folder>
 
+delegates_to:
+  - utils/definition_extract
 ---
 
 # Agentic Data Stack — Metric Audit Generate
@@ -231,48 +233,26 @@ Map every metric definition that exists across the client's semantic layer, BI t
 
 ### Step 2: Enumerate Metric Definitions
 
-Collect metric definitions from every available source:
+Follow `specs/utils/definition_extract.md`, Step 2. It carries the enumeration
+across dbt Semantic Layer / MetricFlow, LookML and dbt `schema.yml` measures, and
+the per-definition fields to record.
 
-**dbt Semantic Layer / MetricFlow:**
-```bash
-# List all metrics
-dbt sl list metrics
-# Or read YAML directly
-find <dbt_project_path> -name "*.yml" | xargs grep -l "^metrics:" | head -20
-```
-
-**LookML (Looker):**
-```bash
-# Find all measure definitions
-grep -r "type: \(sum\|count\|average\|count_distinct\|max\|min\)" <lookml_path> --include="*.lkml" -l
-```
-
-**dbt schema.yml measures (if using dbt Semantic Layer but not MetricFlow):**
-```bash
-find <dbt_project_path> -name "*.yml" | xargs grep -l "measures:"
-```
-
-For each metric/measure found, record:
-- Name
-- Source (dbt SL / LookML / schema.yml / BI tool)
-- Definition (SQL expression or aggregation type + field)
-- Grain / time dimensions available
-- Description (if any)
-- Domain
+`--import <path>` is available here too, for a client whose BI-layer logic sits in
+a system Wire cannot read.
 
 ### Step 3: Identify Definition Conflicts
 
-Flag conflicts when the same business concept is defined differently across sources. Common conflict patterns:
+Follow `specs/utils/definition_extract.md`, Step 3. It carries the conflict
+taxonomy: filter difference, aggregation difference, grain difference, name
+collision.
 
-| Conflict type | Example |
-|---|---|
-| Filter difference | `active_users`: Looker filters last 30 days; dbt SL filters last 90 days |
-| Aggregation difference | `revenue`: Looker uses SUM(gross); dbt SL uses SUM(net) |
-| Grain difference | `orders`: Looker counts order lines; dbt SL counts order headers |
-| Name collision | Two metrics named `conversion_rate` measuring different funnels |
+For each conflict, document both definitions and flag for governance_design
+resolution.
 
-For each conflict, document both definitions and flag for governance_design resolution.
-
+**Where `artifacts/business_rules.yaml` exists in the release**, read the agreed
+decisions from it rather than re-deriving the conflict as open. A rule already
+carrying a decision and a named approver is settled, and re-opening it here would
+put a second, weaker recommendation next to a signed-off one.
 ### Step 4: Identify Coverage Gaps
 
 Compare the metric inventory against the most frequently asked analytics questions. Derive the question list from:

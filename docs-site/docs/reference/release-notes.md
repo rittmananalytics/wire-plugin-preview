@@ -40,6 +40,66 @@ This release turns that graph into data — a `wire/release-types/<type>.yaml` p
 **Cross-vertical pattern matching gets the same confident/adjacent tiering verticals already had.** `data_model-generate` Step 3 was rejecting a cross-vertical schema whenever its own description named a specific originating context — `crm_identity_resolution`'s YAML frames it as reconciling contacts "for a consultancy's or agency's own CRM operations," which read as a disqualifier for any client that isn't literally an agency. A real dry run for a B2B SaaS client with a genuine multi-CRM contact-mismatch problem declined it on exactly that basis, even though the underlying technique — union multiple CRM sources, resolve identity by email/domain match — doesn't care what kind of business is running it. Step 3 now asks the same question Step 2 already asks for verticals: is the entity shape and technique still structurally the same problem, regardless of who the schema's description says it was built for. A schema is proposed as an adjacent match, explicitly labeled as a reframe, whenever the technique applies — and only rejected for a genuine structural mismatch, like `finance_revenue_recognition`'s timesheet/engagement-billing model not applying to a subscription business.
 
 **Automatic validation.** Validate used to be a separate step a consultant had to remember to run between generate and review. Every `-generate` command that has a matching `-validate` command for the same artifact now runs that validate step automatically once it finishes writing the artifact, folding the PASS/FAIL result into generate's own output. A new `auto_validate` front-matter field lets a generate command opt out of the default when its validate step is expensive — real compute or live external IO, like `dbt-validate`'s `dbt run`/`dbt test` or a migration/semantic-layer validate querying a live warehouse or BI tool directly — in which case generate states plainly why and that the consultant needs to trigger validate themselves. Injected at build time into the 68 of 74 `-generate` commands with a matching `-validate` counterpart, via the same mechanism [Tracing](../advanced/tracing) already uses. Nothing changes about the gate that actually matters: `review` already requires `validate: PASS` for its own artifact, so an opted-out artifact can never reach review unvalidated — the field only decides *when* validate runs, not *whether* it's required. See [Core Concepts → Automatic validation](../getting-started/core-concepts#automatic-validation).
+
+### Modelling-led discovery
+
+`sop_discovery` now offers two routes through the same three discovery pillars — map the current state, map the target state, agree the roadmap — and the release type says which artifacts and which order each route uses.
+
+`diagnostic` is the canonical playbook, unchanged: the Hierarchy of Needs, People–Process–Technology and Maturity Curve analyses, a findings playback, then the roadmap.
+
+`modelling_led` is for a client who already knows their problems and is buying a model. The analyses come out. A `current_state_appraisal` goes in, factually recording what exists rather than diagnosing what is wrong, with every row carrying its evidence and a confidence rating — and an all-`confirmed` document fails validate, because an appraisal written without system access must separate what it was told from what it checked. A `logical_model` goes in: keys, cardinality, identity resolution with attributed precedence, normalisation, and attribution rules with their remainder handling. Those decisions were previously made implicitly inside `data_model-generate` and arrived already expressed as dbt models, which made them hard to review as decisions.
+
+The roadmap moves ahead of the playback, because under this profile it is one of the five things the sponsor signs off, alongside the current state, the conceptual model, the logical model and the data flow.
+
+That reordering is what required the underlying change. Release types can now declare `profiles[]` with `enable_phases`, `disable_phases` and `phase_overrides`, and the precondition gate resolves the active profile from `status.md` and applies the override. A single static graph per release type could not hold both orders, and leaving the difference in prose would have left the gate enforcing the wrong one.
+
+Also: `--workshop` mode on `stakeholder-interview-generate` for group sessions, with speaker attribution and explicit Agreed and Unresolved sections; `--depth discovery` on `pipeline_design` plus a target platform architecture section; optional `business_value` and `roi_measure` columns and a `#question` tag on the requirements matrix; owner and priority per roadmap deliverable; and a profile-aware playback deck.
+
+Engagement-specific content stays out of the framework: migration sizing and the like are free `--section` additions, not named parts of any artifact.
+
+### Modality models as a design input
+
+Modality writes client data models as `.mml` files into the client's repository. Wire's design commands could not read them, so entities that already existed got typed in again by hand and then diverged.
+
+`/wire:utils-modality-link` points a release at an existing model. `conceptual_model-generate`, `logical_model-generate` and `pipeline_design-generate` then read entities, attributes, relationships, sources and entity resolutions from it, citing the `.mml` file per value. The requirements are still read, and the difference between the two is treated as a finding rather than resolved silently: an entity in the model but not the requirements is excluded with a reason, and one in the requirements but not the model becomes an open question.
+
+The interesting part is that Modality's specification and its application export disagree, and both produce files in the wild. The specification puts cardinality on the conceptual `relationship` block; the export writes a separate `logical_relationship` block and uses different verbs and different entity types. A reader handling only one vocabulary gets the other wrong quietly, losing every cardinality on a hand-authored model and raising an open question per relationship. So `specs/utils/mml_import.md` accepts both, and resolves cardinality in a stated order before falling back to `undetermined`.
+
+Absence is handled with the same care. `entity_resolution` is written by the export and undefined by the specification, so a missing `entity_resolutions.mml` is never a coverage failure — treating it as one would fail every model written to the specification.
+
+The three validate commands gain a two-direction `modality_coverage` check, which reports SKIP with a reason when the release is not linked rather than reporting PASS.
+
+Out of scope: data products, exposures, the physical model, and write-back. When the model is authored in Modality, Modality is where it is maintained.
+
+### Business rules discovery
+
+Wire had no step that established what a metric means before the build started. Requirements are read from documents; the workshops command runs after them and only resolves markers already written in. Neither looked at the data or at the competing definitions in the legacy systems, so a definition disagreement had nowhere to surface and QA was the first place it could appear.
+
+`/wire:business-rules-generate` runs first in a release, one domain at a time, and produces a register: one entry per rule, holding every competing definition with the file or object it came from, what they actually disagree on, the decision, the named approver, and a reconciliation query comparing both readings against the legacy source. That query runs at generate time, which is usually enough to settle a dispute without a meeting.
+
+Four statuses, and the important one is `unknown`, which passes validate. A command that only records what it found cannot record the *absence* of a decision, and that absence is what the register exists to hold. Assumptions expire: `assumed` needs a confirmer and a date, and validate fails once the date passes.
+
+Definitions in systems Wire cannot read come in through `--import`, with the export date and the person who took it recorded, and an illegible export is recorded as unknown rather than guessed.
+
+Rule ids reach into the build. A dbt model or LookML measure carries `wire_business_rule: BR-n`, and validate checks both directions: every agreed rule has an implementation once the release is building, and every citation names a rule that exists.
+
+The gate on each release type's first design artifact is advisory rather than blocking. It warns, takes a one-line reason and records an `advisory_skip`. A hard gate on a team that already skips gates produces a bypass, and the thing that matters is that a skip is visible: an omitted gate and an overlooked one look identical afterwards.
+
+`ads_metric-audit` is not replaced. The shared half — enumerating definitions and classifying the conflicts between them — moves to `specs/utils/definition_extract.md`, which both commands call, and the metric audit keeps its coverage-gap scoring and its semantic-layer promotion recommendations along with all six of its downstream consumers.
+## v3.11.9 — Three carve-out closes from live client review
+
+**Released**: August 2026
+
+Three issues closed, all raised from the same live tenant carve-out engagement in the week after v3.11.8, two of them found by the client's own review rather than Wire's gates.
+
+**The transported card that still read shared data.** The Metabase carve-out transport rewrote four kinds of ids but never the SQL text itself, and a BigQuery card usually names its table in full — `project.dataset.table` — straight in the query. That literal ignores the card's connection, so a transported card kept reading the shared project while the record said `transported`, and equivalency could not see it because both sides read the same literal table. Transport is now a plan, check, write pipeline (#221): `metabase-carveout-transport-generate` writes a complete dry-run plan including a SQL-text rewrite map (each source-project reference mapped to the tenant project, or `no_change_needed` with a recorded reason); `metabase-carveout-transport-validate` re-scans every card independently of the plan and fails on any unaccounted reference; the write step refuses a plan the validate has not passed and applies the SQL rewrites as its fifth rewrite item. One human gate as before — the rewrite is mechanical once the database mapping is confirmed, so it needed deterministic validation, not a second sign-off.
+
+**A topology for destinations that were never shared.** The reverse-ETL migration offered three topologies, all assuming the new sync's destination is either the same live object the old sync writes to (hence the decoy mechanic and a three-PR cutover) or a from-scratch destination needing full re-auth. A carve-out's actual shape — dedicated destinations provisioned by the client before any sync exists — fitted none of them, forcing undocumented overrides. The fourth topology, `additive_dedicated_destination` (#220), points new syncs at the real destination id from the start (still authored paused), skips the decoy mapping outright, and collapses cutover to one PR. Eligibility is gated per destination by the same complete-destination-set machinery the validate already builds: membership in any existing sync's destination set refuses that sync to the decoy path, and an unreadable set refuses everything rather than assuming.
+
+**Seven silent-pass defect classes, encoded.** Wave 1 of the carve-out shipped 88 models through every RA gate — parse, compile, lint, tests, pre-raise equivalency — and the client's reviewer still pushed eight fixing commits before approval. Each fix was a defect class Wire did not encode, and all seven now are (#219): a semantics check on derived tenant predicates (a column can be named like a tenant column and mean something else — one filtered a global app's install geography, tenant share zero); entity-grain predicates on SCD tables, with static lint rules for the two latent forms; a verified-reduction protocol for models that read foreign-market sources the sovereign project discards; `EXPECTED EMPTY` markers so zero-row models pass explicitly rather than vacuously; a `declared_deviations` record and `pass_declared_deviation` verdict for the case where the target is right and the source is provably wrong; project-hygiene checks (unread sources.yml entries, models falling through to the profile-default dataset); and a new-project coverage gate in batch-raise that checks the client's project-enumerating CI gates actually enumerate the new project and every enabled model is reachable from a DAG — the gap that would have merged 86 models as dead code.
+
+---
+
 ## v3.11.8 — Eight field-raised closes: status reconciliation, reference legibility, and the carve-out gaps
 
 **Released**: August 2026

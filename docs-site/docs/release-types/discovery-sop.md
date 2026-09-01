@@ -13,6 +13,22 @@ Use this release type when:
 - The SOW describes a discovery phase rather than a fixed scope
 - Multiple competing priorities exist and a structured hierarchy-of-needs analysis is needed
 
+## Two profiles
+
+The release type offers two routes through the same three pillars: map the current state, map the target state, agree the roadmap. Set `discovery_profile` in `status.md`; `diagnostic` is the default.
+
+| | `diagnostic` | `modelling_led` |
+|---|---|---|
+| Current state from | The Hierarchy of Needs and People–Process–Technology analyses, which diagnose what is wrong | `current_state_appraisal`, a factual account of what exists |
+| Target state from | Vision Statement and Solution Initiatives in the analyses document | A signed-off conceptual model, logical model, and the target platform architecture on `pipeline_design` |
+| Roadmap | Produced **after** the playback | Produced **before** the playback, because it is one of the things the sponsor signs off |
+| Sign-off checklist | Seven canonical items (maturity pin, hierarchy, PPT, vision, initiatives) | Five items in the deliverables' own terms |
+| Deck | `decks/findings_playback/` | `decks/findings_playback_modelling_led/` |
+
+Pick `modelling_led` when the client is buying a data model rather than a diagnosis: they know their problems and want an enterprise model, a platform design and a costed roadmap.
+
+The ordering difference is enforced, not advisory. The release type declares the override in `wire/release-types/sop_discovery.yaml`, and `specs/utils/precondition_gate.md` applies it, so under `modelling_led` the playback refuses to run until the roadmap is approved.
+
 ## SOP discovery artifact flow
 
 ```mermaid
@@ -28,6 +44,26 @@ graph LR
     RS["Spawn\nRelease 1"]
 
     EB --> SM --> KO --> SI --> RM --> DA --> FP --> DR --> RS
+```
+
+Under `modelling_led` the analyses drop out, the appraisal and the model come in, and the roadmap moves ahead of the playback:
+
+```mermaid
+graph LR
+    EB["Engagement\nBrief"]
+    SM["Stakeholder\nMap"]
+    SI["Interviews\n+ Workshops"]
+    CSA["Current State\nAppraisal"]
+    RM["Requirements\nMatrix"]
+    CM["Conceptual\nModel"]
+    LM["Logical\nModel"]
+    PD["Data Flow +\nTarget Arch"]
+    DR["Delivery\nRoadmap"]
+    FP["Findings\nPlayback"]
+    RS["Spawn\nRelease 1"]
+
+    EB --> SM --> SI --> CSA --> RM --> CM --> LM --> DR --> FP --> RS
+    CM --> PD --> DR
 ```
 
 ## The exit gate: Findings Playback and Sponsor Validation Checklist
@@ -104,3 +140,33 @@ A worked example of a Discovery (SOP) engagement — using a fictional client sc
 
 
 > **Tip**: Run `/wire:playbook-generate 01-discovery` after the engagement brief is approved to generate a BPMN-style diagram of the full SOP discovery flow.
+
+
+## Artifacts added by the `modelling_led` profile
+
+### `current_state_appraisal`
+
+A factual account of what exists: platform components, sources and their owners, replication, transformation, consumption, documentation, governance today, personal data, and data quality as the team experiences it. Then a Gaps and Contradictions section.
+
+Written from documentation and interviews, not system access. Every row carries an `Evidence` value naming where it came from and a `Confidence` value of `confirmed`, `reported` or `unknown`.
+
+`validate` fails a document where every row reads `confirmed`. Without system access, a document claiming everything is verified has not separated what it was told from what it checked, and that separation is the document's main value. It also fails an empty Gaps list that carries no statement of why nothing is outstanding.
+
+Engagement-specific material (sizing a migration, an acquisition integration programme) goes in a free section added with `--section "<title>"` rather than being a named part of the artifact.
+
+### `logical_model`
+
+The step between the conceptual model and the physical dbt design, which Wire previously skipped. Per-entity sources and grain, keys with their reasoning, cardinality and the foreign keys carrying it, identity resolution with attributed precedence, normalisation per entity group, attribution rules with their remainder handling, and who owns each entity definition going forward.
+
+These decisions were being made implicitly inside `data_model-generate`, which meant they arrived already expressed as dbt models and were hard to review as decisions. Now they are reviewable on their own, before anything is built.
+
+Also available, optional, in `full_platform`. Worth running there when identity resolution or attribution is contested.
+
+Source definitions (grain, keys, fields, owner) live here rather than in their own artifact: grain and key are one decision seen from two ends, and splitting them produces two documents that disagree.
+
+## Other changes for both profiles
+
+- `requirements_matrix` can carry optional `business_value` and `roi_measure` columns, and a `#question` tag for business questions, which are none of the four mandatory tags.
+- `delivery_roadmap` carries owner and priority per deliverable, plus an optional leadership `now` / `next` / `later` view and an optional data team recommendation.
+- `stakeholder-interview-generate --workshop <slug>` writes up a group session, with attendee attribution and explicit Agreed and Unresolved sections. A write-up with neither fails validate.
+- `pipeline_design-generate --depth discovery` produces the data flow and the target platform architecture without the operational detail a discovery has not gathered.

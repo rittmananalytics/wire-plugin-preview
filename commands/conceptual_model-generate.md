@@ -196,21 +196,19 @@ release_types:
   - pipeline_only
   - dashboard_extension
   - enablement
+  - sop_discovery
 action_type: artifact
 logs_execution: true
 inputs:
   required:
     - name: release_folder
       description: "Path to the release folder"
-preconditions:
-  - artifact: requirements
-    action: review
-    outcome: approved
+preconditions: dynamic
 delegates_to:
   - utils/precondition_gate
+  - utils/mml_import
 description: Generate conceptual entity model from requirements
 argument-hint: <project-folder>
-
 ---
 
 ## Auto-Delegation
@@ -437,6 +435,35 @@ If the engagement spans a large domain:
 This command creates:
 - `.wire/<project_id>/design/conceptual_model.md`
 - Updates `.wire/<project_id>/status.md`
+
+
+---
+
+## `model_source: modality`
+
+When `status.md` has `model_source: modality`, read the client's existing Modality
+model as the input to the sections named below.
+
+What this command takes from the model: Section 1 from `domain` and `entity` blocks, Section 2's ERD from the resolved cardinality, Section 3's narrative from `description` and `business_logic`. Follow
+`specs/utils/mml_import.md` first: it carries the block grammar, the two
+vocabularies the specification and the application disagree on, and the
+cardinality resolution order.
+
+The model does not replace the requirements. Both are read, and the difference
+between them is itself a finding:
+
+- An entity in the model and not in the requirements goes in the excluded list
+  with the reason "in the Modality model, not in requirements scope". It is not
+  silently carried into scope.
+- An entity in the requirements and not in the model goes in the open questions.
+  It is not silently added to the model's entity set.
+
+Every value taken from the model cites the `.mml` file it came from. A reader
+comparing the Wire document against the model needs to know which claims came from
+where, and a later write-back needs to know which claims are new.
+
+`validate` runs the `modality_coverage` check in both directions. Its rules,
+including the ones about what absence means, are in `specs/utils/mml_import.md`.
 
 Execute the complete workflow as specified above.
 

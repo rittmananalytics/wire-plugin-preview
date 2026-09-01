@@ -75,6 +75,19 @@ required_fields:
     severity: error
 
 # ----------------------------------------------------------------------
+# Business-rule citation — links a measure back to the register that agreed its
+# definition (wire#229). Advisory: only releases that ran business_rules have a
+# register to cite.
+# ----------------------------------------------------------------------
+business_rules:
+  - id: business_rule_id_format
+    description: "A measure citing a business rule uses the form BR-<n>, matching an id in artifacts/business_rules.yaml"
+    block: measure
+    marker_pattern: 'wire_business_rule|BR-'
+    required_pattern_if_present: 'BR-\d+'
+    severity: warning
+
+# ----------------------------------------------------------------------
 # Style
 # ----------------------------------------------------------------------
 style:

@@ -317,6 +317,7 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 | `/wire:utils-ask-list-generate` | `<release-folder> [--max N]` | Draft the top-N client ask list from the register's blocker taxonomy — capped, and guarded against re-asking anything the answers ledger holds |
 | `/wire:utils-delivery-forecast` | `<client-name> [--release <folder>]` | Calculate % delivered and ETA per release using checklist, Jira, Harvest and Fathom velocity, compared against contractual dates |
 | `/wire:utils-doc-analyze` | `<file-path-or-url> [<file-path-2> ...]` | Extract deliverables, acceptance criteria, and timeline from SoW or project documents |
+| `/wire:utils-modality-link` | `<release-folder> [--path <dir>]` | Locate the client's Modality model and record it on the release, so the design commands read the existing model instead of deriving one |
 
 ### RELEASE UTILITIES
 
@@ -400,7 +401,9 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 | `/wire:metabase-carveout-generate` | `<release-folder> [--collection id] [--dashboard id]` | Tenant carve-out of the Metabase estate — layer decision per card set (sandboxing/warehouse/dashboard-parameter/card-edit), registry-resolved filters, dashcard pruning, manifest review gate |
 | `/wire:metabase-carveout-validate` | `<release-folder>` | Validate the Metabase carve-out — filters re-derived from the registry, no unfiltered card, dashcard-level removals, explicit shared-card decisions |
 | `/wire:metabase-carveout-review` | `<release-folder>` | Human gate for the Metabase carve-out — adjudicate layer decisions, sign off manifest rows, resolve manual-review cards |
-| `/wire:metabase-carveout-transport` | `<release-folder> [--target-instance-url url] [--collection id] [--dashboard id] [--dry-run]` | Transport signed-off carve-out cards and dashboards onto the separately-hosted tenant Metabase instance: id-mapped via a confirmed database mapping, dependency-ordered, idempotent by recorded target id |
+| `/wire:metabase-carveout-transport-generate` | `<release-folder> [--collection id] [--dashboard id]` | Produce the transport plan as a dry-run artifact: the four id-rewrites plus SQL-text rewrites of hardcoded source-project table references, writing nothing to either instance |
+| `/wire:metabase-carveout-transport-validate` | `<release-folder>` | Validate the transport plan: re-derive the SQL scan from each card's own SQL, prove every source-project reference accounted for and every id-rewrite resolves on the target |
+| `/wire:metabase-carveout-transport` | `<release-folder> [--target-instance-url url] [--collection id] [--dashboard id] [--dry-run]` | Transport signed-off carve-out cards and dashboards onto the separately-hosted tenant Metabase instance: executes the validated plan (id and SQL-text rewrites), dependency-ordered, idempotent by recorded target id |
 | `/wire:metabase-equivalency-validate` | `<release-folder> [--cards id1,id2] [--dashboard id]` | Card-level equivalence — migrated/carved cards return the same rows, model verdict taxonomy; gates the connection cutover |
 | `/wire:omni-audit-generate` | `<release-folder>` | Catalog Omni connections, model (topics/views/dimensions/measures), and folders/workbooks/tiles |
 | `/wire:omni-audit-validate` | `<release-folder>` | Validate Omni audit completeness and dependency coverage |
@@ -436,9 +439,18 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 | `/wire:delegate` | `<release-folder>` | Decompose a release's pending work into typed tasks and dispatch to specialist local subagents |
 | `/wire:status-sync` | `[release-folder]` | Reconcile recorded release state against evidence (git, execution log, disk, sprint plan) and repair the record with confirmation |
 | `/wire:playbook-generate` | `<release-folder>` | Generate a step-by-step BPMN delivery playbook for any Wire release |
+| `/wire:business-rules-generate` | `<release-folder> [--domain <name>] [--import <path>]` | Discover, define and agree the business rules for one domain, from legacy systems and from the people who own the definitions, before design starts |
+| `/wire:business-rules-validate` | `<release-folder>` | Validate the business rules register: statuses consistent with their required fields, assumptions unexpired, every variant sourced, rules and implementations citing each other |
+| `/wire:business-rules-review` | `<release-folder>` | Review the business rules register with the people who own the numbers — each disputed rule settled or owned, each assumption accepted with its expiry |
+| `/wire:current-state-appraisal-generate` | `<release-folder> [--section "<title>"]` | Appraise the client's current state — platform, sources, replication, tooling, documentation, governance, data quality — from documentation and interviews rather than system access |
+| `/wire:current-state-appraisal-validate` | `<release-folder>` | Validate the current state appraisal: every claim sourced and confidence-rated, sources reconcilable, gaps named rather than empty |
+| `/wire:current-state-appraisal-review` | `<release-folder>` | Review the current state appraisal with the client's technical lead — facts corrected, gaps owned, contradictions resolved or accepted |
 | `/wire:conceptual_model-generate` | `<project-folder>` | Generate conceptual entity model from requirements |
 | `/wire:conceptual_model-validate` | `<project-folder>` | Validate conceptual model completeness and correctness |
 | `/wire:conceptual_model-review` | `<project-folder>` | Review conceptual model with business stakeholders |
+| `/wire:logical_model-generate` | `<release-folder> [--domain <name>]` | Logical data model between the conceptual model and the physical dbt design — per-entity sources and grain, keys, cardinality, identity resolution, normalisation and attribution rules |
+| `/wire:logical_model-validate` | `<release-folder>` | Validate the logical model: every conceptual entity accounted for, keys and cardinality decided or explicitly open, sources reconciled, attribution rules complete |
+| `/wire:logical_model-review` | `<release-folder>` | Review the logical model — precedence and attribution decisions confirmed by the people who own them, open questions closed or owned |
 | `/wire:data_model-generate` | `<project-folder>` | Design dbt model structure |
 | `/wire:data_model-validate` | `<project-folder>` | Validate data model conventions |
 | `/wire:data_model-review` | `<project-folder>` | Review data model with team |
