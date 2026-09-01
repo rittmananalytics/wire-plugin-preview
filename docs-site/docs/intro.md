@@ -13,15 +13,32 @@ In practical terms: instead of a practitioner manually writing dbt models, LookM
 
 **The framework does not replace practitioners.** It gives them an AI that works at machine speed and never forgets a naming convention, freeing the practitioner to focus on client relationships, design decisions, and the creative problem-solving that AI cannot do.
 
+## New in 4.0
+
+Wire 4.0 changes something structural: the rules for how a delivery engagement runs stopped being prose inside Wire's own source and became data the framework reads and enforces.
+
+**The process is written down.** Every release type now has a machine-readable definition — its phases, the documents each produces, and what depends on what. A shared gate reads it and stops a command whose prerequisites are not met. Overriding is allowed, but it takes your name and a reason, and both are recorded. Autopilot reads the same definition rather than keeping its own copy, which had drifted.
+
+**Agree what the numbers mean before building.** [Business rules discovery](./advanced/business-rules.md) is an optional first step that records, per business domain, every competing definition of a metric with the file it came from, what they disagree on, the decision, and who approved it. A rule nobody has decided is recorded rather than left out, and each disputed rule generates a reconciliation query that runs immediately instead of surfacing as a mismatch during testing.
+
+**Start from a model that already exists.** Where a client models their data in [Modality](./advanced/modality-models.md), Wire reads the entities, sources and relationships from it rather than deriving them again. The requirements are still read, and the difference between the two is raised as a finding.
+
+**Discovery that produces a model.** [SOP discovery](./release-types/discovery-sop.md) now has two routes. The default diagnoses. The modelling-led route replaces the three analyses with a current-state appraisal and a signed-off conceptual and logical model, and produces the roadmap before the playback, because the roadmap is one of the things the sponsor signs off.
+
+**A library of industry data models.** When designing a data model, Wire looks for a plausible match in a library covering six industries plus cross-industry patterns, and proposes it as a starting point. Always a proposal, never adopted automatically.
+
+Full detail is in the [release notes](./reference/release-notes.md).
+
 ## What it looks like in practice
 
-You open Claude Code in a git repository where the framework is installed. You type `/wire:new` and answer a few questions about the client and project. You copy the SOW PDF into a folder. Then you work through a sequence of `/wire:*` commands — generating requirements, then designs, then code, then tests, then a deployment runbook, then training materials. At each step the framework validates the output and asks you or the client to approve it before moving on. Alternatively, you can use `/wire:autopilot` to have the AI run through the entire lifecycle autonomously.
+You open Claude Code in a git repository where the framework is installed. You type `/wire:new` and answer a few questions about the client and project. You copy the SOW PDF into a folder. Then you work through a sequence of `/wire:*` commands — generating requirements, then designs, then code, then tests, then a deployment runbook, then training materials. At each step the framework checks the output automatically, then asks you or the client to approve it before moving on. If you try to run a step before the thing it depends on is ready, it stops and says so. Alternatively, you can use `/wire:autopilot` to have the AI run through the entire lifecycle autonomously.
 
 At the end, you have: a production-ready dbt project, a LookML semantic layer, deployed Looker dashboards, data quality tests, a deployment runbook, and training materials — all version-controlled in git with a complete audit trail.
 
 ```mermaid
 graph LR
-    A["SOW +<br/>Source Materials"] --> B["Requirements<br/>Extraction"]
+    A["SOW +<br/>Source Materials"] --> A2["Business Rules<br/>(optional)"]
+    A2 --> B["Requirements<br/>Extraction"]
     B --> C["Design<br/>Review"]
     C --> D["Code<br/>Generation"]
     D --> E["Testing +<br/>UAT"]
