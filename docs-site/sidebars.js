@@ -49,6 +49,8 @@ const sidebars = {
         'advanced/registries',
         'advanced/tracing',
         'advanced/fathom-sync',
+        'advanced/modality-models',
+        'advanced/business-rules',
       ],
     },
     {
