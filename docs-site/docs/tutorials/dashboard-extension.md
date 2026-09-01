@@ -73,6 +73,24 @@ graph LR
     REQ["Requirements"] --> MK["Mockups"] --> DASH["Dashboard Development"] --> UAT["UAT"]
 ```
 
+
+:::info New in 4.0 — business rules discovery
+
+This walkthrough does not use it, so the sequence below still reads correctly. It
+is worth knowing it exists.
+
+`/wire:business-rules-generate` is an optional first phase that establishes what
+the numbers mean before design bakes a definition in: one register per domain,
+holding every competing definition found in dbt, LookML or an `--import` from a
+system Wire cannot read, what they disagree on, the decision, and who approved it.
+A rule nobody has decided is recorded as `unknown` rather than left out.
+
+The gate on `mockups-generate` is advisory: it warns, takes a reason, records the skip and
+proceeds.
+
+Reference: [Business rules discovery](../advanced/business-rules.md).
+:::
+
 ## Engagement overview
 
 | | |

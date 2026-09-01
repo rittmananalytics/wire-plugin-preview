@@ -45,6 +45,10 @@ flowchart TB
 /wire:new                                               # release_type: dashboard_first
 
 # Phase 1: Requirements (Day 1)
+/wire:business-rules-generate <release-folder>           # Optional, new in 4.0
+/wire:business-rules-validate <release-folder>
+/wire:business-rules-review <release-folder>
+
 /wire:requirements-generate <release-folder>
 /wire:requirements-validate <release-folder>
 /wire:requirements-review <release-folder>
@@ -190,3 +194,30 @@ Step 7 is separated in time from the rest — it only runs after client data acc
 - **The prototype is disposable**: The seed-based dbt project exists to validate the design
 
 > **Tip**: Run `/wire:playbook-generate <release-folder>` after mockups are approved.
+
+## Business rules discovery (optional first phase)
+
+New in 4.0. `/wire:business-rules-generate` runs before design and establishes what
+the numbers mean, one business domain at a time.
+
+It reads the definitions that already exist — in dbt, in LookML, and through
+`--import` from systems Wire cannot read such as SAP BW, Hana or SAC — then asks
+the people who own the numbers to settle the ones that disagree. The output is a
+register: one entry per rule, holding every competing definition with the file it
+came from, what they disagree on, the decision, the named approver, and a
+reconciliation query that runs at generate time rather than in QA.
+
+A rule nobody has decided is recorded with status `unknown`, which passes
+validate. That is the point of it: a register has to be able to say "nobody has
+agreed whether in-store orders are in this figure", because that sentence is what
+stops the number being wrong nine months later.
+
+**The gate is advisory.** ``conceptual_model-generate`` warns when the register has not been
+reviewed, asks for a one-line reason, records it as an `advisory_skip`, and
+proceeds. Skipping is a real choice; what matters is that the choice is visible.
+
+Worth running here when the mockup replaces a legacy dashboard: the register is
+where the old and new definitions of each tile's number get compared before the
+build rather than after it.
+
+Full reference: [Business rules discovery](../advanced/business-rules.md).

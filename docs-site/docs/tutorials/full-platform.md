@@ -83,6 +83,46 @@ graph LR
     DEPLOY --> ENABLE["Phase 6<br/>Enablement"]
 ```
 
+
+:::info New in 4.0 — business rules discovery
+
+This walkthrough does not use it, so the sequence below still reads correctly. It
+is worth knowing it exists.
+
+`/wire:business-rules-generate` is an optional first phase that establishes what
+the numbers mean before design bakes a definition in: one register per domain,
+holding every competing definition found in dbt, LookML or an `--import` from a
+system Wire cannot read, what they disagree on, the decision, and who approved it.
+A rule nobody has decided is recorded as `unknown` rather than left out.
+
+The gate on `conceptual_model-generate` is advisory: it warns, takes a reason, records the skip and
+proceeds.
+
+Reference: [Business rules discovery](../advanced/business-rules.md).
+:::
+
+:::info New in 4.0 — optional logical model
+
+`/wire:logical_model-generate` sits between the conceptual and the physical model
+and holds the decisions that are neither business nor dbt: what an entity's primary
+key actually is, cardinality, which source wins when the same customer exists in
+several systems, how far to normalise, and how a conversion is attributed. Those
+were previously decided implicitly inside `data_model-generate`.
+
+Optional, and worth running when identity resolution or attribution is contested.
+This walkthrough does not use it.
+:::
+
+:::info New in 4.0 — reading an existing Modality model
+
+Where the client already models their data in Modality, `/wire:utils-modality-link`
+points the release at it and the design commands read the entities, sources and
+cardinality from the `.mml` files rather than deriving them, still reading the
+requirements so the difference between the two becomes a finding.
+
+Reference: [Modality models as an input](../advanced/modality-models.md).
+:::
+
 ## The scenario
 
 | | |

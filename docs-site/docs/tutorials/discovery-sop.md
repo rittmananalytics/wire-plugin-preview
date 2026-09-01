@@ -92,6 +92,33 @@ graph LR
     EB --> SM --> KO --> SI --> RM --> DA --> FP --> DR --> RS
 ```
 
+
+:::info New in 4.0 — the modelling-led profile
+
+This walkthrough follows the `diagnostic` profile: the three analyses, the findings
+playback, then the roadmap. That is still the default and the sequence below is
+unchanged.
+
+A second profile, `modelling_led`, is for a client who already knows their problems
+and is buying a data model. It replaces the three analyses with a
+`current_state_appraisal` and a signed-off conceptual and logical model, and moves
+the roadmap *before* the playback, because under that profile the roadmap is one of
+the five things the sponsor signs off.
+
+Set it with `discovery_profile: modelling_led` in `status.md`. Reference:
+[Discovery (SOP / Canonical)](../release-types/discovery-sop.md).
+:::
+
+:::info New in 4.0 — reading an existing Modality model
+
+Where the client already models their data in Modality, `/wire:utils-modality-link`
+points the release at it and the design commands read the entities, sources and
+cardinality from the `.mml` files rather than deriving them, still reading the
+requirements so the difference between the two becomes a finding.
+
+Reference: [Modality models as an input](../advanced/modality-models.md).
+:::
+
 ## Engagement overview
 
 | | |

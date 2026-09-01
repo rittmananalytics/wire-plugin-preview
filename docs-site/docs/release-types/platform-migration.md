@@ -105,6 +105,36 @@ Run `/wire:new` and select **Platform Migration**. You will be asked a set of ad
 9. **Target project / account** and any **production project IDs** to treat as off-limits for writes
 10. **Migration scope** — full migration (default) or a **tenant carve-out**. Choosing carve-out captures a `migration.tenant_predicate` and turns on the carve-out flow described below.
 
+
+## Business rules discovery (optional first phase)
+
+New in 4.0. `/wire:business-rules-generate` runs before design and establishes what
+the numbers mean, one business domain at a time.
+
+It reads the definitions that already exist — in dbt, in LookML, and through
+`--import` from systems Wire cannot read such as SAP BW, Hana or SAC — then asks
+the people who own the numbers to settle the ones that disagree. The output is a
+register: one entry per rule, holding every competing definition with the file it
+came from, what they disagree on, the decision, the named approver, and a
+reconciliation query that runs at generate time rather than in QA.
+
+A rule nobody has decided is recorded with status `unknown`, which passes
+validate. That is the point of it: a register has to be able to say "nobody has
+agreed whether in-store orders are in this figure", because that sentence is what
+stops the number being wrong nine months later.
+
+**The gate is advisory.** ``migration-inventory-generate`` warns when the register has not been
+reviewed, asks for a one-line reason, records it as an `advisory_skip`, and
+proceeds. Skipping is a real choice; what matters is that the choice is visible.
+
+On a migration the register earns its place differently: the legacy system *is* the
+reference, so every rule with a legacy variant gets a reconciliation query, and
+those queries are the same comparisons equivalency validation would run later.
+Running them before the batches start turns a definition dispute from a cutover
+blocker into a day-one finding.
+
+Full reference: [Business rules discovery](../advanced/business-rules.md).
+
 ## MCP server connections
 
 The audit and migration commands connect directly to your source and target systems via MCP servers and APIs. Configure these before running any audit commands — not before `/wire:new`.

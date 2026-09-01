@@ -120,17 +120,49 @@ The design phase follows a defined sequence. The conceptual model gates everythi
 
 `/wire:pipeline_design-generate` produces the full pipeline architecture document — source system analysis, replication scenarios with cost analysis, scheduling, error handling, design decisions requiring client input — **plus an embedded Data Flow Diagram (DFD)**.
 
-### Step 3: Data model specification + physical ERD
+### Step 3: Logical model (optional)
+
+`/wire:logical_model-generate` sits between the conceptual and the physical model, and holds the decisions that are neither business nor dbt: what the primary key of an entity actually is, whether a relationship is one-to-many or many-to-many, which source wins when the same customer exists in three systems, how far to normalise, and how a conversion is attributed.
+
+Those decisions were previously made implicitly inside `data_model-generate`, which meant they arrived already expressed as dbt models and were hard to review as decisions. Optional here, and worth running when identity resolution or attribution is contested.
+
+Where the client already models in Modality, this command reads the existing `.mml` rather than restating it. See [Modality models as an input](../advanced/modality-models.md).
+
+### Step 4: Data model specification + physical ERD
 
 `/wire:data_model-generate` produces the complete dbt-layer data model specification — source definitions, staging models, integration models, warehouse models with surrogate keys and FK paths, seed files — **plus an embedded Physical ERD**.
 
 > **This is the most important review gate in the full-platform workflow.** Approving a model with incorrect grain, wrong join keys, or missing entities is expensive to fix after dbt code is generated.
 
-### Step 4: Dashboard mockups
+### Step 5: Dashboard mockups
 
 `/wire:mockups-generate` produces dashboard wireframes. Review with end users, not the technical stakeholder.
 
-**Ready criteria**: all four design artifacts are `review: approved`.
+**Ready criteria**: every required design artifact is `review: approved`. `logical_model` is optional and reported as not applicable when it has not been run.
+
+
+## Business rules discovery (optional first phase)
+
+New in 4.0. `/wire:business-rules-generate` runs before design and establishes what
+the numbers mean, one business domain at a time.
+
+It reads the definitions that already exist — in dbt, in LookML, and through
+`--import` from systems Wire cannot read such as SAP BW, Hana or SAC — then asks
+the people who own the numbers to settle the ones that disagree. The output is a
+register: one entry per rule, holding every competing definition with the file it
+came from, what they disagree on, the decision, the named approver, and a
+reconciliation query that runs at generate time rather than in QA.
+
+A rule nobody has decided is recorded with status `unknown`, which passes
+validate. That is the point of it: a register has to be able to say "nobody has
+agreed whether in-store orders are in this figure", because that sentence is what
+stops the number being wrong nine months later.
+
+**The gate is advisory.** ``conceptual_model-generate`` warns when the register has not been
+reviewed, asks for a one-line reason, records it as an `advisory_skip`, and
+proceeds. Skipping is a real choice; what matters is that the choice is visible.
+
+Full reference: [Business rules discovery](../advanced/business-rules.md).
 
 ## Phase 3: Development (Days 5–8)
 
