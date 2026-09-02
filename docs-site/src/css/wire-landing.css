@@ -32,6 +32,21 @@
 
 .wireLanding * { box-sizing: border-box; }
 
+/* The mock leaves <pre> transparent and lets the dark .win behind it show
+   through. Docusaurus styles bare `pre` with a background, a radius and a
+   colour of its own, so inside a terminal window the console rendered on a
+   light ground. The mock's own pre rules set margin, padding, font, colour and
+   overflow but not background, so that one property fell through to
+   Docusaurus's. Neutralised here rather than in each ported rule, so a new
+   terminal block cannot reintroduce it. */
+.wireLanding .win pre,
+.wireLanding pre {
+  background: transparent;
+  background-color: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
 /* The design ships its own nav and footer. Layout is given noFooter, which
    removes the site footer outright. The navbar has no per-page switch, hence
    :has(). If :has() is unsupported the page still renders correctly, just with
