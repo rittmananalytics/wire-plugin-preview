@@ -137,7 +137,7 @@ Migrate an engagement repository to the **Wire v3.4+ two-tier layout** (`.wire/e
 |------|--------------|-------------|
 | **Case A** | Pre-v3.4 flat `.wire/` | Old layout with project folders directly under `.wire/` |
 | **Case B** | Near-wire root-level structure | Repos with `releases/`, `context/`, `artifacts/` at the repo root — no `.wire/` directory — that evolved organically alongside the Wire framework |
-| **Case C** | v3.4+ layout with legacy `release_type: "discovery"` | Already on the two-tier layout but the release type is the now-renamed `discovery` — rewrite to `shape_up_discovery` and update any internal references |
+| **Case C** | v3.4+ layout with the briefly-used `release_type: "shape_up_discovery"` | Already on the two-tier layout, but the release type is the v3.5.0 name that was reverted in v3.5.1 — rewrite to the canonical `discovery` and update any internal references |
 | **Case D** | Custom commands in wrong namespace | Wire custom command wrappers written to `.claude/commands/` directly (pre-v3.5.7 behaviour) instead of `.claude/commands/wire/`, causing them to appear without the `/wire:` prefix |
 
 This command is safe to re-run. For Case B, the migration runs on a **new git branch** and raises a **PR** so changes can be reviewed before merging. Case C is a small in-place edit and does not need its own branch.

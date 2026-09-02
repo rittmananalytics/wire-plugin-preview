@@ -266,6 +266,15 @@ The data model specification narrows the LLM's generation space for the dbt phas
      - `requirements/requirements_specification.md`
      - `design/conceptual_model.md` (entities, relationships)
      - `design/pipeline_architecture.md` (source tables, staging model names)
+     - `design/logical_model.md` **if it exists** (keys, cardinality, identity
+       resolution, normalisation and attribution decisions). `logical_model` is
+       optional, so its absence is normal and not an error. When it is present it
+       is authoritative for the decisions it records, and this command uses them
+       rather than re-deriving them: the primary key of an entity and why, the
+       cardinality and the foreign keys that carry it, and where normalisation
+       was deliberately traded away. Re-deriving them here is the duplication
+       `logical_model` exists to remove, and the two answers will not always
+       agree.
 4. Use Glob to find all files in `.wire/<project_id>/artifacts/**/*`
 5. Read any source schema examples, existing dbt models, or SQL files in `artifacts/`
 
@@ -292,6 +301,37 @@ This step runs automatically on every engagement — there's no opt-in flag to s
      - **Confident**: the schema's own description already matches this client's situation in substance, regardless of the specific words used to frame it.
      - **Adjacent**: the description frames it around a different kind of organization, but the entities and technique are still the same underlying problem — propose it, explicitly noting the reframe (e.g. "built for an agency's own CRM reconciliation, but the same technique applies to your client's own CRM systems").
    - If Step 2 found nothing and this step finds nothing either (confident or adjacent), **skip silently to Step 2 of the main workflow** (Define Source Definitions) — no message, no note. This remains the majority-case, expected outcome for most engagements.
+
+3b. **If the client has an authoritative model of their own, the proposal is a
+   comparison, not a starting structure.** When `status.md` has
+   `model_source: modality`, the entity set, keys and cardinality already came
+   from the client's own model, by way of `conceptual_model` and, if it ran,
+   `logical_model`. The registry proposal does not replace that. Present it as a
+   comparison against what the client already authored, and name every
+   disagreement rather than resolving one silently. Three kinds recur:
+
+   - **An entity the registry has and the client's model does not.** Do not add
+     it because the registry lists it as core. Say the registry expects it, say
+     the client's model does not carry it, and ask. Where the requirements also
+     put it out of scope, that is three sources agreeing and it is simply
+     excluded, with the reason recorded.
+   - **An entity the client's model has and the registry does not.** Keep it.
+     `conceptual_model` already accounted for it; carry that reason forward
+     rather than re-deriving or dropping it.
+   - **A grain the registry splits and the client's model does not, or the
+     reverse.** This is the one that quietly restructures a client's model. A
+     registry schema proposing an order-header and an order-line fact where the
+     client's model carries a single entity is a real design question about
+     grain, not a naming difference. State both grains, state which was taken,
+     and record why. `data_model-validate`'s Canonical Vertical Comparison
+     already reports a grain that "notably diverges"; this makes the decision
+     deliberate rather than something that check discovers afterwards.
+
+   Where the registry and the client's model disagree and the requirements settle
+   it, the requirements settle it, and the divergence from the registry is
+   recorded. The 4-4-5 versus 4-5-4 retail calendar is the worked example: the
+   registry's structure is worth keeping, its seed contents are not, and a
+   confident vertical match adopted unread would ship the wrong calendar.
 
 4. **Propose whatever was found, tiered by confidence — never auto-adopt:**
    - **Confident vertical match**: present as a strong proposal:

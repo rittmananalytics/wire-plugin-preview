@@ -2,6 +2,7 @@
 release_id: "{{RELEASE_ID}}"
 release_name: "{{RELEASE_NAME}}"
 release_type: "sop_discovery"
+project_type: "sop_discovery"   # the release-type YAML this release resolves against
 client_name: "{{CLIENT_NAME}}"
 engagement_name: "{{ENGAGEMENT_NAME}}"
 created_date: "{{CREATED_DATE}}"

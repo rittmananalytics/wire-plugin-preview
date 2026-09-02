@@ -44,9 +44,30 @@ another.
 
 If `preconditions` is the literal string `dynamic`:
 
-1. Read `.wire/releases/<release_folder>/status.md` front-matter `project_type`.
-2. Load `wire/release-types/<project_type>.yaml`. Find this command's own
+1. Read `.wire/releases/<release_folder>/status.md` front-matter. Take
+   `project_type` if present, else `release_type`. The shipped status
+   templates are not consistent about which of the two they write:
+   `status-template.md` and `custom-status-template.md` write `project_type`,
+   while `discovery-status-template.md`, `droughty-status-template.md` and
+   `sop-discovery-status-template.md` write only `release_type`. Reading one
+   name resolved to nothing for every release created from the latter three,
+   so the gates and the profile silently did not resolve. `autopilot.md`
+   Step 4.3a already reads both; this is the same rule in the same words.
+2. Load `wire/release-types/<that value>.yaml`. Find this command's own
    `artifact` value under `phases[].artifacts[].id`.
+
+   One value needs translating. The Shape Up discovery release records
+   `release_type: discovery`, which is canonical: the v3.5.0 rename to
+   `shape_up_discovery` was reverted in v3.5.1 and `migrate.md` Case C
+   normalises repos back to it. Its release-type file is
+   `discovery_shape_up.yaml`. Treat `discovery` as `discovery_shape_up`.
+   No other value needs translating; the rest match a file name directly.
+
+   If the resolved value matches no file, stop and say so, naming the value
+   and where it was read from. Do not continue with no gate: an unknown
+   release type is a status-file error, and proceeding hides it. This is
+   different from rule 4 below, where the release type is known and simply
+   does not carry the artifact.
 3. If found, use that entry's `depends_on` list as the effective
    preconditions for Step 1 below (an empty `depends_on: []` is a valid
    result — proceed with no gate, same as a static `preconditions: []`).
