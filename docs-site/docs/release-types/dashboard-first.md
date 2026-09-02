@@ -39,6 +39,32 @@ flowchart TB
     UAT --> DEP --> TR --> DOC
 ```
 
+## Two profiles: do you need seed data?
+
+One question decides it: **can you query the source tables the dashboard needs, today?**
+
+Set `discovery_profile` in `status.md`. `seeded` is the default.
+
+| | `seeded` | `live_data` |
+|---|---|---|
+| Use it when | client data access is delayed, or you want a dress rehearsal with no warehouse spend and a reusable CI fixture | you can already query the source tables |
+| `seed_development` phase | on: `seed_data` generates CSV seeds | **off** |
+| `data_refactor` phase | on: staging repointed from seeds to live sources | **off**, there is nothing to refactor |
+| `dbt` released by | `seed_data` review approved | `data_model` review approved |
+| Everything after `dbt` | unchanged: semantic layer, then dashboards | unchanged: semantic layer, then dashboards |
+
+Under `live_data` the two phases are **disabled, not skipped**. That distinction matters:
+`specs/utils/precondition_gate.md` refuses to run an artifact in a disabled phase and reports it
+as not part of the active profile, and `/wire:status` shows it as **not applicable** rather than
+not started. You take no precondition overrides, and nothing sits unexplained in the status file.
+
+Before profiles existed, skipping the spine meant two recorded overrides (`dashboards` and `dbt`
+were both gated on `seed_data`) and two artifacts stuck at `not_started` for the life of the
+release, which read as incomplete delivery rather than a scope decision.
+
+The mockup still drives the design under both profiles. `live_data` removes the seed data, not
+the prototype-first approach.
+
 ## Workflow
 
 ```

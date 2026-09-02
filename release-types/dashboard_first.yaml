@@ -7,6 +7,31 @@ applicable_when:
   - "Team wants to validate the data model through the BI layer before committing to ingestion"
   - "Stakeholder buy-in depends on seeing working dashboards before full build approval"
 
+profiles:
+  - id: seeded
+    name: "Seeded"
+    description: "The canonical shape. Build everything on generated CSV seed data first, then repoint at live client sources. Use it when client data access is delayed, or when you want a dress rehearsal with no warehouse spend and a reusable CI fixture."
+    # Nothing overridden — the phase list below is the seeded graph.
+
+  - id: live_data
+    name: "Live data"
+    description: "Skip the seed spine. Use it when you can already query the source tables the dashboard needs. The mockup still drives the design; the build goes straight against real data."
+    disable_phases:
+      - seed_development
+      - data_refactor
+    phase_overrides:
+      # With no seed_data artifact, dbt is released by the approved data model
+      # instead. Everything downstream of dbt is unchanged: semantic_layer still
+      # waits on dbt validate, dashboards still wait on the semantic layer.
+      - id: build
+        requires_phase: design
+        artifacts:
+          - id: dbt
+            depends_on:
+              - artifact: data_model
+                action: review
+                outcome: approved
+
 phases:
   # Optional. Discover, define and agree what the numbers mean before design
   # bakes a definition in. Warning-level: the gate on the artifact below asks and
@@ -81,7 +106,7 @@ phases:
 
   - id: seed_development
     name: "Seed Development"
-    description: "Build dashboards on seed data to validate the design before connecting to live data"
+    description: "Generate CSV seed data so the whole build runs before any client data access. Disabled by the live_data profile."
     required: true
     requires_phase: design
     artifacts:
@@ -93,20 +118,43 @@ phases:
           - artifact: viz_catalog
             action: generate
             outcome: complete
-      - id: dashboards
-        command: dashboards
+
+  - id: build
+    name: "Build"
+    description: "dbt models, semantic layer, then the dashboards the approved mockup specifies. Same order on seed data or on live data — only the source changes."
+    required: true
+    requires_phase: design
+    artifacts:
+      - id: dbt
+        command: dbt
+        required: true
+        sequence: 1
+        depends_on:
+          - artifact: seed_data
+            action: review
+            outcome: approved
+      - id: semantic_layer
+        command: semantic_layer
         required: true
         sequence: 2
         depends_on:
-          - artifact: seed_data
+          - artifact: dbt
+            action: validate
+            outcome: PASS
+      - id: dashboards
+        command: dashboards
+        required: true
+        sequence: 3
+        depends_on:
+          - artifact: semantic_layer
             action: review
             outcome: approved
 
   - id: data_refactor
     name: "Data Refactor"
-    description: "Replace seed data with live client data — refactor dbt project, rebuild semantic layer"
+    description: "Repoint the staging layer from seeds to live client sources. Disabled by the live_data profile: there is nothing to refactor when the build was never seeded."
     required: true
-    requires_phase: seed_development
+    requires_phase: build
     artifacts:
       - id: data_refactor
         command: data_refactor
@@ -116,28 +164,14 @@ phases:
           - artifact: dashboards
             action: review
             outcome: approved
-      - id: dbt
-        command: dbt
-        required: true
-        sequence: 2
-        depends_on:
-          - artifact: seed_data
-            action: review
-            outcome: approved
-      - id: semantic_layer
-        command: semantic_layer
-        required: true
-        sequence: 3
-        depends_on:
-          - artifact: dbt
-            action: validate
-            outcome: PASS
 
   - id: testing
     name: "Testing"
     description: "Data quality tests and UAT on live data"
     required: true
-    requires_phase: data_refactor
+    # build, not data_refactor: the refactor phase is off under the live_data
+    # profile, and testing depends on a finished build either way.
+    requires_phase: build
     artifacts:
       - id: data_quality
         command: data_quality
