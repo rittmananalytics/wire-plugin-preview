@@ -67,7 +67,7 @@ Most data platform engagements build the data layer first — source connectors,
 
 The mechanism that makes this practical is the `dashboard-mock-developer` agent. Rather than producing static wireframes or a Figma prototype, the agent generates a self-contained, interactive HTML file — Chart.js charts, tab navigation, filter pills, the full Looker visual language — that runs directly in a browser without a build step or a server. The client clicks through it, requests changes, and the agent regenerates. Once the mockup is approved, the agent derives three downstream artifacts atomically: a viz catalog CSV (the machine-readable chart inventory), a dashboard spec, and `data_model_requirements.md`. That last file defines the precise grain, measures, and dimensions the data layer must produce. It is what both the `data-designer` and the `mock-data-developer` agents read.
 
-The second specialist, `mock-data-developer`, takes `data_model_requirements.md` and generates CSV seed files with referential integrity and domain-realistic values. Those seeds power a working dbt project — `dbt seed && dbt run` succeeds — before the client has provided a single database credential. Real source data arrives later. When it does, `/wire:mock_data-refactor` (handled by the same agent) rewrites the staging layer from `ref('seed')` calls to `source()` calls, producing a written migration plan before touching any code. The seed-based prototype is disposable; it exists to validate the design, not to become the production model.
+The second specialist, `mock-data-developer`, takes `data_model_requirements.md` and generates CSV seed files with referential integrity and domain-realistic values. Good seed data has to get four things right: referential integrity checked rather than assumed, a deliberate shape rather than a flat distribution (a flat one makes every chart prove nothing), a non-zero value for every measure in the catalog, and totals small enough that nobody mistakes them for real. Those seeds power a working dbt project — `dbt seed && dbt run` succeeds — before the client has provided a single database credential. Real source data arrives later. When it does, `/wire:data_refactor-generate` (handled by the same agent) rewrites the staging layer from `ref('seed')` calls to `source()` calls, producing a written migration plan before touching any code. The seed-based prototype is disposable; it exists to validate the design, not to become the production model.
 
 ### High-Level Process
 
@@ -190,7 +190,7 @@ subgraph DEV["Development"]
 end
 
 subgraph PHASE2["Phase 2 — Real Data"]
-    REF["mock-data-developer:\nwire:mock_data-refactor\nseeds → GAM + GA4 Fivetran"]:::wireCmd
+    REF["mock-data-developer:\nwire:data_refactor-generate\nseeds → GAM + GA4 Fivetran"]:::wireCmd
 end
 
 END([Dashboards Live]):::event
@@ -400,16 +400,33 @@ With the seeds running cleanly, the build continues:
 → cpm_gbp calculated dynamically: revenue_gbp / (impressions / 1000)
 
 /wire:dashboards-generate 01-claybrook-media-dashboards
-→ Claybrook Campaign Performance dashboard — 4 tiles published
-→ Looker dashboard matches approved HTML prototype tile-for-tile
+→ resolved: bi_tool looker · model claybrook · explore campaign_performance
+→ tile source: design/dashboard_visualization_catalog.csv (11 rows)
+→ 11 tiles generated across 2 dashboard pages
+→ unmapped chart types: 0 · unresolved fields: 0
+→ mockup cross-check: PASS (tile count, titles, filters, fields)
+
+/wire:dashboards-validate 01-claybrook-media-dashboards
+→ 9 checks, 11 tiles: PASS
 ```
+
+`dashboards-generate` reads its tile list from the approved catalog and never invents one. Two
+counts in that output are the ones to look at, and both are written to `status.md`:
+
+- **`unmapped chart types`**: a `chart_type` the mapping table does not recognise. The tile
+  renders as a table, which shows the underlying values, and is reported. It is never guessed at.
+- **`unresolved fields`**: a measure or dimension with no matching semantic layer field. The
+  field is not invented as LookML.
+
+`dashboards-validate` fails while either is above zero, so a partial dashboard cannot pass for a
+finished one.
 
 ### Phase 2: real data migration
 
 Once GAM and GA4 Fivetran connectors are provisioned and access is confirmed, the data refactor replaces the seeds with real sources.
 
 ```
-/wire:mock_data-refactor 01-claybrook-media-dashboards
+/wire:data_refactor-generate 01-claybrook-media-dashboards
 → [mock-data-developer agent]
 → Schema comparison: seed schema vs GAM Fivetran connector schema
 → 3 column renames identified in campaign_performance source

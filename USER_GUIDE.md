@@ -311,8 +311,8 @@ The framework encodes delivery methodology as twelve release types, each definin
 
 In any Claude Code session, register the marketplace, install the plugin, then activate it:
 ```
-/plugin marketplace add rittmananalytics/wire-plugin
-/plugin install wire@rittman-analytics
+/plugin marketplace add rittmananalytics/wire-plugin-preview
+/plugin install wire-preview@rittman-analytics-preview
 /reload-plugins
 ```
 When prompted for scope, select **"Install for you (user scope)"** to make Wire available across all repositories.
@@ -4359,7 +4359,7 @@ Run `/wire:new` in Claude Code to scaffold the engagement, create your first rel
 
 ### Installing the Wire Plugin
 
-The extension activates automatically in any workspace. Before running Wire commands you need the Wire Claude Code plugin installed. Open the **MCP Servers** panel in the Wire sidebar, click the cloud-download button in the title bar, and choose **Install from marketplace**. The picker sends `/plugin marketplace add rittmananalytics/wire-plugin` to Claude Code and copies the follow-up `/plugin install wire@rittman-analytics` command to your clipboard. After install completes, run `/reload-plugins` in Claude Code to activate the plugin in the current session.
+The extension activates automatically in any workspace. Before running Wire commands you need the Wire Claude Code plugin installed. Open the **MCP Servers** panel in the Wire sidebar, click the cloud-download button in the title bar, and choose **Install from marketplace**. The picker sends `/plugin marketplace add rittmananalytics/wire-plugin-preview` to Claude Code and copies the follow-up `/plugin install wire-preview@rittman-analytics-preview` command to your clipboard. After install completes, run `/reload-plugins` in Claude Code to activate the plugin in the current session.
 
 <img src="docs/images/wire_plugin_ss_4_plugin_install.png" alt="Plugin install picker" width="50%">
 

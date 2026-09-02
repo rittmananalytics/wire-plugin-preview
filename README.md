@@ -1,3 +1,8 @@
+> **Preview channel.** This is the Wire preview plugin, published from the
+> `release/v4.0.0` branch. It installs as `wire-preview` alongside the
+> stable `wire` plugin, not in place of it. For the stable release see
+> https://github.com/rittmananalytics/wire-plugin
+
 <img src="docs/images/wire_logo_transparent.png" alt="Wire Framework" width="220">
 
 # Wire Framework v4.0.0
@@ -123,8 +128,8 @@ A typical instrumentation flow chains `diff-intake` â†’ `discover-event-surfaces
 ### Installing the Claude Code Plugin
 
 ```
-/plugin marketplace add rittmananalytics/wire-plugin
-/plugin install wire@rittman-analytics
+/plugin marketplace add rittmananalytics/wire-plugin-preview
+/plugin install wire-preview@rittman-analytics-preview
 /reload-plugins
 ```
 
@@ -329,7 +334,7 @@ Pull requests are welcome for bug fixes and documentation. For larger changes â€
 bash wire/scripts/build-packages.sh
 ```
 Output goes to `wire/dist/`. Push each package to its distribution repository:
-- `wire/dist/claude-plugin/` to `rittmananalytics/wire-plugin`
+- `wire/dist/claude-plugin/` to `rittmananalytics/wire-plugin-preview`
 - `wire/dist/gemini-extension/` to `rittmananalytics/wire-extension`
 
 ---

@@ -58,7 +58,9 @@ flowchart TB
 /wire:mockups-review <release-folder>
 
 # Phase 3: Visualization Catalog (Day 2)
-/wire:viz_catalog-generate <release-folder>             # Generate-only, no validate/review
+/wire:viz_catalog-generate <release-folder>             # Generate-only. Do not skip: sole writer of
+                                                        # design/visualization_catalog.md, which
+                                                        # seed_data-generate requires
 
 # Phase 4: Data Model (Day 2–3)
 /wire:data_model-generate <release-folder>
@@ -80,8 +82,9 @@ flowchart TB
 /wire:semantic_layer-validate <release-folder>
 /wire:semantic_layer-review <release-folder>
 
-/wire:dashboards-generate <release-folder>
-/wire:dashboards-validate <release-folder>
+/wire:dashboards-generate <release-folder>              # One tile per catalog row; stops rather
+                                                        # than guess a model or output path
+/wire:dashboards-validate <release-folder>              # 9 checks against the approved mockup
 /wire:dashboards-review <release-folder>
 
 # Phase 7: Data Refactor — seeds → real data (when client data available)
@@ -131,7 +134,28 @@ The framework:
 3. Generates one or more **self-contained HTML files** that faithfully reproduce the Looker UI
 4. Simultaneously produces `design/dashboard_visualization_catalog.csv` and `design/dashboard_spec.md`
 
-Open the HTML file in a browser — the charts respond to hover and the tabs switch. Iterate on the mockups by asking Claude to modify specific tiles before running `viz_catalog:generate`.
+Open the HTML file in a browser — the charts respond to hover and the tabs switch. Iterate on the mockups by asking Claude to modify specific tiles before running `/wire:viz_catalog-generate`.
+
+**The output is one self-contained file.** The logo mark, toolbar icons and Create button are inline SVG, so there are no image assets to copy and the mockup renders correctly wherever it is opened, including as an email attachment. Builds before `4.0.0-preview+83314053` referenced three PNGs by filename from the skill folder, so every delivered mockup showed three broken images; if you are on an older build, copy `skills/looker-dashboard-mockup/references/*.png` next to the HTML.
+
+## Phase 6a: Dashboards
+
+`dashboards-generate` turns the approved catalog into real dashboard files. Five steps, in order:
+
+1. **Resolve the target.** The BI tool, the semantic layer project, model and explore, and the output path, from `status.md` or the approved artifacts. If any cannot be resolved it stops and asks. A dashboard written against a guessed model into a guessed directory has to be found and deleted by hand.
+2. **Resolve the tile list.** On `dashboard_first` and `dashboard_extension` the tile source is `design/dashboard_visualization_catalog.csv`, one tile per row, and nothing else. Substituting the requirements document would deliver a tile list the stakeholder never approved.
+3. **Map each row's `chart_type`** to the BI tool's visualization type from a fixed table, matched case-insensitively and ignoring whitespace and hyphens, so two people generating from the same catalog produce the same dashboard.
+4. **Generate one file per dashboard page**, fields referenced by semantic layer field name, filters taken from `dashboard_spec.md`, each tile commented with the catalog row it came from.
+5. **Cross-check against the approved mockup** (tile count, titles, filters, fields) before writing status.
+
+Two counts are recorded in `status.md` and printed in the summary:
+
+| Count | Meaning |
+|---|---|
+| `unmapped_tiles` | a `chart_type` the mapping table does not recognise. The tile renders as a table, which shows the underlying values, and is reported. It is never guessed at |
+| `unresolved_fields` | a measure or dimension with no matching semantic layer field. The field is not invented as LookML |
+
+`dashboards-validate` runs nine checks against the approved mockup chain rather than the dashboard's own claims, and fails while either count is above zero. So the table fallback cannot quietly become the delivered dashboard.
 
 ## Phase 7: Data Refactor
 
@@ -141,6 +165,8 @@ Once the client provides access to their actual data sources:
 3. Executes the changes: updates source definitions, staging model SQL, and dbt configuration
 
 The transition from `ref('customers_seed')` to `source('salesforce', 'accounts')` is a mechanical operation guided by the schema comparison.
+
+The refactor stops at the staging boundary. Warehouse models, the explore and the dashboard are unchanged, which is what the three-layer architecture is for: the staging layer absorbs the entire difference between invented data and a real client warehouse.
 
 ## Specialist agents for dashboard_first
 
