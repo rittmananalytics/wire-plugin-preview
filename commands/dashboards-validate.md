@@ -178,36 +178,91 @@ Run `/wire:dashboards-generate <project>` first.
 
 ### Step 2: Run Validation Checks
 
-**Validation Checklist**:
+Ground truth is the approved mockup chain, not the dashboard's own claims: read
+`design/dashboard_visualization_catalog.csv`, `design/dashboard_spec.md`, the approved semantic
+layer, and the generated dashboard files recorded in `status.md` under
+`artifacts.dashboards.dashboard_files`.
 
-| Check | Rule | Severity |
-|-------|------|----------|
-| [Check 1] | [Description] | Critical |
-| [Check 2] | [Description] | Major |
-| [Check 3] | [Description] | Info |
+**Check 1 — Every catalog row produced a tile.** Count tiles across the generated dashboard
+files and compare against the catalog row count. A missing tile is a Critical failure: the
+stakeholder approved a mockup with that visualization on it.
+Severity: **Critical**. Report missing and extra tiles by name.
 
-[Specific validation checks for this artifact type]
+**Check 2 — No unmapped chart types.** Every tile's `type` was resolved from the mapping table
+in `dashboards-generate` Step 3. Any tile that fell through to the table fallback is listed with
+the `chart_type` the catalog gave.
+Severity: **Critical**.
+
+**Check 3 — Every field resolves against the semantic layer.** For each tile, each entry in
+`fields` exists as a real dimension or measure in the approved semantic layer. Field names are
+compared exactly, case-sensitive. A field that does not exist means the tile errors for the
+first person who opens it.
+Severity: **Critical**.
+
+**Check 4 — Model and explore are real and are the ones recorded.** Every tile's `model` and
+`explore` match `semantic_layer_model` and `semantic_layer_explore` in `status.md`, and both
+exist in the semantic layer.
+Severity: **Critical**.
+
+**Check 5 — Every filter in the dashboard spec is present.** Each filter listed under "Filter
+Dimensions" in `dashboard_spec.md` exists on the dashboard, with the default value the spec
+records, and is listened to by at least one tile. A filter nothing listens to is inert.
+Severity: **Major**. Report filters missing, filters with the wrong default, and filters no tile
+listens to, separately.
+
+**Check 6 — Tile titles match the catalog.** Each tile's title matches its catalog row's
+`visualization_name`. Renaming a tile between mockup approval and delivery breaks the audit
+trail even when the numbers are right.
+Severity: **Major**.
+
+**Check 7 — Dashboard files parse.** For Looker, the LookML parses and braces balance. For the
+other BI tools, the tool's own validator or CLI reports no syntax error. If the tool's validator
+cannot be reached, record `unverified` rather than a pass.
+Severity: **Critical**. `unverified` is not a pass.
+
+**Check 8 — No mock or literal data in the dashboard layer.** No tile carries hardcoded values,
+a table calculation standing in for a missing measure, or a derived table of literal rows. The
+same rule `semantic_layer-generate` applies to views applies here.
+Severity: **Critical**.
+
+**Check 9 — Filters and tiles agree on grain.** Any tile whose fields do not include the
+dimension a listened filter filters on is reported, because that filter will not narrow that
+tile.
+Severity: **Info**. Legitimate in some designs, worth a reader knowing.
 
 ### Step 3: Generate Validation Report
 
 **Output Format**:
 
 ```
-## dashboards Validation: [PROJECT_NAME]
+## Dashboards Validation: [PROJECT_NAME]
 
 **Status:** PASS | FAIL
+**Files checked:** [count]  ·  **Tiles checked:** [count]
 
 ### Validation Results
 
-| Check | Status | Notes |
-|-------|--------|-------|
-| [Check 1] | ✅ | |
-| [Check 2] | ✅ | |
-| [Check 3] | ⚠️ | [Warning details] |
+| # | Check | Severity | Status | Notes |
+|---|-------|----------|--------|-------|
+| 1 | Every catalog row produced a tile | Critical | PASS/FAIL | [N catalog rows, N tiles] |
+| 2 | No unmapped chart types | Critical | PASS/FAIL | [list] |
+| 3 | Every field resolves | Critical | PASS/FAIL | [list] |
+| 4 | Model and explore are real | Critical | PASS/FAIL | |
+| 5 | Every spec filter is present | Major | PASS/FAIL | [list] |
+| 6 | Tile titles match the catalog | Major | PASS/FAIL | [list] |
+| 7 | Dashboard files parse | Critical | PASS/FAIL/unverified | |
+| 8 | No mock or literal data | Critical | PASS/FAIL | [list] |
+| 9 | Filters and tiles agree on grain | Info | PASS/note | [list] |
+
+### Verdict
+
+Any Critical failure is a FAIL. A Major failure is a FAIL unless explicitly waived in the
+report with a named reason. Info items never fail the check.
 
 ### Next Steps
 
-1. **Review with stakeholders**: `/wire:dashboards-review <project>`
+1. [If FAIL] Fix the listed items and re-run /wire:dashboards-validate <release>
+2. [If PASS] Review with stakeholders: /wire:dashboards-review <release>
 ```
 
 ### Step 4: Update Status

@@ -248,10 +248,17 @@ Generate internally consistent CSV seed data files that enable the dbt project t
 **Process**:
 1. Read `.wire/<project-folder>/status.md`
 2. Verify `artifacts.data_model.review` is `approved`
-3. Verify the required DDL files exist
-4. Read the `project_type` and `client` from status.md frontmatter
+3. Read the `project_type` and `client` from status.md frontmatter
+4. Verify each required input file exists **by name**, and name the command that writes any
+   that are missing:
 
-If prerequisites not met, show error:
+| File | Written by | Required for |
+|---|---|---|
+| `design/source_tables_ddl.sql` | `data_model-generate` | every release type |
+| `design/target_warehouse_ddl.sql` | `data_model-generate` | every release type |
+| `design/visualization_catalog.md` | **`viz_catalog-generate`** | `dashboard_first` only |
+
+If the data model is not approved:
 ```
 Error: Data model must be reviewed and approved first.
 
@@ -259,6 +266,27 @@ Current status: [status]
 
 Complete data model review: /wire:data_model-review <project>
 ```
+
+If a required file is missing, stop and name both the file and its writer:
+```
+Error: seed data cannot be generated. Missing required input(s):
+
+  [path]   written by  [command]
+
+Run the command(s) above, then re-run: /wire:seed_data-generate <project>
+```
+
+**`design/visualization_catalog.md` is the one people miss.** On a `dashboard_first` release,
+`mockups-generate` Step 4A already wrote `design/dashboard_visualization_catalog.csv`, so
+`viz_catalog-generate` looks redundant and gets skipped. It is not redundant: it is the only
+writer of `design/visualization_catalog.md`, and that file is what tells Step 3 below which
+measures must return a non-zero value. Do not substitute the CSV. Do not proceed without the
+file. Stop and name `viz_catalog-generate`.
+
+In v4.0.0 the precondition gate blocks this case before Step 1 runs, because
+`dashboard_first.yaml` declares `seed_data` as depending on `viz_catalog: generate: complete`.
+This check is the backstop for a release whose gate was overridden, and for release types whose
+YAML does not carry that edge.
 
 ### Step 2: Analyze Data Model
 
