@@ -244,11 +244,42 @@ mockups:
   reviewed_date: 2026-02-13
 ```
 
+### Step 4a.1: On a `dashboard_first` release, generate the visualization catalog
+
+Read `project_type` from `status.md`. If it is **`dashboard_first`** or
+**`dashboard_extension`**, run the `/wire:viz_catalog-generate` workflow in full now, exactly as
+if the consultant had typed it, and fold its result into the output below.
+
+**Why this is automatic rather than a suggested next step.** `viz_catalog-generate` is
+generate-only: no validate, no review, and no human decision inside it. Its entire input is the
+two files `mockups-generate` Step 4A already wrote (`design/dashboard_visualization_catalog.csv`
+and `design/dashboard_spec.md`), and its output, `design/visualization_catalog.md`, is a
+restructuring of them plus a coverage check against the requirements. Its only precondition is
+this approval. There is nothing for a person to decide between the two steps.
+
+Left as a manual step it was reliably skipped, because a command that reads files you already
+have and writes a third one with a near-identical name reads as duplication. On one engagement
+`viz_catalog-generate` ran zero times across four `dashboard_first` releases, which left
+`seed_data-generate` without the input it uses to guarantee every catalog measure returns a
+non-zero value. Chaining it here removes the opportunity to skip it, on the same principle as
+`specs/utils/auto_validate.md`.
+
+**If it fails**, record the failure in the output and continue. Do not roll back the approval:
+the mockup is approved either way, and the catalog can be regenerated on its own. Report it as:
+
+```
+⚠️  Visualization catalog not generated: [reason]
+    Run it before seed data: /wire:viz_catalog-generate [release_folder]
+```
+
 **Suggest next steps**:
 ```
 ## mockups Approved ✅
 
 **Reviewed by:** [Reviewer]
+
+**Visualization catalog:** design/visualization_catalog.md ([N] visualizations)
+[or the warning above, if it failed]
 
 ### Next Steps
 

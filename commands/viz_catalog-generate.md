@@ -155,6 +155,12 @@ Parse the visualization catalog CSV and dashboard specification markdown files p
 
 This is a **generate-only** artifact (no validate or review steps).
 
+**Normally you do not run this by hand.** `mockups-review` Step 4a.1 runs it automatically on
+approval for `dashboard_first` and `dashboard_extension` releases, because every input it needs
+is already on disk at that point and there is no decision for a person to make in between.
+Running it directly is still valid and idempotent: use it to regenerate the catalog after
+editing the CSV or the dashboard spec by hand, or if the automatic run reported a failure.
+
 ## Usage
 
 ```bash
