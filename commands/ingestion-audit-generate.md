@@ -204,9 +204,6 @@ produces:
   - type: document
     path: "audit/ingestion_audit.md"
     description: "Ingestion source catalog with migration readiness flags"
-  - type: document
-    path: "audit/ingestion_audit.csv"
-    description: "Machine-readable connector inventory for migration-inventory"
 preconditions: []
 valid_next:
   - validate

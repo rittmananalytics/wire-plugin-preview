@@ -124,7 +124,7 @@ inputs:
     - name: release_folder
       description: "Path to the release folder"
 preconditions:
-  - artifact: enablement
+  - artifact: analytics_enablement
     action: generate
     outcome: complete
 delegates_to:

@@ -125,8 +125,8 @@ inputs:
       description: "Path to the release folder"
 produces:
   - type: report
-    path: "audit/ingestion_audit_validation.md"
-    description: "PASS/FAIL validation report with gap list"
+    path: "audit/ingestion_audit.md"
+    description: "PASS/FAIL validation report with gap list, appended to the audit document as a Validation section"
 preconditions:
   - artifact: ingestion_audit
     action: generate
