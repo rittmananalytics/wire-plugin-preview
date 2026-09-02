@@ -121,7 +121,6 @@ release_types:
   - dashboard_first
   - pipeline_only
   - dashboard_extension
-  - enablement
 action_type: artifact
 logs_execution: true
 inputs:

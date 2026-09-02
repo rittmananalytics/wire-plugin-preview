@@ -7,6 +7,14 @@ applicable_when:
   - "Team wants to validate the data model through the BI layer before committing to ingestion"
   - "Stakeholder buy-in depends on seeing working dashboards before full build approval"
 
+# The status.md front-matter field a release records its profile choice in, and
+# what to assume when it is absent. precondition_gate.md Step 0 reads the field,
+# falls back to default_profile, and STOPS if the result is not a declared
+# profile id. Without both fields every dashboard_first command errored on
+# resolution rather than defaulting (wire#248).
+profile_field: build_profile
+default_profile: seeded
+
 profiles:
   - id: seeded
     name: "Seeded"
@@ -60,6 +68,18 @@ phases:
         required: true
         sequence: 1
         depends_on: []
+      # Optional. Runs when requirements carry [NEEDS CLARIFICATION] markers or a
+      # design choice needs a stakeholder decision. It was in 3.11.9's
+      # full_platform sequence and fell out of every release type when the
+      # sequences became YAML (wire#248), so no release type could produce it.
+      - id: workshops
+        command: workshops
+        required: false
+        sequence: 2
+        depends_on:
+          - artifact: requirements
+            action: review
+            outcome: approved
 
   - id: design
     name: "Design"
@@ -207,3 +227,31 @@ phases:
           - artifact: uat
             action: review
             outcome: approved
+
+  # Optional. 3.11.9's dashboard_first sequence ended with training and
+  # documentation; both fell out when the sequences became YAML. Optional rather
+  # than required, since a rapid dashboard release does not always buy them
+  # (wire#248).
+  - id: enablement
+    name: "Enablement"
+    description: "Training and documentation for the delivered dashboards"
+    required: false
+    requires_phase: deployment
+    artifacts:
+      - id: training
+        command: training
+        required: false
+        sequence: 1
+        depends_on:
+          - artifact: dashboards
+            action: review
+            outcome: approved
+      - id: documentation
+        command: documentation
+        required: false
+        sequence: 2
+        depends_on:
+          - artifact: dashboards
+            action: review
+            outcome: approved
+

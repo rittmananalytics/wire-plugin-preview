@@ -197,16 +197,7 @@ inputs:
   required:
     - name: release_folder
       description: "Path to the release folder"
-preconditions:
-  - artifact: ingestion_audit
-    action: validate
-    outcome: PASS
-  - artifact: db_object_audit
-    action: validate
-    outcome: PASS
-  - artifact: dbt_audit
-    action: validate
-    outcome: PASS
+preconditions: dynamic
 delegates_to:
   - utils/precondition_gate
 description: Synthesise all audits into a unified catalogue with dependency graph

@@ -187,7 +187,7 @@ there.
 ---
 wire_schema: "1.0"
 command: generate
-artifact: enablement
+artifact: analytics_enablement
 domain: agentic_data_stack
 release_types:
   - agentic_data_stack

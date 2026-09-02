@@ -43,7 +43,7 @@ flowchart TB
 
 One question decides it: **can you query the source tables the dashboard needs, today?**
 
-Set `discovery_profile` in `status.md`. `seeded` is the default.
+Set `build_profile` in `status.md`. `seeded` is the default.
 
 | | `seeded` | `live_data` |
 |---|---|---|
