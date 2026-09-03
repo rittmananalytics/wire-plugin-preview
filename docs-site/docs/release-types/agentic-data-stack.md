@@ -5,6 +5,18 @@ title: Agentic Data Stack
 
 # Agentic Data Stack Release
 
+:::tip[You do not have to type these commands]
+
+Since v4.0.0, on Claude Code, you can direct this release in plain language
+instead: say what you want done and Wire works out which command that is from
+this release type's definition, names it before it runs, runs it, and stops at
+every review gate for your decision. The commands, the artifacts and the record
+on disk are identical either way, and typing them still works. See
+[The Release Director Model](../advanced/release-director).
+
+:::
+
+
 The Agentic Data Stack release type (`release_type: agentic_data_stack`) is an **overlay for an existing data platform** — it assumes a warehouse, a dbt project, and a BI tool are already in place. The deliverable is a governed self-service analytics capability: an AI that answers business questions accurately and stays accurate as the data platform evolves.
 
 This is not a platform build. If a client's warehouse and dbt project don't yet exist, start with `full_platform` or `pipeline_only` first.

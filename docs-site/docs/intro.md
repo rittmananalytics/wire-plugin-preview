@@ -15,7 +15,9 @@ In practical terms: instead of a practitioner manually writing dbt models, LookM
 
 ## New in 4.0
 
-Wire 4.0 changes something structural: the rules for how a delivery engagement runs stopped being prose inside Wire's own source and became data the framework reads and enforces.
+Wire 4.0 changes two things. The rules for how a delivery engagement runs stopped being prose inside Wire's own source and became data the framework reads and enforces. And because those rules are now data, you no longer have to know which of 313 commands comes next.
+
+**You direct; Wire runs the commands.** Say what you want done and Wire works out which command that is from the release-type definition, names it before it runs, runs it, and stops where a decision is yours. Two usage reviews found the command surface, not the method, was what stopped people using Wire: on one engagement, orientation commands were a third of all runs; on another, two client-side developers made 34 commits touching Wire artifacts and ran zero Wire commands. Every step still runs the real command, so the record on disk is identical to typing it yourself. Typing commands still works, always, and one setting restores the old behaviour for a whole engagement. See [The release director model](./advanced/release-director.md).
 
 **The process is written down.** Every release type now has a machine-readable definition — its phases, the documents each produces, and what depends on what. A shared gate reads it and stops a command whose prerequisites are not met. Overriding is allowed, but it takes your name and a reason, and both are recorded. Autopilot reads the same definition rather than keeping its own copy, which had drifted.
 
@@ -31,7 +33,9 @@ Full detail is in the [release notes](./reference/release-notes.md).
 
 ## What it looks like in practice
 
-You open Claude Code in a git repository where the framework is installed. You type `/wire:new` and answer a few questions about the client and project. You copy the SOW PDF into a folder. Then you work through a sequence of `/wire:*` commands — generating requirements, then designs, then code, then tests, then a deployment runbook, then training materials. At each step the framework checks the output automatically, then asks you or the client to approve it before moving on. If you try to run a step before the thing it depends on is ready, it stops and says so. Alternatively, you can use `/wire:autopilot` to have the AI run through the entire lifecycle autonomously.
+You open Claude Code in a git repository where the framework is installed. You point Wire at the SOW and say what you want: "new engagement for this client, dashboards for store performance, two lanes max, stop at decisions." Wire proposes the release type with its reason, you confirm once, and it runs `/wire:new`. From there you direct in plain language — "run what's next", "approve it", "park that for the client" — and Wire runs the right command each time, naming it first. It generates requirements, then designs, then code, then tests, then a deployment runbook, then training materials. At each step it checks the output automatically, and it stops at every approval gate for your decision. If a step's prerequisite is not ready, it says so rather than proceeding.
+
+You can also type every command yourself, exactly as in 3.x — the commands are unchanged and the record is identical either way. Or use `/wire:autopilot` at the other end of the range, where the AI answers its own review gates and runs the entire lifecycle unattended.
 
 At the end, you have: a production-ready dbt project, a LookML semantic layer, deployed Looker dashboards, data quality tests, a deployment runbook, and training materials — all version-controlled in git with a complete audit trail.
 

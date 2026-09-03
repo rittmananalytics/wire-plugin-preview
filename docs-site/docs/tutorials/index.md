@@ -9,6 +9,20 @@ These tutorials are scenario-based walkthroughs of each Wire release type, built
 
 The supplementary tutorials at the bottom of the table cover the operational mechanics: installing and upgrading the plugin, joining an active engagement mid-stream, and upgrading an existing release folder when a newer version of Wire is installed. Read the tutorial for your release type before running `/wire:new`, or keep it open alongside the terminal during delivery. The supplementary tutorials are most useful when something about the environment or the engagement handover is non-standard.
 
+## A note on typed commands
+
+Every tutorial below shows the commands being typed, because that is the
+clearest way to show what runs and in what order. **Since v4.0.0, on Claude
+Code, you do not have to type them.** Say what you want done and Wire works out
+which command that is from the release-type definition, names it before it runs,
+runs it, and stops where a decision is yours.
+
+Read the tutorials as "what Wire will run", not "what you must type". The
+commands, the artifacts and the record on disk are identical either way. See
+[The Release Director Model](../advanced/release-director), and the
+[Dashboard First](./dashboard-first) tutorial for the same release driven by
+direction rather than by keystrokes.
+
 ## Tutorial index
 
 | Tutorial | Release Type | Scenario | Key Features Shown |

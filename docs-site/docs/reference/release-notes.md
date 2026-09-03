@@ -9,7 +9,7 @@ Recent release history for the Wire Framework. For full changelog detail from v3
 
 ---
 
-## v4.0.0 — Precondition gate, process/data-model registries, Autopilot rewrite
+## v4.0.0 — The release director model, precondition gate, process/data-model registries, Autopilot rewrite
 
 **Released**: July 2026
 
@@ -40,6 +40,44 @@ This release turns that graph into data — a `wire/release-types/<type>.yaml` p
 **Cross-vertical pattern matching gets the same confident/adjacent tiering verticals already had.** `data_model-generate` Step 3 was rejecting a cross-vertical schema whenever its own description named a specific originating context — `crm_identity_resolution`'s YAML frames it as reconciling contacts "for a consultancy's or agency's own CRM operations," which read as a disqualifier for any client that isn't literally an agency. A real dry run for a B2B SaaS client with a genuine multi-CRM contact-mismatch problem declined it on exactly that basis, even though the underlying technique — union multiple CRM sources, resolve identity by email/domain match — doesn't care what kind of business is running it. Step 3 now asks the same question Step 2 already asks for verticals: is the entity shape and technique still structurally the same problem, regardless of who the schema's description says it was built for. A schema is proposed as an adjacent match, explicitly labeled as a reframe, whenever the technique applies — and only rejected for a genuine structural mismatch, like `finance_revenue_recognition`'s timesheet/engagement-billing model not applying to a subscription business.
 
 **Automatic validation.** Validate used to be a separate step a consultant had to remember to run between generate and review. Every `-generate` command that has a matching `-validate` command for the same artifact now runs that validate step automatically once it finishes writing the artifact, folding the PASS/FAIL result into generate's own output. A new `auto_validate` front-matter field lets a generate command opt out of the default when its validate step is expensive — real compute or live external IO, like `dbt-validate`'s `dbt run`/`dbt test` or a migration/semantic-layer validate querying a live warehouse or BI tool directly — in which case generate states plainly why and that the consultant needs to trigger validate themselves. Injected at build time into the 77 of 87 `-generate` commands with a matching `-validate` counterpart, via the same mechanism [Tracing](../advanced/tracing) already uses. Nothing changes about the gate that actually matters: `review` already requires `validate: PASS` for its own artifact, so an opted-out artifact can never reach review unvalidated — the field only decides *when* validate runs, not *whether* it's required. See [Core Concepts → Automatic validation](../getting-started/core-concepts#automatic-validation).
+
+### The release director model
+
+Wire ships 313 commands. Two usage reviews found that the command surface, not the method, is what stops people using it.
+
+| Observation | Where |
+|---|---|
+| Orientation commands (`start` 35 runs, `status` 19) were a third of all 182 executions | Migration engagement review, §3 |
+| 969 of 1,646 free-form prompts were conversation, not commands | Second engagement review, §9 |
+| Two client-side developers made 34 commits touching Wire artifacts and ran zero `/wire:` commands | Second engagement review, §9 |
+
+On the migration engagement, the thing that worked was not more commands. One consultant directed in prose while an agent ran them. Typed `/wire:` prompts fell from 4.98% to 0.91% of all prompts while Wire executions per typed prompt rose from 1.10 to 2.56, and about 600 models reached merged in the period, 350 in the final seven days.
+
+From 4.0.0 that is the default on Claude Code, on every release type. **Nothing about the record changes** — every step runs the real Wire command, so `status.md`, `execution_log.md`, the precondition gate, auto-validate, telemetry and the artifacts on disk are identical whether a command was typed or dispatched. What changes is who types.
+
+**Three tiers.** A **release director** (one human per release) states intent, makes rulings and approves at gates. An **orchestrating session** computes what is runnable from the release-type graph, dispatches scoped work, and stops where a human decision is required. **Lane agents** — the thirteen specialists under `agents/` — each do one scoped task in their own tree and report once.
+
+This is only possible now because of the other four mechanisms in this release: the release-type YAML gives a computable runnable set, the precondition gate means a step cannot be skipped silently, auto-validate makes generate-and-check one unit of work, and `enforcement: advisory` gives a director's ruling somewhere to attach.
+
+**What is runnable comes from one place.** `specs/utils/runnable_set.md` reads the release-type YAML, the active profile, `status.md` and `decisions.md`, and returns per artifact one of `runnable: generate`, `runnable: validate`, `parked: needs ruling`, `blocked: <unmet precondition>`, `not applicable` or `complete`. `/wire:start`, `/wire:delegate`, Autopilot and the orchestrating session all read it, so they cannot disagree about what comes next. Autopilot kept its own copy until now, which is how its `full_platform` sequence lost the `orchestration` artifact.
+
+**Reviews are never run without a ruling.** A review edge is never `runnable`. Wire presents the artifact, the validate result and the meeting or document-store context the review spec gathers, then asks for one of approve now, request changes, or park for client sign-off. Parked decisions are a list in `status.md`, not a single `paused_at` value, and their count is the first line of every session.
+
+**Rulings are written when made.** A director's decision goes into `decisions.md` immediately, in a form the precondition gate reads: an advisory gate whose ruling names both this artifact and this dependency is satisfied without asking again, and the override row cites the ruling id. A blocking gate is never satisfied by a ruling — the recorded override, with a name and reason given at the time, remains the only way past one.
+
+**One driver per release.** `status.md` carries a release claim: user, session, branch, `claimed_at`, `last_write`. A second orchestrating session offers join, take-over (only past a 30-minute stall) or move, and never dispatches into a claimed release. This is the file-based answer to a recorded failure — 46 commits in 24 hours across four people, one merge silently discarding 54 models of completed work. A person typing a command gets a warning, not a refusal.
+
+**Lanes stop writing `status.md`.** In orchestrated mode the orchestrating session is the single writer of `status.md` and `execution_log.md`; a lane writes its own artifact tree and its own state file, and the consolidation pass fails a lane that wrote the record itself. Outside orchestrated mode, delegation behaves exactly as it did in 3.x.
+
+**Budget.** An optional `budget:` block caps concurrent lanes, refuses warehouse-querying lanes under `warehouse_spend: none`, and says where to stop. You set it in prose; Wire writes the block. An absent block means the defaults, not a budget of zero.
+
+**Active release is resolved, not guessed.** Named release, then the git worktree or branch, then the only release written to in the last 7 days, then ask. The old rule — most recently modified — silently picked whichever of two in-flight releases was touched last.
+
+**Attribution.** Execution-log rows gain `By` and `Session` columns, and telemetry replaces the hardcoded `autopilot: "false"` property with `invoked_by` (`typed`, `orchestrator`, `lane`, `autopilot`). Without it, an operating model that drives typed commands toward zero would make adoption unreadable. Legacy four-column log rows stay valid and are never rewritten.
+
+**Co-existence.** No global switch. Gemini CLI stays command-driven. "You drive" hands control back for a session. `orchestration.mode: manual` in `.wire/engagement/context.md` restores pre-4.0 behaviour exactly, including `/wire:start` print-only. Typing any command always works. `/wire:upgrade` adds the new blocks to existing engagements with defaults, and nothing changes for them until a director gives a directive.
+
+Six behavioural tests under `wire/tests/core/` cover the runnable set, the claim, active-release resolution, the ruling gate, log ordering and mode precedence. `platform_migration` behaviour under the fleet model is unchanged: its spec is now the migration profile of the general operating model, keeping its lane roster and carve-out additions. See [The Release Director Model](../advanced/release-director).
 
 ### Modelling-led discovery
 

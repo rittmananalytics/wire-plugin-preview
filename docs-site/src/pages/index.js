@@ -24,6 +24,24 @@ const Tick = () => (
 
 const cards = [
   {
+    title: 'Say what you want, not which command',
+    body: (
+      <>
+        Wire has 313 commands. You do not have to know them. Say what you want
+        done and Wire works out which command that is, names it before it runs,
+        runs it, and stops where a decision is yours. Typing commands still
+        works, always.
+      </>
+    ),
+    icon: (
+      <>
+        <path d="M4 6h16M4 12h10M4 18h7" />
+        <path d="M15 17l3 3 5-6" />
+      </>
+    ),
+    link: {to: '/docs/advanced/release-director', text: 'The release director model'},
+  },
+  {
     title: 'Automatic validation',
     body: (
       <>
@@ -97,7 +115,7 @@ const stats = [
     accent: '13',
     title: '313 slash commands',
     body:
-      'A complete command set covering every phase of a data platform engagement, from problem definition through to enablement. A command stops if the step it depends on is not finished.',
+      'A complete command set covering every phase of a data platform engagement, from problem definition through to enablement. A command stops if the step it depends on is not finished — and from 4.0 you can direct the work in plain language instead of typing them.',
   },
   {
     lead: '1',
@@ -146,7 +164,7 @@ function Hero() {
         <div>
           <p className="hero-eyebrow">
             <span className="dot" />
-            New in 4.0
+            New in 4.0 — direct the work, Wire runs the commands
           </p>
           <h1>Wire Framework</h1>
           <p className="sub">
@@ -175,28 +193,28 @@ function Hero() {
               <span>claude — acme-analytics</span>
             </div>
             <pre>
-              <span className="c">&gt; /wire:dbt-generate</span> 02-foundation
+              <span className="c">&gt;</span> run what&apos;s next
               {'\n\n'}
-              <span className="d">reading release definition… full_platform</span>
+              <span className="d">
+                dashboard_first · 03-store-dashboards · requirements approved
+              </span>
               {'\n'}
-              <span className="d">checking preconditions…</span>
+              <span className="d">
+                two runnable, no dependency between them
+              </span>
               {'\n\n'}
-              <span className="r">Precondition not met</span>
+              <span className="y">conceptual_model-generate</span>
+              <span className="d"> — lane · business_rules waived by R-1</span>
               {'\n'}
-              {'  data_model review: '}
-              <span className="y">not_started</span>
-              {'\n  '}
-              <span className="d">Required before dbt-generate.</span>
+              <span className="y">mockups-generate</span>
+              <span className="d"> — foreground, needs you</span>
               {'\n\n'}
-              <span className="c">&gt; /wire:data_model-review</span> 02-foundation
-              {'\n'}
-              <span className="g">✓ approved</span> — recorded to engagement state
+              <span className="g">✓ 7 entities · validate: PASS</span>
               {'\n\n'}
-              <span className="c">&gt; /wire:dbt-generate</span> 02-foundation
+              <span className="r">1 decision waiting</span>
               {'\n'}
-              <span className="d">→ delegating to dbt-developer agent</span>
+              {'  conceptual_model — approve now, changes, or park?'}
               {'\n'}
-              <span className="g">✓ 14 models generated · validate: PASS</span>
             </pre>
           </div>
         </div>

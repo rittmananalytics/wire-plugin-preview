@@ -124,6 +124,8 @@ inputs:
       description: "Path to the release folder (inferred from the most recently modified status.md when omitted)"
 description: Reconcile a release's recorded state — status.md, execution log, sprint plan — against evidence from git, disk, and the log itself, then repair the record with the consultant's confirmation
 argument-hint: [release-folder]
+delegates_to:
+  - utils/execution_log
 ---
 
 # Status Sync Utility
@@ -227,6 +229,29 @@ Totals: each epic subtotal and sprint total must equal the arithmetic sum of its
 
 **4e. Session History and missing log rows.** Qualifying git commits (or repaired artifact states) with no corresponding execution-log row and no Session History row are classified `history_gap`. Proposal: one backfilled log row per evidenced-but-unlogged event, and one Session History row per evidenced work session (date, inferred objective, what was accomplished), both per Contract rule 4.
 
+**4f. Execution-log row ordering.** Rows in `execution_log.md` are appended in
+the order things happened, so each row's timestamp is greater than or equal to
+the row above it (`specs/utils/execution_log.md`, rule 6). Walk the rows in
+file order and compare each row's timestamp with its predecessor's:
+
+| Condition | Category | Proposal |
+|---|---|---|
+| Every row's timestamp is greater than or equal to its predecessor's | `in_sync` | — |
+| A row's timestamp precedes its predecessor's | `log_out_of_order` | Report both rows, in file order, with their timestamps. Ask; do not repair automatically |
+| A row's timestamp is unparseable | `log_out_of_order` | Report the row and its position. It is neither in nor out of order; it cannot be compared |
+
+The proposal is never "re-sort the file". Re-ordering an append-only log
+destroys the evidence of what actually happened in what order, and the wrong
+row could as easily be the one above. The repair is a decision: correct one
+timestamp, or accept the pair as a known artefact of two writers. Observed
+failure: out-of-order rows in both logs of a live migration, unnoticed because
+nothing looked.
+
+A log with fewer than two rows, or no log at all, is `in_sync` for this check.
+Legacy five-column rows are compared on their Timestamp column like any other
+row; missing `By`/`Session` columns are not a defect
+(`specs/utils/execution_log.md`, "Legacy five-column rows").
+
 ### Step 5: Present the Drift Report
 
 Present all findings before asking anything. Suggested shape:
@@ -243,6 +268,7 @@ Present all findings before asking anything. Suggested shape:
 | 3 | Sprint 1 story "Staging models for X" | record_behind (evidence complete) | Status → Done |
 | 4 | Sprint 1 total | totals_stale | points done 0 → 8 |
 | 5 | execution_log.md | history_gap (2 commits, no rows) | backfill 2 rows |
+| 6 | execution_log.md rows 41–42 | log_out_of_order (14:05 follows 15:40) | your call — correct one timestamp, or accept |
 
 Items needing your call (record_ahead): none
 

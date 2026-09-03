@@ -1,11 +1,13 @@
 ---
-sidebar_position: 2
+sidebar_position: 4
 title: Wire Autopilot
 ---
 
 # Wire Autopilot
 
 **Rewritten**: v4.0.0 — Autopilot now runs the same real `/wire:*` commands a person would type, in an order it resolves dynamically from each release type's `wire/release-types/*.yaml`, instead of a separate hardcoded copy of the process. This page describes the current behavior.
+
+**How this differs from directing the work.** Since v4.0.0 the ordinary way to work on Claude Code is [the release director model](./release-director): you direct in plain language, Wire runs the commands, and it **stops at every review gate for your decision**. Autopilot is the far end of the same range — it answers its own review gates and runs unattended. Use the director model for client work; use Autopilot for demonstrations, dry runs, and building a complete example set without a human in the loop.
 
 Wire Autopilot takes a Statement of Work (or proposal document) and any supporting materials, asks a small set of clarifying questions, then autonomously executes the entire engagement lifecycle — a discovery sprint (problem definition → pitch → release brief → sprint plan), followed by every delivery release that discovery identifies, end to end.
 
@@ -83,7 +85,9 @@ The sprint plan's "Downstream Releases" table is the canonical list of what Phas
 
 For each planned release, Autopilot creates the release folder and `status.md`, then resolves the artifact order and runs it:
 
-**Order resolution isn't hardcoded anywhere in `autopilot.md`.** It reads `status.md`'s `project_type`, loads that release type's `wire/release-types/<type>.yaml`, flattens every phase's artifacts into one list, and topologically sorts by `depends_on` (tie-broken by `sequence`). This is the same file the [precondition gate](../getting-started/core-concepts#the-precondition-gate) reads at runtime for every artifact regardless of whether Autopilot or a person is driving — so if a release type's YAML changes via a `wire-process-registry` PR, Autopilot's execution order picks it up automatically, with nothing in `autopilot.md` itself needing an update. See [The Process and Data Model Registries](./registries) for how that YAML gets to this repo.
+**Order resolution isn't hardcoded anywhere in `autopilot.md`.** Since v4.0.0 it is not even implemented there: Step 4.3a delegates to `specs/utils/runnable_set.md`, a single shared procedure that reads `status.md`'s `project_type`, loads that release type's `wire/release-types/<type>.yaml`, applies the active profile, flattens every phase's artifacts into one list, and topologically sorts by `depends_on` (tie-broken by `sequence`). This is the same file the [precondition gate](../getting-started/core-concepts#the-precondition-gate) reads at runtime for every artifact regardless of whether Autopilot or a person is driving — so if a release type's YAML changes via a `wire-process-registry` PR, Autopilot's execution order picks it up automatically. See [The Process and Data Model Registries](./registries) for how that YAML gets to this repo.
+
+`/wire:start`, `/wire:delegate` and [the orchestrating session](./release-director) read that same procedure, so all four agree about what comes next. Keeping four copies of it is precisely how the `full_platform` sequence lost the `orchestration` artifact. Autopilot's behaviour is unchanged by the move — it uses the resolved order and the not-applicable classification, and continues through review edges under self-review where the orchestrating session would stop and ask.
 
 For each artifact in the resolved order, Autopilot runs the actual `/wire:{command}-generate`, `/wire:{command}-validate` (where one exists — `mockups`, `uat`, and `workshops` don't have a validate step), and `/wire:{command}-review` commands — not a paraphrase of their logic, the real command files, with their own Auto-Delegation and Post-Execution Hooks running unchanged.
 

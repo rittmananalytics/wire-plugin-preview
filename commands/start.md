@@ -125,6 +125,9 @@ inputs:
 description: Session entry point and Wire co-pilot — orients new users, surfaces the right next action, and helps navigating consultants pick up where they left off
 argument-hint: [new|resume|explain]
 
+delegates_to:
+  - utils/runnable_set
+  - utils/director_operating_model
 ---
 
 # Wire Start
@@ -372,6 +375,25 @@ git log --oneline -1 -- .wire/ 2>/dev/null
 | `.wire/` exists but no `releases/` subfolder | Suggest running `/wire:adopt` first |
 | Wire never used in this repo but Wire is installed | New-user onboarding (aware of Wire, hasn't started) |
 
+**Signal 3 — Orchestration mode**
+
+Resolve it before Phase 3B, per the precedence in
+`specs/utils/director_operating_model.md` ("Co-existence with typed commands"),
+highest first:
+
+1. **Runtime.** Gemini CLI resolves to `manual`. It has no skills or agents, so
+   there is nothing to dispatch to.
+2. **Conversation.** If the user has said "you drive" in this session, `manual`
+   for the rest of it. "I'll drive", or any directive to run something, hands
+   control back.
+3. **Engagement.** `orchestration.mode` in `.wire/engagement/context.md`
+   (`orchestrated` or `manual`). Absent means `orchestrated`.
+4. **Default.** `orchestrated` on Claude Code.
+
+The resolved mode changes one thing about this command: whether it offers to
+run the next action or only prints it. Everything else — the health check, the
+state summary, the catalogue — is identical either way.
+
 **Lightweight session-start mode** (applies in navigational mode): If the user has run `/wire:start` in this repo within the past 48 hours and no new changes have been made to `.wire/` since then, skip the intent questions and go directly to the Phase 4 output block with current state summary and top next action. Users switching between multiple repos multiple times per day need fast reorientation, not a full interactive session.
 
 ---
@@ -514,7 +536,18 @@ Read the following in parallel:
 
 1. `.wire/engagement/context.md` — client name, engagement lead, release structure
 2. All `.wire/releases/*/status.md` files — artifact states per release
-3. The most recently modified `status.md` — treat this as the active release
+3. The active release, resolved in this order — never guessed between two
+   candidates:
+   a. A release named in the command argument.
+   b. The release whose folder matches the current git worktree or branch
+      (compare the branch against each release's
+      `agents.coordinator_session.branch`, then against the release folder
+      name).
+   c. The only release with a `status.md` write in the last 7 days.
+   d. Otherwise, list the candidates and ask which one. Do not fall back to
+      "most recently modified": with two releases in flight, whichever was
+      touched last wins silently, and that is how work lands in the wrong
+      release.
 4. The active release's `planning/*_playbook.md` if present — use as the expected sequence
 5. The active release's `execution_log.md` — last 10 rows (most recent first)
 
@@ -534,6 +567,19 @@ Artifacts:
 ```
 
 **Execution log summary**: If `execution_log.md` exists, read the last 10 rows. Format them as a compact table for display in the Phase 4 output block (see below). If fewer than 10 rows exist, show all of them. If the file does not exist, show "No activity recorded yet."
+
+**Compute the runnable set.** Run `specs/utils/runnable_set.md` for the active
+release. It returns, for every artifact in the release-type graph, one of
+`runnable: generate`, `runnable: validate`, `parked: needs ruling`,
+`blocked: <unmet precondition>`, `not applicable` or `complete`, plus the
+topological order and which runnable artifacts have no dependency between them.
+This is the same computation `/wire:delegate`, the orchestrating session and
+Autopilot use, so all four agree about what comes next.
+
+The heuristics below (last completed / in-progress / blocked / next) remain the
+plain-language framing for the output block. Where they and the runnable set
+disagree, the runnable set is right: it reads the release-type YAML and the
+active profile, and they do not.
 
 Identify:
 - The **last completed artifact** (all three steps done: review = approved)
@@ -849,6 +895,9 @@ Why: [one sentence — WHY this step, not what it does]
 /wire:[next-command] [args]
 ```
 
+[In orchestrated mode only, add:]
+Shall I run it? (yes / no / show me the command)
+
 ---
 
 ### Things to Know
@@ -858,6 +907,36 @@ Why: [one sentence — WHY this step, not what it does]
 - [Staleness note if .wire/ hasn't been touched in >14 days]
 - [Legacy structure note if .dp/ was found]
 ```
+
+**Run-it default** (orchestrated mode, navigational mode only):
+
+After the output block, offer to run the Priority 1 command rather than leaving
+the consultant to type it:
+
+- **yes** — run it, through the normal command path. Its auto-delegation,
+  precondition gate, auto-validate, execution log row and telemetry all fire
+  unchanged; the only difference from a typed run is `WIRE_INVOKED_BY`, which is
+  set to `orchestrator` so the record says who invoked it
+  (`specs/utils/telemetry.md`). If the runnable set shows a second artifact with
+  no dependency on the first, say so and offer both.
+- **no** — end here, exactly as manual mode does.
+- **show me the command** — print it and stop. Some consultants want the muscle
+  memory.
+
+**Keep the command name in the output either way.** The block above always
+prints `/wire:[command] [args]`, in orchestrated mode as much as in manual, so
+a consultant who has never typed a Wire command still learns what the thing
+they just approved is called. Hiding the command name is how a director model
+becomes a black box.
+
+**In manual mode this offer does not appear.** `/wire:start` prints the next
+action and stops, exactly as it does today.
+
+**A review edge is never offered as "run it".** If the next action is
+`<artifact>-review`, present the three-way ruling instead — approve now,
+request changes, or park for client sign-off — per
+`specs/utils/director_operating_model.md` ("Review as a ruling"). Reviews are
+not run without a director's decision.
 
 **Session plan handoff** (navigational mode only — skip for onboarding and explanation modes):
 
@@ -894,17 +973,26 @@ so you can continue with the framework from where the project actually is.
 
 ### Multiple Releases in Flight
 
-If more than one release has in-progress artifacts:
+If more than one release has in-progress artifacts, apply the resolution order
+in Step B1 first: a named release, then a branch or worktree match, then a
+single release written to in the last 7 days. Only when that leaves two or more
+candidates, ask:
 
 ```
 Multiple releases are in progress:
-  [release_1]: [artifact] — [pending step]
-  [release_2]: [artifact] — [pending step]
+  [release_1]: [artifact] — [pending step]  (branch: [branch], last write: [date])
+  [release_2]: [artifact] — [pending step]  (branch: [branch], last write: [date])
 
 Which release are you working on right now? (enter number or name)
 ```
 
 Wait for confirmation before generating next-action output.
+
+Recommended practice, worth saying once to a consultant who hits this often:
+one git worktree and one session per active release. Switching context is
+switching terminal. That makes the branch match in Step B1 resolve every time,
+and it is what the operating model assumes
+(`specs/utils/director_operating_model.md`, contention rules).
 
 ### No Projects Found
 

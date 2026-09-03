@@ -15,6 +15,25 @@ All Wire commands follow the pattern `/wire:<artifact>-<action> <release-folder>
 
 ---
 
+## You do not have to type any of these
+
+**Since v4.0.0, on Claude Code.** Say what you want done and Wire works out which
+command that is, names it before it runs, runs it, and stops where a decision is
+yours. This page stays the reference for what each command does, and typing one
+always works — but knowing the catalogue by heart is no longer the price of
+entry. See [The Release Director Model](../advanced/release-director).
+
+Two commands behave differently under it:
+
+- **`/wire:start`** computes the next action as before, then offers to run it
+  rather than only printing it. It still prints the command name, so you learn
+  it. Under `orchestration.mode: manual` it prints and stops, exactly as in 3.x.
+- **`/wire:delegate`** checks the release claim before dispatching, enforces the
+  `budget` block in `status.md` (concurrent lanes, warehouse spend), and carries
+  the lane contract in every dispatch.
+
+---
+
 ## Session and management commands
 
 These commands operate on the session or engagement as a whole, not on individual artifacts.
@@ -22,10 +41,10 @@ These commands operate on the session or engagement as a whole, not on individua
 | Command | Description |
 |---|---|
 | `/wire:new` | Create a new release. Prompts for release type, client name, optional Jira/Linear/document store setup. Always the first command for a new engagement. |
-| `/wire:start` | Load session context, show current engagement state, and suggest the next action. Run at the start of any session or whenever you're unsure what to do next. |
+| `/wire:start` | Load session context, show current engagement state, and suggest the next action — and, in orchestrated mode, offer to run it. Run at the start of any session or whenever you're unsure what to do next. |
 | `/wire:status [release]` | Show completion status across all active releases (or a specific release). Reconciles Jira/Linear state when integrations are configured. |
-| `/wire:autopilot <release>` | Run all pending generate → validate cycles autonomously, pausing at review gates and validation failures. |
-| `/wire:delegate <release>` | Build a parallel/sequential delegation plan across specialist subagents and dispatch it. Called internally by Autopilot; run directly to review the plan before agents start. |
+| `/wire:autopilot <release>` | Run all pending generate → validate cycles autonomously, answering its own review gates and pausing only at safety gates and validation failures. The unattended end of the range; for client work, direct the release instead. |
+| `/wire:delegate <release>` | Build a parallel/sequential delegation plan across specialist subagents and dispatch it, within the release's budget and after resolving the release claim. Called internally by Autopilot and by the orchestrating session; run directly to review the plan before agents start. |
 | `/wire:playbook-generate <release>` | Generate a visual BPMN-style delivery plan with dependency order, team assignments, and target dates for the release. |
 | `/wire:delivery-roadmap-generate <release>` | Generate a multi-release delivery roadmap across an entire engagement. |
 | `/wire:archive <release>` | Mark a release as complete or cancelled, write a final status snapshot, and optionally export a client-facing artifact package. |

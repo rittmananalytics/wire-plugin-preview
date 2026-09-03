@@ -22,6 +22,22 @@ The framework encodes delivery methodology as twelve release types, each definin
 | **Droughty** | `droughty` | Schema introspection and base-layer generation | 1–3 days |
 | **Custom** | `custom` | Bespoke scope derived from SoW or project documents | Varies |
 
+## You do not have to know the command sequence
+
+Every release type below is a defined sequence of artifacts with explicit
+dependencies between them. **Since v4.0.0, on Claude Code, Wire reads that
+sequence for you.** Say what you want done and it works out what is runnable,
+names the command, runs it, and stops at every review gate for your decision.
+
+That also means the choice below is one you make in conversation: point Wire at
+the SOW and it proposes a release type **with its reason** for you to confirm,
+rather than asking you to pick from a list cold. Where a release type offers
+profiles — `dashboard_first` (`seeded` or `live_data`) and `sop_discovery`
+(`diagnostic` or `modelling_led`) — `/wire:new` now asks which, instead of
+applying the default silently.
+
+See [The Release Director Model](../advanced/release-director).
+
 ## Choosing the right release type
 
 - **New engagement, scope can be shaped in 1–2 weeks** → **Discovery (Shape Up)**

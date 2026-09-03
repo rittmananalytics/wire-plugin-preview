@@ -9,10 +9,11 @@ title: Upgrading from Wire 3.x
 
 ## What you get
 
-4.x turns the delivery process itself into data. Every release type has a machine-readable definition (`release-types/<type>.yaml`): its phases, artifacts, and the dependencies between them. Two mechanisms read that definition, and most of what you notice day to day comes from them.
+4.x turns the delivery process itself into data. Every release type has a machine-readable definition (`release-types/<type>.yaml`): its phases, artifacts, and the dependencies between them. Several mechanisms read that definition, and most of what you notice day to day comes from them.
 
 | Feature | What you see |
 |---|---|
+| **Directing rather than typing** | On Claude Code, say what you want done and Wire works out which command that is, names it, runs it, and stops where a decision is yours. Every step runs the real command, so the record is identical. Typing commands still works. One setting turns it off per engagement. See [The Release Director Model](../advanced/release-director.md). |
 | **Precondition gate** | Every generate, validate, and review command checks its prerequisites before doing anything. If a required upstream artifact is not approved, the command blocks and tells you why. |
 | **Recorded overrides** | You can proceed past a block, but only by giving your name and a reason. Both are written into `status.md` (`precondition_overrides`) and the execution log. Skipping a step becomes a visible, attributable decision. |
 | **Automatic validation** | Generate runs its own validate step when it finishes and folds the PASS or FAIL into its output. Six expensive validates (real dbt builds, live warehouse or BI queries) stay manual, and generate says so plainly when that applies. Review still requires a passing validate either way. |
@@ -20,6 +21,8 @@ title: Upgrading from Wire 3.x
 | **Fathom call sync** | `new` asks for the client's email domain. Given one, new call transcripts arrive in `.wire/engagement/calls/` automatically at session start, each with a findings write-up. It refuses to enable itself for internal RA engagements. `utils-fathom-sync` covers backfills and Gemini CLI. |
 | **Data model registry** (RA staff, optional) | `data_model-generate` can propose a canonical industry data model as a starting baseline. The content lives in a private repo, never bundled in the public plugin; access is by your own GitHub credentials via `utils-data-model-registry-setup`. Without access, everything skips silently. |
 | **Execution tracing** (opt-in) | Set `WIRE_TRACE=true` and every command writes a step-by-step local trace to `trace.jsonl` in the release folder. Off by default, never sent anywhere. See [Detailed Execution Tracing](../advanced/tracing.md). |
+| **Parked decisions and the release claim** | Decisions waiting on you are a list in `status.md`, reported at the start of every session, replacing the single `paused_at` value. A release records who is driving it, so a second session offers to join as reviewer rather than dispatching into it. |
+| **Attribution in the log** | Execution-log rows gain `By` (the git user) and `Session` (`typed`, `orchestrator`, a lane label, or `autopilot`). Existing four-column rows stay valid and are never rewritten. |
 | **The full 3.11.x line** | 4.x is a superset of the final 3.x release: status-sync, reference legibility, the migration and carve-out features, the Plain Language output style, and the rest. |
 
 ## What changes in your day-to-day workflow
@@ -28,6 +31,9 @@ title: Upgrading from Wire 3.x
 - **Treat a gate block as information.** A block means a prerequisite is not approved. The normal response is to complete the prerequisite; the exceptional response is an override, with a reason you are content to see in the record.
 - **`new` asks one more question** (the client email domain, for call sync).
 - **Autopilot runs need a human within reach**, because Autopilot pauses on gate blocks rather than pushing through.
+- **You can stop looking up command names.** Say what you want; Wire names the command before it runs it, so you learn them as you go rather than up front. If you would rather keep typing, nothing stops you.
+- **Answer the parked decisions.** The first line of each session is the count of decisions waiting on you. A parked review is not a stalled release — other work continues around it — but nothing downstream of it moves until you rule.
+- **One driver per release.** Two people on one release means one drives and one reviews. Two releases, two branches, two terminals is the shape that works.
 - **Process changes go through the registry.** Release-type definitions and command specs are a pinned mirror of the private, branch-protected `wire-process-registry` repo. If the process itself is wrong, that is a registry pull request, not a local edit. See [Process and Data Model Registries](../advanced/registries.md).
 
 ## What you can no longer do
@@ -38,8 +44,20 @@ title: Upgrading from Wire 3.x
 | Ship a generate and forget to validate until review | Validate runs automatically, or generate states explicitly that it is on you |
 | Let Autopilot push through a questionable state | Autopilot pauses for a human on any gate block |
 | Adjust a spec or the process order in your local plugin copy | Specs and release-type definitions are pinned mirrors of the governed registry |
+| Have two sessions dispatch agent work into the same release at once | The release claim stops the second one, and offers join, take-over or move |
+| Let a subagent write `status.md` while another is writing it | In orchestrated mode the orchestrating session is the single writer of `status.md` and the execution log |
 
-Nothing about review changes: review always required a passing validate. 4.x enforces mechanically what 3.x stated in prose.
+Nothing about review changes: review always required a passing validate, and no agent approves an artifact on your behalf. 4.x enforces mechanically what 3.x stated in prose.
+
+### Existing engagements
+
+`/wire:upgrade` adds the new `status.md` and `context.md` blocks with defaults —
+`parked_decisions`, the expanded `agents` block, `orchestration.mode` — and
+writes the profile field explicitly where a release type has one and the release
+has been running on the default implicitly. It deliberately does **not** write a
+`budget` block: an absent block means no budget was set, and writing one would
+claim a decision nobody made. Nothing changes for the release until someone
+gives a directive.
 
 ## Do you need the latest 3.x first?
 

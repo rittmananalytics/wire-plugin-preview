@@ -43,7 +43,11 @@ flowchart TB
 
 One question decides it: **can you query the source tables the dashboard needs, today?**
 
-Set `build_profile` in `status.md`. `seeded` is the default.
+**Since v4.0.0 `/wire:new` asks the question** and writes `build_profile` to
+`status.md`. `seeded` is still the default, but it is now a decision you made
+rather than one that happened. Until 4.0.0 nothing asked, the field was left
+unwritten, and `live_data` was reachable only by hand-editing `status.md` after
+creation — a route nobody found, on a choice that changes which phases exist.
 
 | | `seeded` | `live_data` |
 |---|---|---|
@@ -64,6 +68,25 @@ release, which read as incomplete delivery rather than a scope decision.
 
 The mockup still drives the design under both profiles. `live_data` removes the seed data, not
 the prototype-first approach.
+
+## Directing this release rather than typing it
+
+Since v4.0.0 you can run the whole sequence below by saying what you want. The
+commands are the same and the record is identical; you just do not have to
+remember which comes next.
+
+| You say | Wire runs |
+|---|---|
+| "New engagement for this client, store performance dashboards. SOW is in `docs/sow.pdf`. Two lanes max, nothing against a warehouse, stop at decisions." | Reads the SOW, proposes `dashboard_first` / `seeded` with the reason and asks the profile question. One confirmation block, then `/wire:new` and the budget block. |
+| "Confirm. Skip business rules, agree at kickoff." | Records ruling R-1 in `decisions.md`, which satisfies `conceptual_model`'s advisory business-rules gate later without asking again. |
+| *(nothing)* | `requirements-generate`, auto-validating. One report: requirement count, PASS/FAIL, clarification markers, and the client call that covers them. |
+| "Approve internally, carry the markers to kickoff." | `requirements-review`. |
+| *(nothing)* | Approval releases two: `conceptual_model` as a lane, `mockups` in the foreground with you — it is interactive, so it never runs as a lane. |
+| "Approved." | `mockups-review`, then `viz_catalog-generate`. |
+| "Go. Report when done." | `data_model` and `seed_data` as two lanes, within the budget. |
+
+Every review still stops for your decision: approve now, request changes, or park
+for client sign-off. See [The Release Director Model](../advanced/release-director).
 
 ## Workflow
 

@@ -125,6 +125,8 @@ inputs:
 description: Upgrade a release folder's status.md and Wire files to the current plugin version schema — adds missing sections, surfaces new commands, never overwrites existing values
 argument-hint: [release-folder]
 
+delegates_to:
+  - utils/director_operating_model
 ---
 
 # Wire Upgrade Command
@@ -332,6 +334,46 @@ Report in the summary: `bq_target backfilled: N rows re-resolved from the manife
 
 ---
 
+### Step 6d: Add the director-model blocks (4.0.0, every release type)
+
+Applies to every release. These blocks are additive with safe defaults, so an
+existing engagement behaves exactly as it did until a director gives a
+directive.
+
+**In `.wire/releases/<folder>/status.md`:**
+
+| Block | Added as | Notes |
+|---|---|---|
+| `budget:` | Not added | An absent block means the defaults (4 lanes, no warehouse restriction, stop at decisions). Writing an explicit block would claim a decision nobody made. Report in the summary that the block is available and what the defaults are. |
+| `parked_decisions:` | `parked_decisions: []` | Empty list. If `agents.paused_at` holds a value, convert it to one entry: `kind: review`, `artifact` from the `<artifact>-review` value, `question` "Approve now, request changes, or park for client sign-off?", `parked_at` from `agents.last_orchestrated` if set, else today. Leave `agents.paused_at` in place — nothing gains from deleting it, and an old reader still finds it. |
+| `agents.coordinator_session` | Left as `null` unless already set | A claim is written by whatever is going to dispatch, not by an upgrade. |
+| Profile field | Added only where the release type declares `profile_field` and the field is absent | Write `default_profile` as the value, and say so in the summary: the release has been running on that default already, and this makes it explicit rather than implicit. Never change a profile value that is already set. |
+
+**In `.wire/engagement/context.md`:**
+
+| Block | Added as | Notes |
+|---|---|---|
+| `orchestration:` | `orchestration:\n  mode: orchestrated` | The 4.0.0 default on Claude Code. A client-side team or a regulated engagement that wants today's behaviour sets `mode: manual`; say so in the summary so the off switch is discoverable at the moment it is introduced. |
+
+Under `--dry-run`, list the blocks that would be added and write nothing.
+
+Report in the summary:
+
+```
+Director model (4.0.0):
+  status.md      parked_decisions: [] added [+ 1 entry converted from paused_at]
+                 [profile_field]: [default_profile] written (was implicit)
+  context.md     orchestration.mode: orchestrated added
+  budget:        not set — defaults apply (4 lanes, no warehouse restriction,
+                 stop at decisions). Set it in prose and Wire will write it.
+  Off switch:    set orchestration.mode: manual in context.md for today's behaviour.
+```
+
+Nothing changes for this release until a director gives a directive. The blocks
+are the record's shape, not a mode being switched on.
+
+---
+
 ### Step 7: Surface New Commands
 
 Based on `release_type` and the detected additions, report any commands that are now available but were not present in the installed version when the release was created. Use the following known command introductions as the reference:
@@ -442,14 +484,14 @@ If the file does not exist, create it with the header:
 ```markdown
 # Execution Log
 
-| Timestamp | Command | Result | Detail |
-|-----------|---------|--------|--------|
+| Timestamp | Command | Result | Detail | By | Session |
+|-----------|---------|--------|--------|----|---------|
 ```
 
 Then append one row per execution:
 
 ```markdown
-| YYYY-MM-DD HH:MM | /wire:<command> | <result> | <detail> |
+| YYYY-MM-DD HH:MM | /wire:<command> | <result> | <detail> | <by> | <session> |
 ```
 
 ### Field Definitions
@@ -466,7 +508,8 @@ Then append one row per execution:
   - `archived` — `/wire:archive` archived a project
   - `removed` — `/wire:remove` deleted a project
   - `activated` — a skill was auto-activated (used with `skill` in the Command column)
-  - `override` — `specs/utils/precondition_gate.md` recorded a consultant overriding an unmet precondition
+  - `override` — `specs/utils/precondition_gate.md` recorded a consultant overriding an unmet precondition, or an advisory gate satisfied by a director's ruling
+  - `mode` — the director handed control over or took it back ("you drive" / "I'll drive"), per `specs/utils/director_operating_model.md`
 - **Detail**: A concise one-line summary of what happened. Include:
   - For generate: number of files created or key output filename
   - For validate: number of checks passed/failed
@@ -475,13 +518,27 @@ Then append one row per execution:
   - For archive/remove: project name
   - For skill activations: brief description of what triggered the skill
   - For override: the unmet precondition, who overrode it, and their reason
+  - For a ruling-satisfied advisory gate: the precondition and the ruling id
+- **By**: the git user (`git config user.name`), or `unknown` if git has no
+  user configured. Who the run is attributable to, regardless of what typed it.
+- **Session**: what invoked the run. One of:
+  - `typed` — a person typed the command
+  - `orchestrator` — the orchestrating session dispatched it, followed by its
+    session id in brackets where one is available: `orchestrator [a1b2c3]`
+  - a lane label — the lane that ran it, e.g. `dbt-developer [staging 1/2]`
+  - `autopilot` — `/wire:autopilot` ran it
+
+  This is the same value the `invoked_by` telemetry property carries
+  (`specs/utils/telemetry.md`), read from `WIRE_INVOKED_BY` and defaulting to
+  `typed`. The log records it per row so the record on disk answers the same
+  question telemetry answers in aggregate.
 
 ## Skill Activation Entries
 
 When a skill activates, it appends a row in the same format as commands, using `skill` in the Command column and the skill identifier in the Result column:
 
 ```markdown
-| YYYY-MM-DD HH:MM | skill | <skill-identifier> | activated | <brief trigger description> |
+| YYYY-MM-DD HH:MM | skill | <skill-identifier> | activated | <brief trigger description> | <by> | <session> |
 ```
 
 Skill identifiers:
@@ -530,31 +587,61 @@ This check is self-contained within this utility, so every caller gets it automa
 
 ## Rules
 
-1. **Append only** — never modify or delete existing log entries
+1. **Append only** — never modify or delete existing log entries, and never
+   re-order them. A row is appended at the bottom, always. Rewriting the file
+   to insert a row in timestamp order is a modification, not an append.
 2. **One row per command execution** — even if a command is re-run, add a new row (this creates the revision history)
 3. **Always log after status.md is updated** — the log entry should reflect the final state
 4. **Pipe characters in detail** — if the detail text contains `|`, replace with `—` to preserve table formatting
 5. **Keep detail under 120 characters** — be concise
+6. **Timestamps must not go backwards.** Because rows are appended in the order
+   things happened, each row's timestamp is greater than or equal to the row
+   above it. A row whose timestamp precedes its predecessor's means either the
+   clock moved or a row was inserted out of order; both are record defects.
+   `/wire:status-sync` flags them, naming both rows. This does not block any
+   command — the log is written either way, and the flag is a repair prompt.
+7. **Single writer in orchestrated mode.** When
+   `specs/utils/director_operating_model.md`'s operating model is in force,
+   only the orchestrating session appends to this file. Lanes write their own
+   state files and the orchestrator writes the log rows from them (rule 6 of
+   the operating model). Outside orchestrated mode, every command writes its
+   own row as it always has.
+
+## Legacy five-column rows
+
+Logs written before the `By` and `Session` columns existed have four data
+columns. They stay valid and are never rewritten:
+
+- A reader parses columns positionally and treats a missing `By` or `Session`
+  as unknown. It does not treat a five-column row as malformed and does not
+  backfill it.
+- The two columns are added on the next write. A file whose header still has
+  four columns gets the new header written once, at the point the first
+  six-column row is appended; existing rows are left as they are, so a log can
+  legitimately hold both shapes.
+- Nothing derives meaning from the absence of the columns. An old row is not
+  "typed"; it is unknown.
 
 ## Example
 
 ```markdown
 # Execution Log
 
-| Timestamp | Command | Result | Detail |
-|-----------|---------|--------|--------|
-| 2026-02-22 14:30 | skill | engagement-context | activated | Context loaded for new conversation |
-| 2026-02-22 14:35 | /wire:new | created | Project created (type: full_platform, client: Acme Corp) |
-| 2026-02-22 14:40 | /wire:requirements-generate | complete | Generated requirements specification (3 files) |
-| 2026-02-22 15:12 | /wire:requirements-validate | pass | 14 checks passed, 0 failed |
-| 2026-02-22 16:00 | /wire:requirements-review | approved | Reviewed by Jane Smith |
-| 2026-02-23 09:15 | /wire:conceptual_model-generate | complete | Generated entity model with 8 entities |
-| 2026-02-23 10:30 | /wire:conceptual_model-validate | fail | 2 issues: missing relationship, orphaned entity |
-| 2026-02-23 11:00 | /wire:conceptual_model-generate | complete | Regenerated entity model (fixed 2 issues, 8 entities) |
-| 2026-02-23 11:15 | /wire:conceptual_model-validate | pass | 12 checks passed, 0 failed |
-| 2026-02-23 14:00 | /wire:conceptual_model-review | changes_requested | Reviewed by John Doe — add Customer entity |
-| 2026-02-23 15:30 | /wire:conceptual_model-generate | complete | Regenerated entity model (9 entities, added Customer) |
-| 2026-02-23 15:45 | /wire:conceptual_model-validate | pass | 14 checks passed, 0 failed |
-| 2026-02-23 16:00 | /wire:conceptual_model-review | approved | Reviewed by John Doe |
-| 2026-02-24 09:05 | /wire:migration-strategy-generate | override | migration_inventory.review required approved, was not_started — overridden by Jane Smith: client demo tomorrow, inventory sign-off deferred to Monday |
+| Timestamp | Command | Result | Detail | By | Session |
+|-----------|---------|--------|--------|----|---------|
+| 2026-02-22 14:30 | skill | engagement-context | activated | Context loaded for new conversation | Jane Smith | typed |
+| 2026-02-22 14:35 | /wire:new | created | Project created (type: full_platform, client: Acme Corp) | Jane Smith | typed |
+| 2026-02-22 14:40 | /wire:requirements-generate | complete | Generated requirements specification (3 files) | Jane Smith | orchestrator [a1b2c3] |
+| 2026-02-22 15:12 | /wire:requirements-validate | pass | 14 checks passed, 0 failed | Jane Smith | orchestrator [a1b2c3] |
+| 2026-02-22 16:00 | /wire:requirements-review | approved | Reviewed by Jane Smith | Jane Smith | typed |
+| 2026-02-23 09:15 | /wire:conceptual_model-generate | complete | Generated entity model with 8 entities | Jane Smith | data-designer |
+| 2026-02-23 10:30 | /wire:conceptual_model-validate | fail | 2 issues: missing relationship, orphaned entity | Jane Smith | data-designer |
+| 2026-02-23 11:00 | /wire:conceptual_model-generate | complete | Regenerated entity model (fixed 2 issues, 8 entities) | Jane Smith | data-designer |
+| 2026-02-23 11:15 | /wire:conceptual_model-validate | pass | 12 checks passed, 0 failed | Jane Smith | data-designer |
+| 2026-02-23 14:00 | /wire:conceptual_model-review | changes_requested | Reviewed by John Doe — add Customer entity | Jane Smith | typed |
+| 2026-02-23 15:30 | /wire:conceptual_model-generate | complete | Regenerated entity model (9 entities, added Customer) | Jane Smith | data-designer |
+| 2026-02-23 15:45 | /wire:conceptual_model-validate | pass | 14 checks passed, 0 failed | Jane Smith | data-designer |
+| 2026-02-23 16:00 | /wire:conceptual_model-review | approved | Reviewed by John Doe | Jane Smith | typed |
+| 2026-02-24 09:05 | /wire:migration-strategy-generate | override | migration_inventory.review required approved, was not_started — overridden by Jane Smith: client demo tomorrow, inventory sign-off deferred to Monday | Jane Smith | typed |
+| 2026-02-24 10:20 | /wire:conceptual_model-generate | override | business_rules.review required approved, was not_started — ruling R-1 (Jane Smith): agree definitions at kickoff | Jane Smith | orchestrator [a1b2c3] |
 ```

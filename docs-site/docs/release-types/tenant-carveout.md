@@ -5,6 +5,18 @@ title: Tenant Carve-out
 
 # Tenant Carve-out Release
 
+:::tip[You do not have to type these commands]
+
+Since v4.0.0, on Claude Code, you can direct this release in plain language
+instead: say what you want done and Wire works out which command that is from
+this release type's definition, names it before it runs, runs it, and stops at
+every review gate for your decision. The commands, the artifacts and the record
+on disk are identical either way, and typing them still works. See
+[The Release Director Model](../advanced/release-director).
+
+:::
+
+
 The Tenant Carve-out release type extracts a single tenant's data, models, and access model from a shared multi-tenant platform into the tenant's own target project, isolated from every other tenant. It is delivered as a scope of the [Platform Migration](./platform-migration) release type: `migration.scope: tenant_carveout` in `status.md`, set at `/wire:new`. It reuses the whole platform-migration command set and adds five carve-out command families, per-object tenant scoping, and an isolation proof before cutover.
 
 This page documents the release type as of **v3.11.4**.

@@ -1,5 +1,5 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 title: Wire Agents
 ---
 
@@ -8,6 +8,12 @@ title: Wire Agents
 **Introduced**: v3.8.6 (orchestrate command) → v3.9.2 (12 specialists + `/wire:delegate`) → v3.9.2 (14 specialists, adds `dashboard-mock-developer` and `mock-data-developer`) → v3.9.3 (migration generate commands auto-delegate to `migration-specialist`) → v3.9.5 (all 44 non-migration generate commands auto-delegate) → v3.9.6 (intra-batch parallelism for dbt migration — groups of ~5 models per agent) → v3.9.7 (post-execution hooks, stale artifact detection, Data Safety blocks on all migration specs)
 
 Wire Agents replaces the single-agent pattern with thirteen named specialist agents, each with a focused skill set, dispatched by the `/wire:delegate` command.
+
+**Since v4.0.0** these same agents are the third tier of
+[the release director model](./release-director): one human directs, one session
+orchestrates, and the specialists run as **lanes**. Everything on this page still
+applies; the lane contract below is what changes when a lane is dispatched by an
+orchestrating session rather than by a command you typed.
 
 The core insight: a single Claude Code agent doing requirements, dbt development, LookML authoring, data quality, and migration audits across a full engagement dilutes context and produces generic output. A specialist with a narrow brief — "your job is dbt models and nothing else" — operates with a much cleaner context and makes better decisions within its domain.
 
@@ -154,6 +160,30 @@ Once approved, re-run /wire:delegate [release_folder] to continue.
 
 Run the review manually, then re-run `/wire:delegate` to resume.
 
+## The lane contract
+
+When a specialist runs as a lane under the director model, the dispatch carries
+a brief and five rules apply. Outside orchestrated mode — a single command
+auto-delegating, or an engagement set to `orchestration.mode: manual` —
+behaviour is unchanged and none of this applies.
+
+| Rule | Why (the failure it comes from) |
+|---|---|
+| Write progress to your own state file after **each** completed item | Two hard usage-limit outages resumed with near-zero loss only because every lane had incremental state |
+| Write only inside the directories the brief names, and commit exactly those files | A broad commit from one lane swept up another's half-written state file and corrupted both resume points |
+| **Do not write `status.md` or `execution_log.md`** | 46 commits in 24 hours across four people; one merge silently discarded 54 models of completed work |
+| Do not spawn sub-agents below yourself — lanes are flat | Nested fan-out caused two hard usage-limit outages in one day |
+| Report once: complete, stalled, or needs a ruling | Polling chatter burned context and tokens while the state files already held the answer |
+
+The third rule is the change for ordinary release types. The orchestrating
+session is the single writer of `status.md` and the execution log: it reads the
+lane's state file and writes the record. Its **consolidation pass** then checks
+the artifact files exist, that validate ran and its result matches what the lane
+claimed, that the lane did not write `status.md`, and — for warehouse work —
+re-checks results against the warehouse rather than the lane's word.
+
+`decisions.md` is still the lane's to append to.
+
 ## The decisions.md convention
 
 Each subagent appends non-obvious choices and rationale to `.wire/releases/{release}/decisions.md` as it works — grain choices, tool selections, modelling trade-offs. Downstream agents read it; so do human reviewers at the review gates. This creates a lightweight audit trail of architectural decisions that wouldn't otherwise be captured in the artifacts themselves.
@@ -166,11 +196,19 @@ Wire Agents runs entirely on your workstation. Subagents are spawned using Claud
 
 `/wire:autopilot` calls `/wire:delegate` internally. When you run Autopilot, you are already using Wire Agents — the batch delegation and specialist routing happen automatically. Run `/wire:delegate` directly when you want to review and confirm the delegation plan before agents start.
 
-## Roadmap
+## From roadmap to shipped
 
-| Phase | Version | What ships |
-|---|---|---|
-| Phase 1 | v3.9–v3.9.7 (current) | 14 specialist agent definitions + local batch orchestration via `/wire:delegate`; all generate commands auto-delegate as of v3.9.5; intra-batch parallel agents for dbt migration in v3.9.6; migration reliability hooks and safety blocks in v3.9.7 |
-| Phase 2 | v4.0 | Ticket-driven pull model — agents watch Jira/Linear for `ready_for_agent` issues and execute autonomously |
-| Phase 3 | v4.1 | Agent-to-agent coordination via child tickets |
-| Phase 4 | v4.2 | Named persistent agents with engagement-level expertise; a delivery-coordinator that takes a SoW and generates the full project plan autonomously |
+The 3.9 roadmap proposed a ticket-driven pull model, then agent-to-agent
+coordination, then named persistent agents. v4.0.0 ships something different and
+simpler, because the evidence pointed elsewhere: the barrier was never agent
+autonomy, it was command discovery. A human directs in prose, one session
+orchestrates, and the agents stay exactly as they are — flat, scoped, and
+stopping at every human gate.
+
+| Was proposed | What shipped in v4.0.0 |
+|---|---|
+| Agents watch Jira/Linear for `ready_for_agent` issues and execute autonomously | A human directs in plain language; the orchestrating session dispatches. Issue trackers stay a sync target, not a work queue. |
+| Agent-to-agent coordination via child tickets | Lanes stay flat and never coordinate with each other. Nested fan-out is the rule they are forbidden to break, for a recorded reason. |
+| A `delivery-coordinator` that takes a SoW and generates the whole plan | The orchestrating session reads a SOW and proposes the release type with its reason — as **one confirmation block**, never as an autonomous plan. |
+
+See [The Release Director Model](./release-director) for the whole picture.

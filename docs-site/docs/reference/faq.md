@@ -46,6 +46,58 @@ Archive the existing release (`/wire:archive <release-folder>`) and create a new
 
 ---
 
+## Directing the work (v4.0.0)
+
+**Q: Do I still have to know which command to run?**
+
+No, on Claude Code. Say what you want done — "run what's next", "approve it and
+carry on", "start an engagement from this SOW" — and Wire works out which
+command that is from the release-type definition, names it before it runs, runs
+it, and stops where a decision is yours. See
+[The Release Director Model](../advanced/release-director).
+
+**Q: Is it doing something different from what my typed command would do?**
+
+No. It runs the same command file, so the precondition gate, auto-validate,
+`status.md`, the execution log, the artifacts on disk and telemetry are all
+identical. The only difference is the `Session` column in the log and the
+`invoked_by` telemetry property, which say what invoked the run.
+
+**Q: Will it approve things on my behalf?**
+
+Never. A review edge is never treated as runnable. At every review gate Wire
+asks for one of three: approve now, request changes, or park for client
+sign-off. Parked decisions are listed in `status.md` and are the first line of
+every session until you answer them. (`/wire:autopilot` is the exception, and it
+is a separate, explicitly-invoked command that answers its own review gates.)
+
+**Q: How do I turn it off?**
+
+Three ways, depending on scope. Say **"you drive"** and it stops dispatching for
+the rest of the session. Set `orchestration.mode: manual` in
+`.wire/engagement/context.md` to restore pre-4.0 behaviour for a whole
+engagement, including `/wire:start` printing the next action rather than offering
+to run it. Or just type commands: typing one always works, and Wire picks up
+from the resulting state.
+
+**Q: Two of us are working the same engagement. What happens?**
+
+Different releases on different branches is the normal case and nothing changes.
+On the *same* release, the second session reads the release claim in `status.md`
+and offers to join as a reviewer, take over (only if the holder has not written
+for 30 minutes), or move to another release. It will not dispatch work into a
+release someone else is driving. A person typing a single command gets a warning
+naming the holder, not a refusal.
+
+**Q: Does this work in Gemini CLI?**
+
+No. Gemini CLI has no skills or agents, so it stays command-driven and resolves
+to manual mode regardless of any setting. Gemini users still get the
+active-release resolution, the log columns and the profile question through the
+command changes themselves.
+
+---
+
 ## Commands and artifacts
 
 **Q: What happens if I run a generate command twice on the same artifact?**

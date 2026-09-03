@@ -40,6 +40,7 @@ const sidebars = {
       label: 'Advanced',
       items: [
         'advanced/worked-example',
+        'advanced/release-director',
         'advanced/wire-agents',
         'advanced/autopilot',
         'advanced/vscode-extension',

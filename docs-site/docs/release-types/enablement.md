@@ -5,6 +5,18 @@ title: Enablement
 
 # Enablement Release
 
+:::tip[You do not have to type these commands]
+
+Since v4.0.0, on Claude Code, you can direct this release in plain language
+instead: say what you want done and Wire works out which command that is from
+this release type's definition, names it before it runs, runs it, and stops at
+every review gate for your decision. The commands, the artifacts and the record
+on disk are identical either way, and typing them still works. See
+[The Release Director Model](../advanced/release-director).
+
+:::
+
+
 Use this when an existing platform needs training and documentation — either as a standalone release or as the final phase of a delivery that was not originally run through the Wire Framework.
 
 **In-scope artifacts**: `training`, `documentation`

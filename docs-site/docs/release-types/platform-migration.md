@@ -5,6 +5,21 @@ title: Platform Migration
 
 # Platform Migration Release
 
+:::tip[You do not have to type these commands]
+
+Since v4.0.0, on Claude Code, you can direct this release in plain language
+instead: say what you want done and Wire works out which command that is from
+this release type's definition, names it before it runs, runs it, and stops at
+every review gate for your decision. The commands, the artifacts and the record
+on disk are identical either way, and typing them still works. See
+[The Release Director Model](../advanced/release-director). The fleet operating
+model this release type has used since v3.11 is now the migration profile of
+that general model — the lane roster, the stage ladder and the carve-out lane
+additions are unchanged.
+
+:::
+
+
 The Platform Migration release type covers the full lifecycle of migrating a data platform from one warehouse stack to another. It supports bidirectional BigQuery ↔ Snowflake migrations and introduces two structural features: a two-zone artifact model and an iterative equivalency loop.
 
 **Supported platform pairs**: `bigquery_to_snowflake`, `snowflake_to_bigquery`

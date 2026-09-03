@@ -125,6 +125,9 @@ inputs:
 description: Decompose a release's pending work into typed tasks and dispatch to specialist local subagents
 argument-hint: <release-folder>
 
+delegates_to:
+  - utils/runnable_set
+  - utils/director_operating_model
 ---
 
 # Wire Delegate Command
@@ -161,7 +164,49 @@ Individual generate/validate commands also auto-delegate to the appropriate spec
    - `release_type`
    - `current_phase`
    - All `artifacts.*` entries with their generate/validate/review status values
-3. Read `.wire/engagement/context.md` — extract `client_name`, `engagement_name`, warehouse type (`bigquery` or `snowflake`)
+3. Read `.wire/engagement/context.md` — extract `client_name`, `engagement_name`, warehouse type (`bigquery` or `snowflake`), and `orchestration.mode` (`orchestrated` or `manual`; absent means `orchestrated` on Claude Code, `manual` on Gemini CLI)
+4. Read `status.md`'s `budget:` block. Absent means the defaults: `lanes_max: 4`, `warehouse_spend` unrestricted, `stop_at: decisions`.
+5. Read `status.md`'s `agents.coordinator_session` — the release claim.
+
+---
+
+### Step 1b: Resolve the Release Claim
+
+Before anything is dispatched, resolve the claim per
+`specs/utils/director_operating_model.md` ("The release claim"):
+
+| Claim state | What this command does |
+|---|---|
+| No claim, or `null` | Claim it: write `agents.coordinator_session` with this user, this session id, the current branch, `claimed_at` and `last_write`. Proceed. |
+| Held by this user, this session | Proceed. Refresh `last_write`. |
+| Held by this user, a different session | Rewrite `session_id` to this session and proceed. One person cannot contend with themselves. |
+| Held by another user, `last_write` within 30 minutes | **Do not dispatch.** Offer: join as reviewer (read state and rule, no dispatch), or move to another release. |
+| Held by another user, `last_write` older than 30 minutes | **Do not dispatch yet.** Offer: take over (the 30-minute stall rule — rewrites the claim and says whose it was), join as reviewer, or move. |
+
+Output when the claim is held by someone else:
+
+```
+This release is claimed.
+
+  Held by:     [user]
+  Session:     [session_id]
+  Branch:      [branch]
+  Last write:  [last_write]  ([N] minutes ago)
+
+  [If under 30 minutes:]
+  Another session is driving this release. Options:
+    join   — read state and make rulings; no dispatch
+    move   — pick a different release
+  [If over 30 minutes:]
+  That session has not written for [N] minutes. Options:
+    take   — take the release over; the claim is rewritten in your name
+    join   — read state and make rulings; no dispatch
+    move   — pick a different release
+```
+
+Never dispatch while another live claim exists. A person typing a single
+command by hand is a different case: they get a warning naming the holder, and
+proceed (the collision guard in the operating model).
 
 ---
 
@@ -237,7 +282,46 @@ When fan-out applies to a step, replace the single agent line with a multi-wave 
 
 ### Step 3: Compute Execution Plan
 
-Determine which agent tasks can run in parallel and which must be sequential, based on these dependency rules:
+**Start from the runnable set.** Run `specs/utils/runnable_set.md` for this
+release. It reads the release-type YAML and the active profile and returns each
+artifact's state and the topological order. That is the authority on what can
+run and what can run alongside what; the rules below are the agent-level view
+of the same graph and must not contradict it. Where they disagree, the runnable
+set is right.
+
+Three of its outputs change the plan directly:
+
+- `parked: needs ruling` — not scheduled. Surface it as a decision the director
+  must make. Every review edge is parked.
+- `blocked: <unmet precondition>` — not scheduled. Surface it with the unmet
+  precondition named.
+- `not applicable` — not scheduled, and not reported as pending. The profile
+  has ruled it out.
+
+**Apply the budget** (`specs/utils/director_operating_model.md`, "Budget"):
+
+| Setting | Effect on the plan |
+|---|---|
+| `lanes_max: N` | No step dispatches more than N agents at once. Where the graph offers more, take them in the runnable set's order and queue the rest. Fan-out batches (Step 2.5) count individually: 5 `dbt-developer` batches under `lanes_max: 2` run 2 at a time. |
+| `model_tier: economy` | Pass the lower-tier model override to each lane. The consolidation pass runs regardless. |
+| `warehouse_spend: none` | **Refuse** to dispatch any lane whose command queries a warehouse (`dbt-*` builds, `equivalency-validate`, `data_quality-validate`, `droughty-*`, any `-validate` with `auto_validate: false` that runs against a live system). Report them as budget-blocked, naming the setting. Do not silently drop them. |
+| `warehouse_spend: estimate_required` | Dispatch them, with the cost-governance rules in each lane brief. |
+| `warehouse_spend: cap:<amount>` | As above, plus: a lane whose estimate would take the release past the cap becomes a parked decision, not a dispatch. |
+| `stop_at: decisions` | Stop the plan at the first parked decision and report. |
+| `stop_at: phase_end` | Continue past a parked decision on one artifact to other runnable work in the phase. |
+| `stop_at: never` | Run until nothing is runnable. |
+
+Output when a lane is refused on budget:
+
+```
+Not dispatched — budget:
+  [artifact]-[action]   warehouse_spend: none (queries the warehouse)
+  [artifact]-[action]   lanes_max: 2 reached — queued behind [artifact], [artifact]
+
+Change the budget in status.md, or say so, and I will re-plan.
+```
+
+Then determine which agent tasks can run in parallel and which must be sequential, based on these dependency rules:
 
 **Hard dependencies (downstream cannot start until upstream is complete):**
 
@@ -351,16 +435,45 @@ For each step in the plan, in sequence (launching parallel steps concurrently us
    - Prompt: task instruction including release folder, specific artifact actions, and paths to input artifacts
    - The agent definition at `agents/[agent-name]/AGENT.md` is loaded as the subagent's system context
 
-   Example task instruction (single agent):
+   **Every dispatch carries the lane brief** from
+   `specs/utils/director_operating_model.md` ("Lane brief template"): the lane
+   label, the release, the task, the directories the lane owns, its state file
+   path, the resume contract, its budget line, the flat-lane rule, the
+   status-writing rule, and report-once. The brief is not optional decoration:
+   rules 1, 3, 4 and 6 are conventions, and the brief is where they are stated.
+
+   Example task instruction (single agent, orchestrated mode):
    ```
-   Release: [release_folder]
-   Tasks: pipeline-generate, data_model-generate, dbt-generate
+   Lane:        conceptual_model
+   Release:     [release_folder]
+   Tasks:       conceptual_model-generate
+   Owns:        .wire/releases/[release]/design/
+   State file:  .wire/releases/[release]/lanes/conceptual_model.md
+   Resume:      Read the state file first; skip completed items. Rewrite it
+                after each completed item, not at the end.
+   Budget:      warehouse_spend: none — do not query a warehouse.
+   Flat:        Do not spawn sub-agents. If this is bigger than one lane, say
+                so and stop.
+   Status:      Do not write status.md or execution_log.md. I write them from
+                your state file. (WIRE_INVOKED_BY=lane is set for you.)
+   Report:      Report once — complete, stalled, or needs a ruling.
    Inputs:
      - Requirements: .wire/releases/[release]/artifacts/requirements/requirements.md
      - Conceptual model: .wire/releases/[release]/artifacts/conceptual_model/conceptual_model.md
    Context file: .wire/engagement/context.md
-   Update status.md and decisions.md as you complete each artifact.
+   Append non-obvious choices to decisions.md.
    ```
+
+   **In manual mode** (`orchestration.mode: manual`, or a single command
+   auto-delegating outside the director model) the `Status:` line is omitted
+   and the lane updates `status.md` itself, exactly as it does today. This is
+   the only behavioural difference between the two modes at dispatch.
+
+   Set `WIRE_INVOKED_BY=lane` in each lane's environment before dispatch, and
+   `WIRE_INVOKED_BY=orchestrator` for commands this session runs itself. The
+   telemetry hook and the execution log both read it
+   (`specs/utils/telemetry.md`, `specs/utils/execution_log.md`), so the record
+   says what invoked each run without anyone being asked.
 
    For fan-out agents, include the scoped model list in the task instruction:
    ```
@@ -380,16 +493,36 @@ For each step in the plan, in sequence (launching parallel steps concurrently us
    Note: parallel agents are generating other batches simultaneously — do not wait for them.
    ```
 
-2. Update `status.md` to reflect work in progress:
+2. Update `status.md` to reflect work in progress. In orchestrated mode this
+   session is the only writer of `status.md` and `execution_log.md`:
    ```yaml
    agents:
-     mode: local
+     mode: orchestrated
+     coordinator_session:
+       user: "[git user.name]"
+       session_id: "[session id]"
+       branch: "[current branch]"
+       claimed_at: "[when this session claimed the release]"
+       last_write: "[now]"
      last_orchestrated: [timestamp]
    ```
+   In manual mode, write `mode: local` and `last_orchestrated` as before.
 
 3. Show subagent progress in the console as it executes. Surface artifact completion events without pasting full content.
 
-4. On subagent completion, check that expected artifact files exist and `status.md` has been updated.
+4. On subagent completion, run the consolidation check from
+   `specs/utils/director_operating_model.md` ("The consolidation and backstop
+   pass") before treating the lane's work as done:
+   - the artifact files the lane claimed exist on disk;
+   - validate ran, and its recorded result matches what the lane reported;
+   - **the lane did not write `status.md`** (orchestrated mode only). A lane
+     that did is a rule-6 violation: report it, and reconcile `status.md` from
+     the lane's state file rather than trusting the lane's edit;
+   - for warehouse-touching work, re-check build results against the warehouse
+     rather than the lane's claim.
+
+   Then write `status.md` from the lane's state file. In manual mode, check
+   instead that the lane updated `status.md` itself, as today.
 
 5. After each step completes, launch the next step (or the next parallel batch).
 
@@ -410,13 +543,27 @@ Run /wire:[artifact]-review [release_folder] to conduct the stakeholder review.
 Once approved, re-run /wire:delegate [release_folder] to continue.
 ```
 
-Update `status.md`:
+Record the park in `status.md` as a parked decision, not as a single
+`paused_at` value — a release can be waiting on more than one thing at once
+(`specs/utils/director_operating_model.md`, "Parked decisions"):
+
 ```yaml
 agents:
-  mode: local
+  mode: orchestrated
   last_orchestrated: [timestamp]
-  paused_at: [artifact]-review
+
+parked_decisions:
+  - id: PD-[n]
+    artifact: [artifact]
+    kind: review
+    question: "Approve now, request changes, or park for client sign-off?"
+    parked_at: "[timestamp]"
+    awaiting: "[who is expected to answer, if not the director]"
 ```
+
+In orchestrated mode, present the three-way ruling (approve now / changes /
+park for client sign-off) rather than only printing the review command. The
+review command still runs, unchanged, when the director approves.
 
 ---
 
@@ -508,14 +655,14 @@ If the file does not exist, create it with the header:
 ```markdown
 # Execution Log
 
-| Timestamp | Command | Result | Detail |
-|-----------|---------|--------|--------|
+| Timestamp | Command | Result | Detail | By | Session |
+|-----------|---------|--------|--------|----|---------|
 ```
 
 Then append one row per execution:
 
 ```markdown
-| YYYY-MM-DD HH:MM | /wire:<command> | <result> | <detail> |
+| YYYY-MM-DD HH:MM | /wire:<command> | <result> | <detail> | <by> | <session> |
 ```
 
 ### Field Definitions
@@ -532,7 +679,8 @@ Then append one row per execution:
   - `archived` — `/wire:archive` archived a project
   - `removed` — `/wire:remove` deleted a project
   - `activated` — a skill was auto-activated (used with `skill` in the Command column)
-  - `override` — `specs/utils/precondition_gate.md` recorded a consultant overriding an unmet precondition
+  - `override` — `specs/utils/precondition_gate.md` recorded a consultant overriding an unmet precondition, or an advisory gate satisfied by a director's ruling
+  - `mode` — the director handed control over or took it back ("you drive" / "I'll drive"), per `specs/utils/director_operating_model.md`
 - **Detail**: A concise one-line summary of what happened. Include:
   - For generate: number of files created or key output filename
   - For validate: number of checks passed/failed
@@ -541,13 +689,27 @@ Then append one row per execution:
   - For archive/remove: project name
   - For skill activations: brief description of what triggered the skill
   - For override: the unmet precondition, who overrode it, and their reason
+  - For a ruling-satisfied advisory gate: the precondition and the ruling id
+- **By**: the git user (`git config user.name`), or `unknown` if git has no
+  user configured. Who the run is attributable to, regardless of what typed it.
+- **Session**: what invoked the run. One of:
+  - `typed` — a person typed the command
+  - `orchestrator` — the orchestrating session dispatched it, followed by its
+    session id in brackets where one is available: `orchestrator [a1b2c3]`
+  - a lane label — the lane that ran it, e.g. `dbt-developer [staging 1/2]`
+  - `autopilot` — `/wire:autopilot` ran it
+
+  This is the same value the `invoked_by` telemetry property carries
+  (`specs/utils/telemetry.md`), read from `WIRE_INVOKED_BY` and defaulting to
+  `typed`. The log records it per row so the record on disk answers the same
+  question telemetry answers in aggregate.
 
 ## Skill Activation Entries
 
 When a skill activates, it appends a row in the same format as commands, using `skill` in the Command column and the skill identifier in the Result column:
 
 ```markdown
-| YYYY-MM-DD HH:MM | skill | <skill-identifier> | activated | <brief trigger description> |
+| YYYY-MM-DD HH:MM | skill | <skill-identifier> | activated | <brief trigger description> | <by> | <session> |
 ```
 
 Skill identifiers:
@@ -596,31 +758,61 @@ This check is self-contained within this utility, so every caller gets it automa
 
 ## Rules
 
-1. **Append only** — never modify or delete existing log entries
+1. **Append only** — never modify or delete existing log entries, and never
+   re-order them. A row is appended at the bottom, always. Rewriting the file
+   to insert a row in timestamp order is a modification, not an append.
 2. **One row per command execution** — even if a command is re-run, add a new row (this creates the revision history)
 3. **Always log after status.md is updated** — the log entry should reflect the final state
 4. **Pipe characters in detail** — if the detail text contains `|`, replace with `—` to preserve table formatting
 5. **Keep detail under 120 characters** — be concise
+6. **Timestamps must not go backwards.** Because rows are appended in the order
+   things happened, each row's timestamp is greater than or equal to the row
+   above it. A row whose timestamp precedes its predecessor's means either the
+   clock moved or a row was inserted out of order; both are record defects.
+   `/wire:status-sync` flags them, naming both rows. This does not block any
+   command — the log is written either way, and the flag is a repair prompt.
+7. **Single writer in orchestrated mode.** When
+   `specs/utils/director_operating_model.md`'s operating model is in force,
+   only the orchestrating session appends to this file. Lanes write their own
+   state files and the orchestrator writes the log rows from them (rule 6 of
+   the operating model). Outside orchestrated mode, every command writes its
+   own row as it always has.
+
+## Legacy five-column rows
+
+Logs written before the `By` and `Session` columns existed have four data
+columns. They stay valid and are never rewritten:
+
+- A reader parses columns positionally and treats a missing `By` or `Session`
+  as unknown. It does not treat a five-column row as malformed and does not
+  backfill it.
+- The two columns are added on the next write. A file whose header still has
+  four columns gets the new header written once, at the point the first
+  six-column row is appended; existing rows are left as they are, so a log can
+  legitimately hold both shapes.
+- Nothing derives meaning from the absence of the columns. An old row is not
+  "typed"; it is unknown.
 
 ## Example
 
 ```markdown
 # Execution Log
 
-| Timestamp | Command | Result | Detail |
-|-----------|---------|--------|--------|
-| 2026-02-22 14:30 | skill | engagement-context | activated | Context loaded for new conversation |
-| 2026-02-22 14:35 | /wire:new | created | Project created (type: full_platform, client: Acme Corp) |
-| 2026-02-22 14:40 | /wire:requirements-generate | complete | Generated requirements specification (3 files) |
-| 2026-02-22 15:12 | /wire:requirements-validate | pass | 14 checks passed, 0 failed |
-| 2026-02-22 16:00 | /wire:requirements-review | approved | Reviewed by Jane Smith |
-| 2026-02-23 09:15 | /wire:conceptual_model-generate | complete | Generated entity model with 8 entities |
-| 2026-02-23 10:30 | /wire:conceptual_model-validate | fail | 2 issues: missing relationship, orphaned entity |
-| 2026-02-23 11:00 | /wire:conceptual_model-generate | complete | Regenerated entity model (fixed 2 issues, 8 entities) |
-| 2026-02-23 11:15 | /wire:conceptual_model-validate | pass | 12 checks passed, 0 failed |
-| 2026-02-23 14:00 | /wire:conceptual_model-review | changes_requested | Reviewed by John Doe — add Customer entity |
-| 2026-02-23 15:30 | /wire:conceptual_model-generate | complete | Regenerated entity model (9 entities, added Customer) |
-| 2026-02-23 15:45 | /wire:conceptual_model-validate | pass | 14 checks passed, 0 failed |
-| 2026-02-23 16:00 | /wire:conceptual_model-review | approved | Reviewed by John Doe |
-| 2026-02-24 09:05 | /wire:migration-strategy-generate | override | migration_inventory.review required approved, was not_started — overridden by Jane Smith: client demo tomorrow, inventory sign-off deferred to Monday |
+| Timestamp | Command | Result | Detail | By | Session |
+|-----------|---------|--------|--------|----|---------|
+| 2026-02-22 14:30 | skill | engagement-context | activated | Context loaded for new conversation | Jane Smith | typed |
+| 2026-02-22 14:35 | /wire:new | created | Project created (type: full_platform, client: Acme Corp) | Jane Smith | typed |
+| 2026-02-22 14:40 | /wire:requirements-generate | complete | Generated requirements specification (3 files) | Jane Smith | orchestrator [a1b2c3] |
+| 2026-02-22 15:12 | /wire:requirements-validate | pass | 14 checks passed, 0 failed | Jane Smith | orchestrator [a1b2c3] |
+| 2026-02-22 16:00 | /wire:requirements-review | approved | Reviewed by Jane Smith | Jane Smith | typed |
+| 2026-02-23 09:15 | /wire:conceptual_model-generate | complete | Generated entity model with 8 entities | Jane Smith | data-designer |
+| 2026-02-23 10:30 | /wire:conceptual_model-validate | fail | 2 issues: missing relationship, orphaned entity | Jane Smith | data-designer |
+| 2026-02-23 11:00 | /wire:conceptual_model-generate | complete | Regenerated entity model (fixed 2 issues, 8 entities) | Jane Smith | data-designer |
+| 2026-02-23 11:15 | /wire:conceptual_model-validate | pass | 12 checks passed, 0 failed | Jane Smith | data-designer |
+| 2026-02-23 14:00 | /wire:conceptual_model-review | changes_requested | Reviewed by John Doe — add Customer entity | Jane Smith | typed |
+| 2026-02-23 15:30 | /wire:conceptual_model-generate | complete | Regenerated entity model (9 entities, added Customer) | Jane Smith | data-designer |
+| 2026-02-23 15:45 | /wire:conceptual_model-validate | pass | 14 checks passed, 0 failed | Jane Smith | data-designer |
+| 2026-02-23 16:00 | /wire:conceptual_model-review | approved | Reviewed by John Doe | Jane Smith | typed |
+| 2026-02-24 09:05 | /wire:migration-strategy-generate | override | migration_inventory.review required approved, was not_started — overridden by Jane Smith: client demo tomorrow, inventory sign-off deferred to Monday | Jane Smith | typed |
+| 2026-02-24 10:20 | /wire:conceptual_model-generate | override | business_rules.review required approved, was not_started — ruling R-1 (Jane Smith): agree definitions at kickoff | Jane Smith | orchestrator [a1b2c3] |
 ```

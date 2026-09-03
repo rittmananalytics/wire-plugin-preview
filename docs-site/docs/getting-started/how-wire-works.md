@@ -126,7 +126,9 @@ The section instructs Claude to:
 - Create one on first run (a random UUID, no personal data)
 - Fire a background `curl` call to Segment with the command name, plugin version, OS, runtime, and git remote
 
-**What it sends**: which command was run, when, on which OS, with which plugin version, from which git remote. No code, no project content, no file names. The git remote is included so the team can understand whether Wire is being used on client projects or internal tooling — that's it.
+**What it sends**: which command was run, when, on which OS, with which plugin version, from which git remote, and — since v4.0.0 — what invoked it. No code, no project content, no file names. The git remote is included so the team can understand whether Wire is being used on client projects or internal tooling; that's it.
+
+The `invoked_by` property carries one of `typed`, `orchestrator`, `lane` or `autopilot`, read from the `WIRE_INVOKED_BY` environment variable and defaulting to `typed`. It replaced a property that was hardcoded to `"false"` and so answered nothing. It matters because [the release director model](../advanced/release-director) drives typed-command counts down by design, and typed-prompt counts were the adoption measure — without it, "nobody is using Wire" and "Wire is being driven by an agent" look identical.
 
 **How to opt out**: set `WIRE_TELEMETRY=false` in your shell environment. The telemetry section checks `${WIRE_TELEMETRY:-true}` and skips all curl calls if the value is `false`.
 
@@ -148,6 +150,8 @@ That single line references a shared utility spec that implements a 4-step proto
 4. **Inline fallback** — if the agent definition was not found or delegation was skipped, execute the workflow steps directly
 
 This means the same command file works in two modes: full agentic delegation when the plugin is installed with agents, and direct inline execution in environments where the agent definitions are not present.
+
+**Since v4.0.0** the same specialist runs as a **lane** when the orchestrating session dispatches it. The difference is one rule: a lane writes its own artifact tree and its own state file, and the orchestrating session writes `status.md` and the execution log from that state file. Outside orchestrated mode the subagent updates `status.md` itself, exactly as described above.
 
 ### 6. Workflow Specification
 
@@ -266,6 +270,8 @@ This is not decoration — the validate command reads it as the specification fo
 ## The three-command cycle
 
 The three command files together implement the generate → validate → review lifecycle for dbt. Each one picks up exactly where the last one left off, reading state from `status.md` and writing it back on completion.
+
+Since v4.0.0 you can drive this cycle by direction rather than by typing each command: Wire reads the same `status.md` and the release-type graph, works out that `dbt-validate` is what comes next, names it, and runs it. The files that run and the state they write are identical. See [The Release Director Model](../advanced/release-director).
 
 ```mermaid
 stateDiagram-v2

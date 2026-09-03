@@ -48,6 +48,22 @@ Each release-type namespace under `wire/tests/<release_type>/` follows the same 
 
 Coverage spans every release type: `platform_migration` (feature detection, materialization preservation, region tagging, dbt node-selection grammar, migration-batching SCC/wave topology), `agentic_data_stack` (metric/query audit coverage classification, canonical-models deprecation tagging), `core` lifecycle commands, `development` (dbt naming conventions, Fivetran sync-frequency tiers), `discovery` (sprint-plan capacity/appetite math), `sop_discovery` (the four-tag stakeholder-interview rule, the sponsor-validation checklist gate, requirements traceability), `droughty` (PK/FK inference, `generate.md`'s mode/step orchestration), and `misc_release_types` (kickoff-deck validation, the deployment cutover-order dependency rule).
 
+**Since v4.0.0, six of these cover the release director model** (`wire/tests/core/`), because it is entirely deterministic rule-following that a spec can state ambiguously:
+
+| Test | What it pins down |
+|---|---|
+| `validate_runnable_set.py` | One fixture per shipped release type, plus profile resolution, rulings, review edges, `auto_validate: false`, and `lanes_max`. Reads the real `wire/release-types/*.yaml` and the live command registry, so it fails if the rule and the graph drift apart. |
+| `validate_release_claim.py` | claim / resume / ask-to-join / offer-take-over, the 30-minute stall boundary, and `dispatch_allowed` asserted separately from the outcome — because what the rule stops is the point of it. |
+| `validate_active_release.py` | Named release, branch match, single recent write, and the ask cases the old "most recently modified" rule got wrong. |
+| `validate_ruling_gate.py` | Including a ruling that names a blocking gate precisely and is still ignored. |
+| `validate_execution_log_order.py` | Row ordering, unparseable timestamps, and legacy four-column rows staying valid. |
+| `validate_orchestration_mode.py` | Full precedence, both override directions, and a typo in `orchestration.mode` falling through to the default rather than switching the model off silently. |
+
+Two of those tests found genuine ambiguities in the specs as first written, which
+were fixed at source rather than encoded as an expected value: an over-broad rule
+that let an optional artifact satisfy its own advisory gate, and an unstated
+answer to where an artifact's lifecycle steps come from.
+
 **A genuine ambiguity is not a bug.** Where a spec's prose is read literally but two equally-defensible interpretations exist — and the spec itself never states a precedence — the test fixture marks that case `"ambiguous": true` (or prints it as `SKIP`) rather than guessing an answer to make the test pass. The fixture's own note explains the ambiguity and what would need to change in the spec for it to be resolved. Forcing a scored answer onto a genuinely undecided rule would just encode a guess as if it were ground truth — worse than not testing it at all.
 
 ### Tier 2 — scenario tests (planned)

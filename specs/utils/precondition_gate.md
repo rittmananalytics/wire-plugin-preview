@@ -143,7 +143,7 @@ what the numbers mean before design is right, and making it a hard gate on a tea
 that already skips gates yields a bypass, not a register.
 
 Sort the unmet preconditions into two lists. If every unmet precondition is
-advisory, go to Step 2b. If any unmet precondition is blocking, go to Step 2 and
+advisory, go to Step 2a. If any unmet precondition is blocking, go to Step 2 and
 report the advisory ones alongside as context.
 
 ### Step 2: Block by default
@@ -168,9 +168,61 @@ Override and proceed anyway? (yes / no)
   not proceed with the calling spec's workflow.
 - **yes** — continue to Step 3.
 
+### Step 2a: Advisory — look for a ruling first
+
+Before asking anything, read
+`.wire/releases/<release_folder>/decisions.md` for a ruling that covers this
+advisory precondition. Rulings are written by the release director the moment
+they are given, in the structured form specified in
+`specs/utils/director_operating_model.md` ("Rulings"):
+
+```markdown
+## R-3 | 2026-09-02 14:12 | Mark Rittman | skip business_rules
+Applies to: conceptual_model.depends_on.business_rules (advisory)
+Ruling: skip. Reason: agree metric definitions at kickoff, 2026-09-09.
+```
+
+A ruling **matches** an unmet advisory precondition when all three hold:
+
+1. Its `Applies to:` line names **this** artifact (the one being gated) as the
+   first element, and **this** unmet precondition's dependency artifact as the
+   `depends_on.<dep_artifact>` element. A ruling for a different artifact's
+   gate on the same dependency does not match — a decision to skip
+   `business_rules` before `conceptual_model` says nothing about skipping it
+   before `data_model`.
+2. It is marked `(advisory)`.
+3. Its `Ruling:` line says to proceed (`skip`, `proceed`, `waive`). A ruling
+   that says to wait does not satisfy the gate; it is a decision to stop.
+
+If a matching ruling exists for **every** unmet advisory precondition:
+
+- Do not ask for a reason. Use the ruling's own `Reason:` text as the recorded
+  skip reason.
+- Record the skip in `status.md` under `advisory_skips` exactly as Step 2b
+  does, with `ruling: R-<n>` added to the entry.
+- Write the `override` row to `execution_log.md` per
+  `specs/utils/execution_log.md`, with the ruling id in the Detail string:
+  `<dep_artifact>.<dep_action> required <outcome>, was <actual> — ruling R-<n>
+  (<director name>): <reason>`.
+- Output one line, `⚠️  Advisory precondition waived by ruling R-<n> —
+  <reason>.`, and proceed to the calling spec's workflow.
+
+If some unmet advisory preconditions have a matching ruling and some do not,
+apply the rulings that matched and continue to Step 2b for the rest. Ask only
+about the ones no ruling covers.
+
+**Rulings never satisfy a blocking precondition.** This step runs only on the
+advisory branch. A blocking precondition reached Step 2, and the only way past
+it is the recorded override in Steps 3 to 5 — a real person's name and a real
+reason, given at the time. A ruling in `decisions.md` is not a substitute for
+that and is ignored there.
+
+If no ruling matches, continue to Step 2b.
+
 ### Step 2b: Advisory — warn, ask for a reason, proceed
 
-Where every unmet precondition is advisory, do not block. Output:
+Where every unmet precondition is advisory and no ruling covers it, do not
+block. Output:
 
 ```
 ⚠️  Advisory precondition not met

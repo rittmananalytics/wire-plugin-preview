@@ -28,6 +28,18 @@ data_model_registry:
   cross_vertical_schemas: []  # e.g. [crm_identity_resolution, revenue_recognition] — accepted independently
                   # of any vertical match; a client can need these whether or not `vertical` above is set.
 
+# How Wire is driven on this engagement (specs/utils/director_operating_model.md).
+#   orchestrated — the release-director skill turns your direction into Wire
+#                  command runs, dispatches lanes, and stops at decisions. The
+#                  default on Claude Code. Typed commands keep working.
+#   manual       — today's behaviour: /wire:start prints the next action and
+#                  stops, you type the commands. Use it for client-side teams
+#                  and regulated engagements.
+# Per-session override: say "you drive" to hand control back for that session.
+# Gemini CLI resolves to manual regardless: it has no skills or agents.
+orchestration:
+  mode: orchestrated  # orchestrated | manual
+
 fathom_sync:
   enabled: {{FATHOM_SYNC_ENABLED}}  # true | false — resolved at /wire:new Step 2 from the client domain given;
                   # false if no domain was given, or if the domain/client_name looked like an internal RA

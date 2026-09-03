@@ -27,6 +27,7 @@ Wire does not replace consultants or developers. It gives them an AI that works 
 
 ## Key Features
 
+- **Direct the work, don't memorise the commands** (v4.0.0) — on Claude Code, say what you want done and Wire works out which command that is from the release type's own definition, names it before it runs, runs it, and stops where a decision is yours. Every step runs the real command, so `status.md`, the execution log, the precondition gate and the artifacts on disk are identical to typing it. Reviews are never run without your ruling; parked decisions are listed at the start of every session; and `orchestration.mode: manual` in the engagement context restores the pre-4.0 behaviour exactly. Three tiers: one human directs, one session orchestrates, and the specialist agents run as flat lanes with their own state files
 - **313 slash commands** covering the full delivery lifecycle: Discovery (Shape Up + RA Canonical SOP), Requirements, Design, Development, Testing, Deployment, Enablement, Platform Migration, Agentic Data Stack
 - **12 release types** matching common engagement shapes: Shape Up discovery, SOP / Canonical discovery (sponsor-facing Findings Playback), full platform builds, pipeline-only, dbt development, dashboard extensions, dashboard-first rapid dev, enablement, platform migration (BigQuery ↔ Snowflake), agentic data stack (governed self-service analytics with eval suite), droughty (schema introspection and base-layer generation from live warehouses), and custom (bespoke deliverables defined from SoW documents) — every release type is now backed by a machine-readable process definition (see Precondition Gate below), not just documentation
 - **Two-tier engagement structure** separating long-running client context from individual scoped releases
@@ -40,7 +41,9 @@ Wire does not replace consultants or developers. It gives them an AI that works 
 - **Plain Language by default**: the plugin ships a `Plain Language` output style that activates automatically while Wire is enabled, so every response is written in simple, concise, jargon-free English. Generated artifacts are unaffected (they follow their own templates and the reference-legibility convention); override per project in `.claude/settings.local.json` or by editing the style
 - **Status reconciliation** (`/wire:status-sync`) for work done outside command runs: diffs recorded state against git history, files on disk, and the execution log, then repairs status files, sprint-plan story states, and session history with consultant confirmation
 - **27 ad-hoc development skills** that activate automatically during coding work (dbt, LookML, Dagster, Python, Fivetran, Airbyte, Coupler.io, RudderStack, Segment, Looker, Snowflake, Hightouch, BigQuery, Cloud Run, gcloud) without any explicit invocation, plus **26 Amplitude product-analytics skills** for working with an Amplitude instance
-- **Wire Agents** — 13 specialist subagents (dbt developer, semantic layer developer, pipeline engineer, migration specialist, and 9 others) dispatched automatically on every generate and validate command. `/wire:delegate` computes a full parallel/sequential execution plan across all pending work, with fan-out parallelism for large model sets (layers stay sequential; agents within each layer run in parallel)
+- **Wire Agents** — 13 specialist subagents (dbt developer, semantic layer developer, pipeline engineer, migration specialist, and 9 others) dispatched automatically on every generate and validate command. `/wire:delegate` computes a full parallel/sequential execution plan across all pending work, with fan-out parallelism for large model sets (layers stay sequential; agents within each layer run in parallel). Under the director model they run as lanes: own tree, own state file rewritten after each completed item, and no writes to `status.md` — the orchestrating session is the single writer of the record
+- **Release claim and parked decisions** (v4.0.0) — a release records who is driving it, so a second session offers to join as reviewer or take over after a 30-minute stall rather than dispatching into work someone else is running. Decisions waiting on you are a list in `status.md`, reported first thing every session
+- **Attribution** (v4.0.0) — execution-log rows carry `By` and `Session` (`typed`, `orchestrator`, a lane label, or `autopilot`), and telemetry carries the same as `invoked_by`. Older four-column log rows stay valid and are never rewritten
 - **Autopilot mode** for autonomous end-to-end delivery
 - **Jira and Linear integration** for issue tracking synced to the artifact lifecycle
 - **Confluence and Notion integration** for client-facing document review
@@ -212,6 +215,14 @@ Every Wire engagement uses a two-tier layout in `.wire/`:
 ```
 
 The engagement folder holds everything that spans the whole client relationship. Releases are scoped, time-boxed units of delivery, each with its own `status.md` tracking file and `execution_log.md` recording every command run against it.
+
+### Two ways to run it
+
+**Direct it.** Say what you want done — "new engagement from this SOW", "run what's next", "approve it and carry on" — and Wire computes what is runnable from the release type's definition, names the command, runs it, and stops at every review gate for your decision. This is the default on Claude Code from v4.0.0.
+
+**Type it.** Every command still works exactly as before, and the command name is printed before each directed run so you learn them as you go. Set `orchestration.mode: manual` in `.wire/engagement/context.md` for a whole engagement, or say "you drive" for one session. Gemini CLI stays command-driven throughout.
+
+Either way the same command files run and the record on disk is identical.
 
 ### The Generate / Validate / Review Cycle
 

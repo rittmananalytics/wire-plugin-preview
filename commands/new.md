@@ -120,6 +120,8 @@ action_type: lifecycle
 logs_execution: true
 description: Create a new Wire engagement or add a release to an existing engagement
 
+delegates_to:
+  - utils/director_operating_model
 ---
 
 # Wire New Command
@@ -187,6 +189,34 @@ If `.wire/releases/` exists and contains one or more subdirectories, read each s
 This guard prevents a second consultant from accidentally running `/wire:new` on an already-initialised project and overwriting the engagement context or status files.
 
 ---
+
+### Step 0b: Invoked by the orchestrating session
+
+When the orchestrating session invokes this command
+(`specs/utils/director_operating_model.md`), it has already read the SOW and
+the director's directive and derived every answer Steps 1 to 6 would ask for.
+It passes them in. In that case:
+
+1. Do not ask Steps 1 to 6. Take the values as given:
+   `client_name`, `engagement_name`, `engagement_lead` (from `git config
+   user.name`), client domain (from the SOW's contact details, for Fathom
+   Sync), `repo_mode`, `sow_path`, `release_type`, `release_name`, and the
+   profile where the release type declares one (Step 6b).
+2. **Every derived value carries its reason.** The release type in particular:
+   the confirmation block says why that type was chosen, in one line, from the
+   SOW. A derived value the director cannot check is a guess wearing a
+   confirmation prompt.
+3. **Anything not derivable is asked, one question at a time, before the
+   confirmation block.** The orchestrator does not invent a client name or a
+   release name.
+4. Go straight to Step 7's confirmation block. It is the one confirmation, and
+   it is not optional: nothing is created until the director confirms it.
+5. On "Change settings", fall back to the interactive path from Step 2 as
+   normal.
+
+Everything after Step 7 runs identically whether the answers were typed or
+derived. The engagement structure, `status.md`, the context file and the log
+rows are the same either way.
 
 ### Step 1: New Engagement or Additional Release?
 
@@ -368,6 +398,38 @@ Map selection to `release_type`:
 4. `release_folder = "[release_number]-[release_name]"` (e.g. `01-discovery`)
 5. Today's date as `release_id` = `YYYYMMDD` (for status file ID, distinct from folder name)
 
+### Step 6b: Ask the Profile, Where the Release Type Has One
+
+Some release types offer more than one route through the same phases, and
+record the choice in `status.md`. Read
+`wire/release-types/<release_type>.yaml`: if it declares a `profiles:` block,
+ask which one, and write the answer to the front-matter field named by
+`profile_field`.
+
+| Release type | `profile_field` | Options | Default |
+|---|---|---|---|
+| `dashboard_first` | `build_profile` | `seeded`, `live_data` | `seeded` |
+| `sop_discovery` | `discovery_profile` | `diagnostic`, `modelling_led` | `diagnostic` |
+
+Ask it with `AskUserQuestion`, using each profile's own `name` and
+`description` from the YAML as the option label and description, and marking
+the `default_profile` as recommended. Do not hardcode the list here: a release
+type that gains a profile in a registry PR must get its question without this
+spec being touched.
+
+If the release type declares no `profiles:` block, skip this step and write no
+profile field.
+
+**Why this is asked at all.** Until now nothing asked, and the profile field
+was left unwritten, so `default_profile` applied silently. `live_data` on a
+`dashboard_first` release was only reachable by hand-editing `status.md` after
+creation — a route nobody found, on a choice that changes which phases exist.
+The default is still the default; it is now a decision rather than an
+accident.
+
+Record the answer in the confirmation block below, and in `decisions.md` as a
+ruling when the orchestrating session invoked this command.
+
 ### Step 7: Confirm Settings
 
 Show derived values:
@@ -385,8 +447,13 @@ Engagement:
 
 First Release:
   Type:           [release_type]
+  [If the type declares profiles:] Profile: [profile_id] — [profile name]
   Folder:         .wire/releases/[release_folder]/
   Release ID:     [release_id]
+
+[When invoked by the orchestrating session, add:]
+  Chosen because:  [one line, from the SOW]
+  Budget:          [lanes_max] lanes, warehouse spend [none|estimate_required|cap:N], stop at [decisions|phase_end|never]
 ```
 
 Use `AskUserQuestion` to confirm:
@@ -865,6 +932,25 @@ Store `warehouse` and `droughty_context`.
 3. Set artifact scope based on release type (same logic as prior `new.md` Step 8)
 4. Write to `.wire/releases/[release_folder]/status.md`
 
+**Applies to every release type — after the template is written:**
+
+1. **Profile.** If Step 6b asked a profile question, write the answer to the
+   front-matter field named by the release type's `profile_field`. Where the
+   release type declares profiles and the field is absent from the template,
+   add it.
+2. **Budget.** If the director gave budget instructions in prose ("two lanes,
+   nothing against a warehouse, stop at decisions"), write the `budget:` block
+   from `specs/utils/director_operating_model.md`, with `set_by` as the
+   director's name and `set_at` as today. If they gave none, omit the block —
+   the defaults apply (4 lanes, no warehouse restriction, stop at decisions)
+   and an absent block is how a release says "no budget was set".
+3. **Claim.** When the orchestrating session created the release, it claims it:
+   write `agents.mode: orchestrated` and the `coordinator_session` block (user,
+   session id, current branch, `claimed_at`, `last_write`). When a person
+   created it by hand, leave `agents.mode` null. A claim is written by whatever
+   is going to dispatch, not by creation itself.
+4. **Parked decisions.** `parked_decisions: []`. A new release has none.
+
 ### Step 15: Set Up Issue Tracker(s) (if opted in)
 
 **If Jira or Both selected**: Follow the workflow in `specs/utils/jira_create.md`. Pass `jira_project_key`, `jira_mode`, `jira_structure`, release type, and artifact scope.
@@ -1019,14 +1105,14 @@ If the file does not exist, create it with the header:
 ```markdown
 # Execution Log
 
-| Timestamp | Command | Result | Detail |
-|-----------|---------|--------|--------|
+| Timestamp | Command | Result | Detail | By | Session |
+|-----------|---------|--------|--------|----|---------|
 ```
 
 Then append one row per execution:
 
 ```markdown
-| YYYY-MM-DD HH:MM | /wire:<command> | <result> | <detail> |
+| YYYY-MM-DD HH:MM | /wire:<command> | <result> | <detail> | <by> | <session> |
 ```
 
 ### Field Definitions
@@ -1043,7 +1129,8 @@ Then append one row per execution:
   - `archived` — `/wire:archive` archived a project
   - `removed` — `/wire:remove` deleted a project
   - `activated` — a skill was auto-activated (used with `skill` in the Command column)
-  - `override` — `specs/utils/precondition_gate.md` recorded a consultant overriding an unmet precondition
+  - `override` — `specs/utils/precondition_gate.md` recorded a consultant overriding an unmet precondition, or an advisory gate satisfied by a director's ruling
+  - `mode` — the director handed control over or took it back ("you drive" / "I'll drive"), per `specs/utils/director_operating_model.md`
 - **Detail**: A concise one-line summary of what happened. Include:
   - For generate: number of files created or key output filename
   - For validate: number of checks passed/failed
@@ -1052,13 +1139,27 @@ Then append one row per execution:
   - For archive/remove: project name
   - For skill activations: brief description of what triggered the skill
   - For override: the unmet precondition, who overrode it, and their reason
+  - For a ruling-satisfied advisory gate: the precondition and the ruling id
+- **By**: the git user (`git config user.name`), or `unknown` if git has no
+  user configured. Who the run is attributable to, regardless of what typed it.
+- **Session**: what invoked the run. One of:
+  - `typed` — a person typed the command
+  - `orchestrator` — the orchestrating session dispatched it, followed by its
+    session id in brackets where one is available: `orchestrator [a1b2c3]`
+  - a lane label — the lane that ran it, e.g. `dbt-developer [staging 1/2]`
+  - `autopilot` — `/wire:autopilot` ran it
+
+  This is the same value the `invoked_by` telemetry property carries
+  (`specs/utils/telemetry.md`), read from `WIRE_INVOKED_BY` and defaulting to
+  `typed`. The log records it per row so the record on disk answers the same
+  question telemetry answers in aggregate.
 
 ## Skill Activation Entries
 
 When a skill activates, it appends a row in the same format as commands, using `skill` in the Command column and the skill identifier in the Result column:
 
 ```markdown
-| YYYY-MM-DD HH:MM | skill | <skill-identifier> | activated | <brief trigger description> |
+| YYYY-MM-DD HH:MM | skill | <skill-identifier> | activated | <brief trigger description> | <by> | <session> |
 ```
 
 Skill identifiers:
@@ -1107,31 +1208,61 @@ This check is self-contained within this utility, so every caller gets it automa
 
 ## Rules
 
-1. **Append only** — never modify or delete existing log entries
+1. **Append only** — never modify or delete existing log entries, and never
+   re-order them. A row is appended at the bottom, always. Rewriting the file
+   to insert a row in timestamp order is a modification, not an append.
 2. **One row per command execution** — even if a command is re-run, add a new row (this creates the revision history)
 3. **Always log after status.md is updated** — the log entry should reflect the final state
 4. **Pipe characters in detail** — if the detail text contains `|`, replace with `—` to preserve table formatting
 5. **Keep detail under 120 characters** — be concise
+6. **Timestamps must not go backwards.** Because rows are appended in the order
+   things happened, each row's timestamp is greater than or equal to the row
+   above it. A row whose timestamp precedes its predecessor's means either the
+   clock moved or a row was inserted out of order; both are record defects.
+   `/wire:status-sync` flags them, naming both rows. This does not block any
+   command — the log is written either way, and the flag is a repair prompt.
+7. **Single writer in orchestrated mode.** When
+   `specs/utils/director_operating_model.md`'s operating model is in force,
+   only the orchestrating session appends to this file. Lanes write their own
+   state files and the orchestrator writes the log rows from them (rule 6 of
+   the operating model). Outside orchestrated mode, every command writes its
+   own row as it always has.
+
+## Legacy five-column rows
+
+Logs written before the `By` and `Session` columns existed have four data
+columns. They stay valid and are never rewritten:
+
+- A reader parses columns positionally and treats a missing `By` or `Session`
+  as unknown. It does not treat a five-column row as malformed and does not
+  backfill it.
+- The two columns are added on the next write. A file whose header still has
+  four columns gets the new header written once, at the point the first
+  six-column row is appended; existing rows are left as they are, so a log can
+  legitimately hold both shapes.
+- Nothing derives meaning from the absence of the columns. An old row is not
+  "typed"; it is unknown.
 
 ## Example
 
 ```markdown
 # Execution Log
 
-| Timestamp | Command | Result | Detail |
-|-----------|---------|--------|--------|
-| 2026-02-22 14:30 | skill | engagement-context | activated | Context loaded for new conversation |
-| 2026-02-22 14:35 | /wire:new | created | Project created (type: full_platform, client: Acme Corp) |
-| 2026-02-22 14:40 | /wire:requirements-generate | complete | Generated requirements specification (3 files) |
-| 2026-02-22 15:12 | /wire:requirements-validate | pass | 14 checks passed, 0 failed |
-| 2026-02-22 16:00 | /wire:requirements-review | approved | Reviewed by Jane Smith |
-| 2026-02-23 09:15 | /wire:conceptual_model-generate | complete | Generated entity model with 8 entities |
-| 2026-02-23 10:30 | /wire:conceptual_model-validate | fail | 2 issues: missing relationship, orphaned entity |
-| 2026-02-23 11:00 | /wire:conceptual_model-generate | complete | Regenerated entity model (fixed 2 issues, 8 entities) |
-| 2026-02-23 11:15 | /wire:conceptual_model-validate | pass | 12 checks passed, 0 failed |
-| 2026-02-23 14:00 | /wire:conceptual_model-review | changes_requested | Reviewed by John Doe — add Customer entity |
-| 2026-02-23 15:30 | /wire:conceptual_model-generate | complete | Regenerated entity model (9 entities, added Customer) |
-| 2026-02-23 15:45 | /wire:conceptual_model-validate | pass | 14 checks passed, 0 failed |
-| 2026-02-23 16:00 | /wire:conceptual_model-review | approved | Reviewed by John Doe |
-| 2026-02-24 09:05 | /wire:migration-strategy-generate | override | migration_inventory.review required approved, was not_started — overridden by Jane Smith: client demo tomorrow, inventory sign-off deferred to Monday |
+| Timestamp | Command | Result | Detail | By | Session |
+|-----------|---------|--------|--------|----|---------|
+| 2026-02-22 14:30 | skill | engagement-context | activated | Context loaded for new conversation | Jane Smith | typed |
+| 2026-02-22 14:35 | /wire:new | created | Project created (type: full_platform, client: Acme Corp) | Jane Smith | typed |
+| 2026-02-22 14:40 | /wire:requirements-generate | complete | Generated requirements specification (3 files) | Jane Smith | orchestrator [a1b2c3] |
+| 2026-02-22 15:12 | /wire:requirements-validate | pass | 14 checks passed, 0 failed | Jane Smith | orchestrator [a1b2c3] |
+| 2026-02-22 16:00 | /wire:requirements-review | approved | Reviewed by Jane Smith | Jane Smith | typed |
+| 2026-02-23 09:15 | /wire:conceptual_model-generate | complete | Generated entity model with 8 entities | Jane Smith | data-designer |
+| 2026-02-23 10:30 | /wire:conceptual_model-validate | fail | 2 issues: missing relationship, orphaned entity | Jane Smith | data-designer |
+| 2026-02-23 11:00 | /wire:conceptual_model-generate | complete | Regenerated entity model (fixed 2 issues, 8 entities) | Jane Smith | data-designer |
+| 2026-02-23 11:15 | /wire:conceptual_model-validate | pass | 12 checks passed, 0 failed | Jane Smith | data-designer |
+| 2026-02-23 14:00 | /wire:conceptual_model-review | changes_requested | Reviewed by John Doe — add Customer entity | Jane Smith | typed |
+| 2026-02-23 15:30 | /wire:conceptual_model-generate | complete | Regenerated entity model (9 entities, added Customer) | Jane Smith | data-designer |
+| 2026-02-23 15:45 | /wire:conceptual_model-validate | pass | 14 checks passed, 0 failed | Jane Smith | data-designer |
+| 2026-02-23 16:00 | /wire:conceptual_model-review | approved | Reviewed by John Doe | Jane Smith | typed |
+| 2026-02-24 09:05 | /wire:migration-strategy-generate | override | migration_inventory.review required approved, was not_started — overridden by Jane Smith: client demo tomorrow, inventory sign-off deferred to Monday | Jane Smith | typed |
+| 2026-02-24 10:20 | /wire:conceptual_model-generate | override | business_rules.review required approved, was not_started — ruling R-1 (Jane Smith): agree definitions at kickoff | Jane Smith | orchestrator [a1b2c3] |
 ```

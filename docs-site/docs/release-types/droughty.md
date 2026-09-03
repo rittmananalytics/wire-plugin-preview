@@ -5,6 +5,18 @@ title: Droughty
 
 # Droughty Release
 
+:::tip[You do not have to type these commands]
+
+Since v4.0.0, on Claude Code, you can direct this release in plain language
+instead: say what you want done and Wire works out which command that is from
+this release type's definition, names it before it runs, runs it, and stops at
+every review gate for your decision. The commands, the artifacts and the record
+on disk are identical either way, and typing them still works. See
+[The Release Director Model](../advanced/release-director).
+
+:::
+
+
 Use the Droughty release type when the engagement begins with an existing data warehouse and the immediate goal is to understand what's in it, generate documentation, or produce a base semantic layer — before (or instead of) writing dbt models from scratch.
 
 Droughty is a bottom-up schema-introspection toolkit. It reads the live warehouse and generates four categories of artefact: DBML entity-relationship diagrams, AI-generated field descriptions, LangGraph data-quality reports, and base LookML views.

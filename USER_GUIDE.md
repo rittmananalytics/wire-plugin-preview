@@ -352,6 +352,80 @@ Plugin and extension users get updates automatically when a new version is publi
 
 > **Command notation:** Commands in this handbook are shown in Claude Code format (`/wire:*`). If you are using Gemini CLI, drop the `/wire:` prefix and replace colons with spaces — e.g., `/wire:requirements-generate my_project` becomes `/dp requirements generate my_project`.
 
+### Directing the work rather than typing commands
+
+**Since v4.0.0, on Claude Code.** Wire has 313 commands. You do not have to know
+which one comes next. Say what you want done and Wire computes the answer from
+the release type's own definition, names the command, runs it, and stops where a
+decision is yours.
+
+```
+> New engagement for Northwind Retail, store performance dashboards.
+  SOW is in docs/sow.pdf. No warehouse access for two weeks.
+  Two lanes max, nothing against a warehouse, stop at decisions.
+
+  Read the SOW. Proposing dashboard_first / seeded, because the SOW asks for
+  four store dashboards in three weeks with data access unconfirmed.
+
+    Client:      Northwind Retail
+    Lead:        Mark Rittman  (from git config)
+    Release:     01-store-dashboards  (dashboard_first, seeded)
+    Budget:      2 lanes, no warehouse spend, stop at decisions
+
+  Create this engagement and first release?
+
+> Confirm. Skip business rules, agree at kickoff.
+
+  Ruling R-1 recorded.
+  Running /wire:requirements-generate 01-store-dashboards...
+
+  14 requirements, validate PASS, 2 clarification markers.
+  Relevant call: "Northwind kickoff prep", 28 Aug.
+
+  Approve now, request changes, or park for client sign-off?
+```
+
+**Three tiers.** You are the **release director**: you state intent, make
+rulings and approve at gates. The **orchestrating session** turns that into Wire
+command runs. The specialist **lane agents** each do one scoped task in their
+own folder and report once.
+
+**Nothing about the record changes.** Every step runs the real Wire command, so
+`status.md`, `execution_log.md`, the precondition gate, auto-validate, telemetry
+and the artifacts on disk are identical to typing it yourself. What changes is
+who types.
+
+**Four things worth knowing.**
+
+1. **The command name is always printed before it runs.** You learn the
+   catalogue as you go rather than up front, and you can always take over.
+2. **A review is never run without your ruling.** Wire asks for one of approve
+   now, request changes, or park for client sign-off. Parked decisions
+   accumulate in `status.md` and their count is the first line of every session.
+3. **A release records who is driving it.** A second session on the same release
+   offers to join as a reviewer, or to take over if the holder has not written
+   for 30 minutes. It will not dispatch work into a release someone else is
+   running. Two people on one engagement normally means two releases, two
+   branches, two terminals.
+4. **You can turn it off.** Say "you drive" for the rest of a session. Set
+   `orchestration.mode: manual` in `.wire/engagement/context.md` for a whole
+   engagement, which restores the pre-4.0 behaviour exactly, including
+   `/wire:start` printing the next action rather than offering to run it. Gemini
+   CLI is command-driven regardless: it has no skills or agents.
+
+**Budget.** Say it in prose and Wire writes it into `status.md`: how many lanes
+may run at once, whether anything may query a warehouse, and where to stop
+(at the first decision, at the end of the phase, or not at all). A lane refused
+on budget is reported with the setting that refused it, never silently dropped.
+
+**Rulings.** A decision you give is written to `decisions.md` the moment you
+give it, not when it is used, so it survives the session. A ruling can waive an
+**advisory** gate — Wire will not ask you the same question twice — but never a
+**blocking** one: those still need the recorded override, with your name and
+reason given at the time.
+
+Everything else in this section applies unchanged either way.
+
 ### Self-contained command architecture
 
 Every `/wire:*` command is a single, self-contained file — the command file *is* the complete workflow specification. There is no separation between a discovery layer and a logic layer. In Claude Code, these are `.md` files distributed as a plugin; in Gemini CLI, `.toml` files distributed as an extension.
@@ -4172,6 +4246,28 @@ The entire session — from SOW to complete multi-release deliverables with all 
 > **Introduced**: v3.8.6 (orchestrate command) → v3.9.2 (12 specialists + `/wire:delegate`) → v3.9.2 (14 specialists, adds `dashboard-mock-developer` and `mock-data-developer`) → v3.9.4 (migration generate commands auto-delegate to `migration-specialist`)
 
 Wire Agents replaces the single-agent pattern with thirteen named specialist agents, each with a focused skill set, dispatched by the `/wire:delegate` command.
+
+**Since v4.0.0** these agents are the third tier of the release director model
+(see [Directing the work rather than typing commands](#directing-the-work-rather-than-typing-commands)):
+one human directs, one session orchestrates, and the specialists run as **lanes**.
+Everything in this section still applies; five rules apply on top when a lane is
+dispatched by an orchestrating session rather than by a command you typed.
+
+| Rule | Why (the failure it comes from) |
+|---|---|
+| Write progress to your own state file after **each** completed item | Two hard usage-limit outages resumed with near-zero loss only because every lane had incremental state |
+| Write only inside the directories the brief names, and commit exactly those files | A broad commit from one lane swept up another's half-written state file and corrupted both resume points |
+| **Do not write `status.md` or `execution_log.md`** | 46 commits in 24 hours across four people; one merge silently discarded 54 models of completed work |
+| Do not spawn sub-agents below yourself — lanes are flat | Nested fan-out caused two hard usage-limit outages in one day |
+| Report once: complete, stalled, or needs a ruling | Polling chatter burned context and tokens while the state files already held the answer |
+
+The third rule is the change. The orchestrating session is the single writer of
+`status.md` and the execution log: it reads the lane's state file and writes the
+record, then runs a consolidation pass — do the artifact files exist, did
+validate run and does its result match what the lane claimed, did the lane write
+`status.md` when it should not have, and for warehouse work, does the warehouse
+agree rather than just the lane. Outside orchestrated mode, delegation behaves
+exactly as it did in 3.x and the subagent updates `status.md` itself.
 
 The core insight is simple: a single Claude Code agent doing requirements, dbt development, LookML authoring, data quality, and migration audits across a full engagement dilutes context and produces generic output. A specialist with a narrow brief — "your job is dbt models and nothing else" — operates with a much cleaner context and makes better decisions within its domain.
 
