@@ -325,6 +325,7 @@ Each of the first four has a behavioural test — see [Testing](../reference/tes
 
 ## See also
 
+- [Tutorial: Looker to Omni Migration](../tutorials/looker-to-omni-migration): a batched release type run under this model, with every command Wire runs named
 - [Wire Agents](./wire-agents) — the thirteen specialists that run as lanes
 - [Wire Autopilot](./autopilot) — the fully autonomous end of the range
 - [Core Concepts](../getting-started/core-concepts) — the precondition gate, auto-validate, profiles

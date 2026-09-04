@@ -191,16 +191,14 @@ artifact: cutover
 domain: migration
 release_types:
   - platform_migration
+  - bi_migration
 action_type: artifact
 logs_execution: true
 inputs:
   required:
     - name: release_folder
       description: "Path to the release folder"
-preconditions:
-  - artifact: equivalency
-    action: validate
-    outcome: PASS
+preconditions: dynamic
 delegates_to:
   - utils/precondition_gate
 description: Generate cutover runbook (SAFETY GATE — point of no return)
@@ -286,6 +284,17 @@ Generate a time-ordered runbook with:
 9. **T+90min**: Open target platform to all users
 10. **T+120min**: Go/no-go decision: full cutover confirmed OR rollback initiated
 
+#### bi_migration releases
+
+On a `bi_migration` release the warehouse does not change, so the sequence is about access and content, not connections and writes. Read `bi_migration.parallel_run_days` and the parity gate from `status.md`, then build:
+
+1. **Parity gate**: every in-scope tile holds `pass` or `pass_qualified` in the register from `/wire:bi-equivalency-validate`. A `fail` or unresolved tile blocks the runbook; list them and stop.
+2. **Parallel run**: Looker and Omni both live for `parallel_run_days` days (default 60). Omni content is published; Looker is unchanged. The register's dashboard rows carry `delivery_stage: in_pr` until users are switched.
+3. **Access switch, group by group**: add users to the Omni groups from the permission map one group at a time, in the plan's order, with a check-in after each group. Record each switch in the runbook with its date.
+4. **Schedules and alerts**: recreate each Looker schedule and alert against its Omni dashboard (from the content catalog's `schedule` and `alert` rows) and disable the Looker original once its Omni copy has delivered once.
+5. **Looker read-only**: at the end of the parallel run, set Looker content to read-only and record the date. Nothing is deleted.
+6. **Decommission**: a separate, scheduled step after the read-only period: export and archive the LookML repo and content, then remove Looker access.
+
 ### Step 4: Build the rollback procedure
 
 **The true point of no return is the first successful production write to the target — not the clock.** Once a downstream system has written data to the target that does not exist on the source, a clean rollback is no longer possible; from that point, issues are resolved by fixing forward. The T+120min decision point is the deadline for making the rollback call *before* that happens. Order the sequence so smoke tests and validation complete before any production write lands on the target.
@@ -296,6 +305,10 @@ Document the full rollback procedure (valid until the first production write, an
 3. Pause target orchestration jobs
 4. Notify users of rollback
 5. Root cause analysis before retry
+
+#### bi_migration releases
+
+Rollback on a `bi_migration` release is re-enabling Looker access for the affected group, because nothing in the warehouse changed and Looker content was never edited. Order the rollback by the same groups as the access switch. A parity failure found after a group has switched is triaged like a data discrepancy above: fix forward in the Omni model or content when the tile can be corrected on the branch, roll the group back to Looker when it cannot. The decommission step never runs while any group is on Looker.
 
 **Rollback decision tree** — not every issue warrants a rollback. Triage by type:
 

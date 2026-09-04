@@ -12,8 +12,16 @@ specs:
   - ads/semantic_layer_design-generate
   - ads/semantic_layer_design-validate
   - droughty/lookml
+  # bi_migration (Looker to Omni, wire#258): the Omni model and content batches
+  - migration/omni_model-generate
+  - migration/omni_model-lint
+  - migration/omni_model-validate
+  - migration/omni_model-reverse_port
+  - migration/omni_content-generate
+  - migration/omni_content-validate
 skills:
   - lookml-content-authoring
+  - omni
 mcp_requirements:
   - bigquery
   - github

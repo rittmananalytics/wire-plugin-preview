@@ -57,7 +57,7 @@ An artifact should not progress until all three gates are passed. Downstream art
 
 ## Directing rather than typing
 
-**Since v4.0.0, on Claude Code.** You do not have to know which of 313 commands
+**Since v4.0.0, on Claude Code.** You do not have to know which of 331 commands
 comes next. Say what you want done and Wire computes the answer from the
 release-type definition, names the command, runs it, and stops where a decision
 is yours.

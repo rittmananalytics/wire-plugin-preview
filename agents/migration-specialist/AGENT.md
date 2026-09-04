@@ -50,6 +50,14 @@ specs:
   - migration/metabase_audit-validate
   - migration/metabase_migration-generate
   - migration/metabase_migration-validate
+  # bi_migration (Looker to Omni, wire#258)
+  - migration/looker_audit-generate
+  - migration/looker_audit-validate
+  - migration/bi_migration_plan-generate
+  - migration/bi_migration_plan-validate
+  - migration/omni_target_setup-generate
+  - migration/omni_target_setup-validate
+  - migration/bi_equivalency-validate
 skills: []
 mcp_requirements:
   - bigquery
@@ -70,7 +78,7 @@ output_contract:
 
 ## Role
 
-You own the full platform migration lifecycle on a `platform_migration` release: auditing the source platform, inventorying migration scope, planning the strategy, implementing the migration, validating equivalency, and producing the cutover guide.
+You own the full platform migration lifecycle on a `platform_migration` release, and the audit, plan, target-setup and parity steps of a `bi_migration` release (Looker to Omni): auditing the source platform, inventorying migration scope, planning the strategy, implementing the migration, validating equivalency, and producing the cutover guide.
 
 When running audit tasks, multiple instances of this agent run in parallel — one per audit type. Each instance has only its own audit in context. When running inventory, strategy, or implementation tasks, a single instance works sequentially from the combined audit outputs.
 

@@ -232,6 +232,8 @@ Group pending work by agent type using this mapping:
 | `semantic_layer`, `dashboards`, `ads/lookml_views`, `ads/semantic_layer`, `droughty/lookml` | `semantic-layer-developer` |
 | `orchestration`, `migration/orchestration_audit`, `migration/orchestration_migration` | `orchestration-engineer` |
 | `data_quality`, `uat`, `droughty/setup`, `droughty/introspect`, `droughty/docs`, `droughty/qa`, `droughty/dbml` | `data-quality-engineer` |
+| `migration/omni_model`, `migration/omni_content` (`bi_migration` releases) | `semantic-layer-developer` |
+| `migration/looker_audit`, `migration/bi_migration_plan`, `migration/omni_target_setup`, `migration/bi_equivalency` (`bi_migration` releases) | `migration-specialist` |
 | `migration/*` (all except orchestration_audit/orchestration_migration) | `migration-specialist` |
 | `deployment`, `kickoff`, `enablement/training_*`, `playbook` | `delivery-lead` |
 | `agentic_data_stack/*` | `agentic-data-stack-developer` |

@@ -361,6 +361,7 @@ Use `AskUserQuestion`:
       {"label": "Platform Migration", "description": "Full lifecycle migration of a data platform from one warehouse stack to another. Covers ingestion audit, db object audit, security audit, dbt audit, orchestration audit → migration inventory → strategy → target setup → parallel ingestion → batched dbt translation (models and snapshots, with SCD-2 snapshot history preserved) → orchestration migration → equivalency validation loop → cutover."},
       {"label": "Agentic Data Stack", "description": "Build a governed self-service agentic data stack — dataset governance, semantic layer expansion, per-domain knowledge skills, and an eval suite with per-domain accuracy gates. Delivers an installable Claude agentic data stack skill and maintenance infrastructure."},
       {"label": "Droughty", "description": "Schema introspection and base-layer generation using Droughty. Use for discovery sprints on existing warehouses (ERD, field docs, QA) or as a post-dbt phase to generate staging SQL, schema tests, and base LookML views. Can also be added as an optional phase to any delivery release."},
+      {"label": "BI tool migration (Looker to Omni)", "description": "Migrate a reporting layer from Looker to Omni on the same warehouse: audit the Looker estate, decide what moves, build the Omni model on a branch, move the content, prove tile-level parity, cut over."},
       {"label": "Custom", "description": "Bespoke scope not covered by a standard release type. Wire analyses your SoW or plan and proposes a tailored release structure — mapping deliverables to existing commands where possible, generating new project-scoped specs for the rest."}
     ],
     "multiSelect": false
@@ -383,6 +384,7 @@ Map selection to `release_type`:
 | Platform Migration | `platform_migration` |
 | Agentic Data Stack | `agentic_data_stack` |
 | Droughty | `droughty` |
+| BI tool migration (Looker to Omni) | `bi_migration` |
 | Custom | `custom` |
 
 ### Step 6: Determine Release ID
@@ -774,6 +776,12 @@ mkdir -p .wire/releases/[release_folder]/artifacts/droughty/field_descriptions
 touch .wire/releases/[release_folder]/artifacts/droughty/.gitkeep
 ```
 
+**For `bi_migration` release type**:
+```bash
+mkdir -p .wire/releases/[release_folder]/{audit,migration,migration/omni_model,migration/omni_content}
+touch .wire/releases/[release_folder]/audit/.gitkeep
+```
+
 **For all other release types**:
 ```bash
 mkdir -p .wire/releases/[release_folder]/{artifacts,planning,requirements,design,dev,test,deploy,enablement}
@@ -925,6 +933,41 @@ Store `warehouse` and `droughty_context`.
    - `{{SOURCE_DOCUMENTS}}` → "TBD — provided in /wire:custom-define"
 3. Write to `.wire/releases/[release_folder]/status.md`
 4. **Invoke `wire/specs/custom/define.md`** to handle document ingestion, deliverable mapping, custom spec generation, and `.claude/commands/` wrapper creation. The `define` command handles all remaining scaffolding — do not write a standard deliverables section to status.md; `define` does this after the user confirms the proposed structure.
+
+**For `bi_migration` release type**:
+
+Ask the following additional questions (one at a time):
+
+1. "Where is the **LookML repo** checked out locally?" (Default: `./lookml`. Accept if the user presses Enter. The path must exist.)
+2. "What is the **Looker base URL**?" (e.g. `https://client.looker.com`)
+3. "What is the **Omni base URL**?" (e.g. `https://client.omniapp.co`)
+4. "What is the **Omni model id** the migrated model will be built in?" (From the Omni model IDE URL. The model must already exist; `/wire:omni-target-setup-generate` creates the branch, not the model.)
+5. "Which **Omni CLI profile** should Wire use?" (Optional. Press Enter to use the active profile from `omni config show`.)
+"Is the LookML project in a **git repository Wire can clone**? Give the GitHub URL (repo root, or `/tree/<branch>/<subfolder>`), or press Enter to use the local path only." Storing a URL registers the `lookml` source so the audit reads a refreshed snapshot and every row carries a commit; the local path alone cannot support `migration-drift-generate`.
+"Is the **Omni model git-connected**? Give the model repo URL, or press Enter for none." Storing a URL registers the `omni_model` source and a `bi_target_model` client repo so `omni-model-reverse-port` can read what client modellers change in Omni.
+6. "How many days will Looker and Omni **run in parallel** before cutover?" (Default: 60)
+
+Store `lookml_repo_path`, `looker_base_url`, `omni_base_url`, `omni_model_id`, `omni_profile`, `parallel_run_days`.
+
+1. Read `TEMPLATES/bi-migration-status-template.md`
+2. Replace placeholders:
+   - `{{PROJECT_ID}}` → release_id
+   - `{{PROJECT_NAME}}` → release_folder
+   - `{{CLIENT_NAME}}` → client_name
+   - `{{ENGAGEMENT_NAME}}` → engagement_name
+   - `{{CREATED_DATE}}` → today's date
+   - `{{LAST_UPDATED}}` → today's date
+   - `{{LOOKML_REPO_PATH}}` → lookml_repo_path
+   - `{{LOOKER_BASE_URL}}` → looker_base_url
+   - `{{OMNI_BASE_URL}}` → omni_base_url
+   - `{{OMNI_MODEL_ID}}` → omni_model_id
+   - `{{PARALLEL_RUN_DAYS}}` → parallel_run_days
+   - `bi_migration.omni_profile` → omni_profile if given; otherwise leave the template default `null`
+   - `migration_sources.lookml` → when a LookML repo git URL was given, the block `migration-source-register` would write (`specs/migration/migration_source/register.md` Step 4: `git_repo`, `branch`, `subfolder`, `local_snapshot_path` `.wire/releases/[release_folder]/migration/source_snapshot/lookml/`, `last_refreshed: null`, `last_commit: null`); otherwise leave `null` and rely on `bi_migration.lookml_repo_path`
+   - `migration_sources.omni_model` and `migration.client_repos[]` (`role: bi_target_model`) → when an Omni model git repo URL was given; otherwise leave `null` and `[]`
+3. Write to `.wire/releases/[release_folder]/status.md`
+
+The `bi_pair` field is written by the profile step below (the release type declares one profile, `looker_to_omni`, which is also its default). When the orchestrating session runs this command from a directive, it derives these answers from the directive and the SOW where it can and asks only for what is missing, per `specs/utils/director_operating_model.md`.
 
 **For all other release types**:
 1. Read `TEMPLATES/status-template.md`

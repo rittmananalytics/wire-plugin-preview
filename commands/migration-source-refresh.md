@@ -117,6 +117,7 @@ artifact: migration_source
 domain: migration
 release_types:
   - platform_migration
+  - bi_migration
 action_type: utility
 logs_execution: true
 inputs:
@@ -141,7 +142,7 @@ Note: Wire cannot run shell commands autonomously. This spec instructs the AI as
 ## Arguments
 
 - `<release-folder>` — required. The release folder name (e.g. `04-lift-and-shift-pilot`).
-- `[source_type]` — optional. One of `dbt`, `ingestion`, `reverse_etl`, `orchestration`, `security`. If omitted, refresh **all** types present under `migration_sources` in `status.md`.
+- `[source_type]` — optional. One of `dbt`, `ingestion`, `reverse_etl`, `orchestration`, `security`, `lookml`, `omni_model`. If omitted, refresh **all** types present under `migration_sources` in `status.md`.
 
 ## Prerequisites
 
@@ -258,6 +259,8 @@ After the copy completes, count files by type appropriate to the source:
 | `reverse_etl` | `*.yaml`, `*.json` |
 | `orchestration` | `*.py`, `*.yaml` |
 | `security` | `*.yaml`, `*.tf` |
+| `lookml` | `*.lkml`, `*.lookml` (grouped by `views/`, `models/`, `dashboards/`) |
+| `omni_model` | `*.view`, `*.topic`, `relationships.yaml` |
 
 Run Bash tool calls to count files:
 ```bash
@@ -297,6 +300,8 @@ Check that the subfolder and branch are correct in status.md.
 #### Step 2d: Update status.md
 
 Set `migration_sources.<source_type>.last_refreshed` to today's ISO date (YYYY-MM-DD).
+
+Set `migration_sources.<source_type>.last_commit` to the commit the snapshot was taken from: `git -C "$TMP_DIR" rev-parse HEAD` captured before the temporary clone is removed, or `git -C "<local_snapshot_path>" rev-parse HEAD` for an in-place update, or `git -C "<local path>" rev-parse HEAD` for a local path that is a git checkout. Set it to `null` when the source is not a git repository. `looker-audit-generate` stamps this value on every catalog row as `lookml_commit`, `omni-model-generate` records it as each row's `last_migrated_commit`, and `migration-drift-generate` diffs against it, so a refresh that cannot determine the commit should say so rather than leave a stale value.
 Leave all other fields unchanged.
 
 ### Step 3: Output summary

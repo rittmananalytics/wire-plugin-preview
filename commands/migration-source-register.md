@@ -117,6 +117,7 @@ artifact: migration_source
 domain: migration
 release_types:
   - platform_migration
+  - bi_migration
 action_type: utility
 logs_execution: true
 inputs:
@@ -143,6 +144,8 @@ Registers the git location of one source system in `status.md` under `migration_
 | `reverse_etl` | `/wire:reverse-etl-audit-generate` | Hightouch / Census git-backed sync definitions |
 | `orchestration` | `/wire:orchestration-audit-generate` | Dagster assets, Airflow DAGs, dbt Cloud job YAML |
 | `security` | `/wire:security-audit-generate` | IAM policies, Terraform role definitions |
+| `lookml` | `/wire:looker-audit-generate` (`bi_migration`) | The client's LookML project: `.lkml` views, explores, models. The upstream of a Looker to Omni migration |
+| `omni_model` | `/wire:omni-model-reverse-port` (`bi_migration`) | A git-connected Omni model repo: `.view`, `.topic`, `relationships.yaml`. The downstream of a Looker to Omni migration; Omni writes to it on `omni models commit` |
 
 A single GitHub repo may contain multiple source types in different subfolders — register each with a separate command pointing to the appropriate subfolder URL. For example, a monorepo with Airflow DAGs at root and a dbt project at `dbt-snowflake/` would use:
 ```
@@ -160,7 +163,7 @@ A single GitHub repo may contain multiple source types in different subfolders �
 
 ## Prerequisites
 
-- Release folder exists with `release_type: platform_migration` in `status.md`
+- Release folder exists with `project_type: platform_migration` or `project_type: bi_migration` in `status.md`
 
 ---
 
@@ -176,9 +179,9 @@ source_type    = second token
 github_url     = third token
 ```
 
-**Validate `source_type`**: must be one of `dbt`, `ingestion`, `reverse_etl`, `orchestration`, `security`. If not, abort:
+**Validate `source_type`**: must be one of `dbt`, `ingestion`, `reverse_etl`, `orchestration`, `security`, `lookml`, `omni_model`. If not, abort:
 ```
-[wire] Unknown source type: "<value>". Must be one of: dbt, ingestion, reverse_etl, orchestration, security.
+[wire] Unknown source type: "<value>". Must be one of: dbt, ingestion, reverse_etl, orchestration, security, lookml, omni_model.
 ```
 
 **Parse `github_url`** to extract three fields:
@@ -211,7 +214,7 @@ If the URL does not match the expected GitHub format (`https://github.com/{org}/
 ### Step 2: Confirm release and check for existing registration
 
 1. Read `.wire/releases/<release_folder>/status.md`. If it does not exist: `[wire] Release folder not found.`
-2. Confirm `release_type: platform_migration`.
+2. Confirm `project_type` (or `release_type`) is `platform_migration` or `bi_migration`. `lookml` and `omni_model` are the `bi_migration` source types; the other five belong to `platform_migration`.
 3. Read the `migration_sources.<source_type>` block if it already exists. If it does, show the current values and ask:
 ```
 [wire] A "<source_type>" source is already registered:
@@ -244,6 +247,7 @@ migration_sources:
     subfolder: "<subfolder>"
     local_snapshot_path: ".wire/releases/<release_folder>/migration/source_snapshot/<source_type>/"
     last_refreshed: null
+    last_commit: null          # recorded by migration-source-refresh; the commit the snapshot was taken from
 ```
 
 The `migration_sources` block is a map — each type is a separate key. Preserve any already-registered source types when writing.

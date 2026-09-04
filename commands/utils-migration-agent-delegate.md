@@ -161,6 +161,10 @@ If the agent definition exists and the above skip conditions are not met, determ
 
    Example: 3 pending batches of 20 models each, group size 5 → 12 agents spawned simultaneously.
 
+#### For `bi_migration` releases
+
+`looker-audit-generate`, `bi-migration-plan-generate` and `omni-target-setup-generate` each dispatch a **single** `wire:migration-specialist` agent, as below. `bi-equivalency-validate` dispatches one agent per content batch in scope (`--batch N` each) under the release director model, each writing its own verdict JSON per `specs/migration/equivalency/verdict_schema.md`; without `--batch` it runs as one agent over the whole parity scope. `omni-model-generate` and `omni-content-generate` do not use this protocol: they follow `specs/utils/semantic_layer_developer_delegate.md`.
+
 #### For all other migration generate commands
 
 Spawn a **single** `wire:migration-specialist` subagent with:

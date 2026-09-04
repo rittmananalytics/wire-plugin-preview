@@ -196,6 +196,7 @@ release_types:
   - pipeline_only
   - dashboard_extension
   - enablement
+  - bi_migration
 action_type: artifact
 logs_execution: true
 inputs:

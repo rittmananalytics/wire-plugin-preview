@@ -191,16 +191,14 @@ artifact: migration_drift
 domain: migration
 release_types:
   - platform_migration
+  - bi_migration
 action_type: artifact
 logs_execution: true
 inputs:
   required:
     - name: release_folder
       description: "Path to the release folder"
-preconditions:
-  - artifact: migration_register
-    action: generate
-    outcome: complete
+preconditions: dynamic
 delegates_to:
   - utils/precondition_gate
 description: Scheduled drift gate — diff the live source dbt repo against each migrated model's last-migrated commit, classify new/modified/removed, flag downstream Hightouch syncs, and trigger the masking-policy hook
@@ -215,6 +213,31 @@ Follow `specs/utils/stale_artifact_check.md` with `artifact_id: migration_drift`
 ---
 
 # Migration Drift — Generate
+
+## bi_migration mode
+
+On a `bi_migration` release the source is the client's LookML repo (`migration_sources.lookml`) and the content is the Looker instance, not a dbt project and a warehouse. The gate keeps its shape (refresh, diff against each row's baseline, classify, blast radius, report) with these rules, tested by `wire/tests/bi_migration/validate_bi_drift.py`:
+
+**Model rows** (`object_type` `view` or `topic`), diffed with `git diff --name-status <last_migrated_commit>..<head> -- <lkml_file>` on the refreshed snapshot:
+
+| Finding | Rule | Register |
+|---|---|---|
+| `not_applicable` | `last_migrated_commit` is null (never translated) | unchanged |
+| `unchanged` | file not in the diff | unchanged |
+| `modified` | file `M`. Re-run the four-class rule (`wire/bi_pairs/looker_to_omni/feature_detection.md`) on the changed view; `class_changed` when the class differs from the catalog, `blocking` when the new class is `redesign` (a mechanical view that gained Liquid cannot be re-translated mechanically) | `state: drifted`, `drift_head`, change summary in `notes` |
+| `removed` | file `D` | `state: drifted`, `notes: removed_upstream` |
+| `renamed` | file `R` | `state: drifted`, new path in `notes` |
+| `impacted` | a topic whose model file is unchanged but which references a drifted view | `notes: impacted_by <views>` |
+| `unregistered_new` | file `A` with no register row | reported; the plan decides whether it joins a batch |
+
+**Content rows** (`object_type` `dashboard` or `look`), compared through the Looker API: `content_drifted` when Looker's `updated_at` is newer than the row's `source_updated_at`; `unknown` when the baseline is null (never drifted on missing data); otherwise `unchanged`. A `content_drifted` dashboard whose content batch is complete needs `omni-content-generate --batch <id>` re-run for that dashboard before its next parity run.
+
+Blast radius on this release type is topics and dashboards that reference a drifted view, read from `audit/dependencies.jsonl` and each batch's `migration/omni_model/<batch_id>/dependencies.jsonl` (the two halves of one graph, joined on `object_uri`), not Hightouch syncs; Steps 3, 4, 5, 5b and 5c do not apply. Scheduling and CI gating are unchanged.
+
+**Evidence invalidation.** After classification, recompute every affected object's evidence fingerprint: `python3 <plugin-root>/scripts/bi_evidence.py invalidate --old <stored components> --new <recomputed components> [--target-change-kind semantic|presentation_only] [--row-filtering-policy]`, and write the result's `invalidated` kinds to `stale_kinds` in `migration/parity/evidence.csv`. The rules, tested by `wire/tests/bi_migration/validate_bi_evidence.py`: a changed LookML definition, dependency closure, `parity_as_of`, test contract or adapter version stales `numeric_parity` and `interaction_fidelity`; a semantic Omni change (from `omni-model-reverse-port`: sql, aggregate type, filters, joins, timeframes) stales those and `presentation_fidelity`; a presentation-only Omni change (labels, formats, colours, layout) stales `presentation_fidelity` alone and triggers no warehouse query; a policy change stales `access_parity`, and `numeric_parity` too when the object is under an access filter that shapes rows. A tile with `numeric_parity` in `stale_kinds` no longer counts for the cutover gate until `bi-equivalency-validate` re-runs it. Drift never edits a verdict; it marks the evidence stale and says which tiles to re-run.
+
+**Baseline check.** Compare `migration/baseline.yaml` against what is live: the Looker project's deployed revision, the Omni model id and branch, the converter and comparator versions installed, `parity_as_of` in status.md. Any difference is a `baseline_drift` finding, `blocking`: the plan must re-baseline (`bi-migration-plan-generate` writes a new `baseline_id`) before another parity run counts.
+
 
 ## Purpose
 

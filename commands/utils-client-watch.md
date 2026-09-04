@@ -147,6 +147,8 @@ client_comms:
 
 Client repos come from `migration.client_repos` — the same list `dbt-migration-batch-raise` and `utils-ci-parity` read; this command adds no second repo registry.
 
+On a `bi_migration` release the tick reads two more signals and fires two more actions, both configured from blocks that already exist: a merge to the registered `migration_sources.lookml` repo fires `/wire:migration-drift-generate <release>` (the LookML changed under a translated view), and a commit to the `client_repos` entry with `role: bi_target_model` fires `/wire:omni-model-reverse-port <release>` (a client modeller changed the Omni model). Both are reported once, with the commit, like a merged PR.
+
 ## State
 
 `.wire/releases/$ARGUMENTS/client_comms/watch_state.json` — the tracked-post list (message refs this release has posted to the channel and is awaiting replies on) and the last-tick cursors (per-channel last-read timestamp, per-repo last-seen merged PR). Rewritten at the end of each tick; a killed tick loses at most one tick's cursor advance and the next tick re-reads idempotently.

@@ -47,15 +47,32 @@ The fleet model was built for a release with thousands of independent items
 and 6 to 12 lanes. A `dbt_development` release has 5 required artifacts and 3
 hard review gates. The tiers are the same; the orchestrator's job shifts.
 
-| Tier | `platform_migration` (`migration_fleet.md`) | Linear release types |
-|---|---|---|
-| Release director | Rulings on waivers, fleet size, budget, client comms | Release type and profile choice, goal priorities, approvals at each review edge, registry proposals, budget |
-| Orchestrating session | Dispatch and monitor 6 to 12 lanes, single writer of register and verdict log, consolidation pass | Know where the release is, run the next runnable step(s), carry rulings to gates, report once, park at the next approval edge |
-| Lanes | Translation slices, build lanes, comparison sweeps, PR prep | One artifact each (the existing auto-delegation in `specs/delegate.md` Step 2), fan-out only where `delegate.md` Step 2.5 already defines it (dbt layers, explores) |
+| Tier | `platform_migration` (`migration_fleet.md`) | Linear release types | `bi_migration` |
+|---|---|---|---|
+| Release director | Rulings on waivers, fleet size, budget, client comms | Release type and profile choice, goal priorities, approvals at each review edge, registry proposals, budget  Parity or redesign per dashboard tier, the drop list, PDT disposition, permission mapping, topic architecture, batch order, parallel-run window, cutover date, decommission |
+| Orchestrating session | Dispatch and monitor 6 to 12 lanes, single writer of register and verdict log, consolidation pass | Know where the release is, run the next runnable step(s), carry rulings to gates, report once, park at the next approval edge  Dispatch model slices, content batches and parity sweeps per batch; single writer of the register and verdict log; re-run `omni models validate` on the branch before reporting a batch ready |
+| Lanes | Translation slices, build lanes, comparison sweeps, PR prep | One artifact each (the existing auto-delegation in `specs/delegate.md` Step 2), fan-out only where `delegate.md` Step 2.5 already defines it (dbt layers, explores)  One model batch, one content batch, or one parity sweep each; a permissions lane; all flat |
 
 Parallelism on a linear release type comes from the graph, not from item
 counts. `specs/utils/runnable_set.md` computes it: two artifacts with no
 dependency between them are two lanes.
+
+### bi_migration lane roster
+
+A `bi_migration` release (Looker to Omni) is batched like a migration and gated like a linear release. The plan (`/wire:bi-migration-plan-generate`) cuts the batches; the graph releases each artifact; lanes take one batch each.
+
+| Lane type | Scope | State file | Invokes |
+|---|---|---|---|
+| Model slice | One model batch of views and explores | progress manifest at `migration/omni_model/<batch>/lane.md` | `/wire:omni-model-generate <release> --batch N`, `/wire:omni-model-lint <release> --batch N`, `/wire:omni-model-validate <release> --batch N` |
+| Content batch | One content batch of dashboards | plan and manifest under `migration/omni_content/<batch>/` | `/wire:omni-content-generate <release> --batch N`, `/wire:omni-content-validate <release> --batch N` |
+| Parity sweep | One batch's tiles | verdict JSON per `specs/migration/equivalency/verdict_schema.md` | `/wire:bi-equivalency-validate <release> --batch N` |
+| Permissions | Groups, user attributes, access grants from the plan | progress manifest | `/wire:omni-target-setup-generate <release>` |
+
+Rulings the director makes, each a parked decision until made: parity or redesign per dashboard tier; the drop list; PDT disposition (dbt model, Omni query view, or drop); permission mapping; topic architecture (one topic per explore, or schema, shared and workbook layering); batch order; parallel-run window; cutover date; decommission. `/wire:bi-migration-plan-review` is where most of them close.
+
+Budget note: parity runs query the same warehouse from both tools. The plan sets `bi_migration.parity_scope` (tiles of tier 1 dashboards by default, or all), a pinned as-of, and the cost governance rules below apply: the dry-run bound is the authorisation figure, and an overrun is disclosed in the lane's report.
+
+Consolidation pass for this type: before a model batch is reported ready, the orchestrator re-runs `omni models validate` on the branch and reads the `needs_human` count from the batch's file, never from the lane's summary. Before a content batch is reported ready, it reads the manifest's `state` column. Before cutover, it reads tile verdicts from the register.
 
 ## Operating rules
 

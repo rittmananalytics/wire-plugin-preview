@@ -418,6 +418,29 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 | `/wire:oac-migration-validate` | `<release-folder>` | Validate OAC migration runbook completeness |
 | `/wire:oac-migration-review` | `<release-folder>` | Internal RA review of OAC migration runbook |
 
+### BI MIGRATION
+
+| Command | Arguments | Description |
+|---------|-----------|-------------|
+| `/wire:looker-audit-generate` | `<release-folder>` | Catalog the Looker estate: LookML views, explores, fields and joins classified for translation, plus dashboards, Looks, tiles, schedules and usage |
+| `/wire:looker-audit-validate` | `<release-folder>` | Validate Looker audit completeness: every construct classified, every content row with usage, counts match status |
+| `/wire:looker-audit-review` | `<release-folder>` | Internal RA review of the Looker audit |
+| `/wire:bi-migration-plan-generate` | `<release-folder>` | Usage-ranked inventory, director rulings (parity or redesign, drop list, PDT disposition, permissions, topic design), model and content batches, register bootstrap |
+| `/wire:bi-migration-plan-validate` | `<release-folder>` | Validate the plan: every object in one batch or the drop list, batch dependencies, register row count |
+| `/wire:bi-migration-plan-review` | `<release-folder>` | Release director review of the BI migration plan and its rulings |
+| `/wire:omni-target-setup-generate` | `<release-folder>` | Prepare the Omni target: connection check, model branch, schema refresh, groups and user attributes |
+| `/wire:omni-target-setup-validate` | `<release-folder>` | Validate the Omni target: branch exists, model validates with no blocking issue, groups exist |
+| `/wire:omni-target-setup-review` | `<release-folder>` | Internal RA review of the Omni target setup |
+| `/wire:omni-model-generate` | `<release-folder> [--batch N ` | Translate a batch of LookML views and explores to Omni views and topics on the model branch (deterministic converter plus agent judgement) |
+| `/wire:omni-model-lint` | `<release-folder> [--batch N]` | Static lint of emitted Omni YAML for a batch: no ${TABLE}, no Liquid, valid timeframes, aggregate types, filter objects, primary keys, relationship types |
+| `/wire:omni-model-validate` | `<release-folder> [--batch N]` | Validate a model batch on the branch: Omni validator clean, every in-scope field present, one smoke query per topic |
+| `/wire:omni-model-review` | `<release-folder> [--batch N]` | Release director review of a translated model batch and its needs_human resolutions |
+| `/wire:omni-model-reverse-port` | `<release-folder> [--batch N] [--dry-run]` | Carry changes made to the Omni model downstream (in Omni or its git repo) back into the delivery tree; four-way classification per emitted file, never clobbering unwritten local work |
+| `/wire:omni-content-generate` | `<release-folder> [--batch N ` | Plan and create Omni dashboards for a batch of Looker dashboards and Looks; skipped tiles listed with reasons |
+| `/wire:omni-content-validate` | `<release-folder> [--batch N]` | Validate a content batch: plan fields exist on the branch, controls map, created documents resolve with the planned tile count |
+| `/wire:omni-content-review` | `<release-folder> [--batch N]` | Release director review of a migrated dashboard batch |
+| `/wire:bi-equivalency-validate` | `<release-folder> [--batch N ` | Tile-level parity: Looker and Omni results compared under a pinned as-of, verdicts in the model taxonomy; gates cutover |
+
 ### DROUGHTY
 
 | Command | Arguments | Description |

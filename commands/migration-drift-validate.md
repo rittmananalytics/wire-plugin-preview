@@ -117,6 +117,7 @@ artifact: migration_drift
 domain: migration
 release_types:
   - platform_migration
+  - bi_migration
 action_type: artifact
 logs_execution: true
 inputs:
