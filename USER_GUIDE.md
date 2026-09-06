@@ -568,14 +568,16 @@ When you run `/wire:start`, the framework reads all `status.md` files across all
 In addition to `status.md`, each project maintains an `execution_log.md` file that records a timestamped entry for every command that changes state. This provides a complete, append-only history of the delivery process — what was run, when, what the result was, and a brief summary.
 
 ```markdown
-| Timestamp | Command | Result | Detail |
-|-----------|---------|--------|--------|
-| 2026-02-22 14:40 | /wire:requirements-generate | complete | Generated requirements spec (3 files) |
-| 2026-02-22 15:12 | /wire:requirements-validate | pass | 14 checks passed, 0 failed |
-| 2026-02-22 16:00 | /wire:requirements-review | approved | Reviewed by Jane Smith |
+| Timestamp | Command | Result | Detail | By | Session | Duration | Tokens | Cost (USD) |
+|-----------|---------|--------|--------|----|---------|----------|--------|------------|
+| 2026-02-22 14:40 | /wire:requirements-generate | complete | Generated requirements spec (3 files) | Jane Smith | typed | 18m 05s | 412876 | $3.18 |
+| 2026-02-22 15:12 | /wire:requirements-validate | pass | 14 checks passed, 0 failed | Jane Smith | typed | 6m 22s | 156430 | $1.02 |
+| 2026-02-22 16:00 | /wire:requirements-review | approved | Reviewed by Jane Smith | Jane Smith | typed | 24m 10s | 98764 | $0.74 |
 ```
 
-The log is useful for handovers (a new team member can see the full history of what was done), for auditing (confirming when artifacts were generated and who approved them), and for debugging (identifying when a failure occurred and what preceded it).
+Each row records who ran the command (`By`, the git user) and what invoked it (`Session`: `typed`, `orchestrator [id]`, a lane label such as `dbt-developer [staging 1/2]`, or `autopilot`), plus what the run took. Duration is measured by the command itself. Token count and estimated cost are backfilled after the turn by the plugin's metrics hook on Claude Code, which reads the measured usage from the session transcript — values are never estimated, so a cell is either measured or `n/a` (always `n/a` on Gemini CLI, which has no hook mechanism). Opt out of the backfill with `WIRE_METRICS=false`.
+
+The log is useful for handovers (a new team member can see the full history of what was done), for auditing (confirming when artifacts were generated, who approved them, and what each step cost), and for debugging (identifying when a failure occurred and what preceded it).
 
 ### Detailed execution tracing (opt-in)
 

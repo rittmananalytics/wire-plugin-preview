@@ -161,14 +161,14 @@ declares profiles, the release also records which profile it is running.
 Each project maintains an `execution_log.md` file that records a timestamped entry for every command that changes state:
 
 ```markdown
-| Timestamp | Command | Result | Detail | By | Session |
-|-----------|---------|--------|--------|----|---------|
-| 2026-02-22 14:40 | /wire:requirements-generate | complete | Generated requirements spec (3 files) | Jane Smith | orchestrator [a1b2c3] |
-| 2026-02-22 15:12 | /wire:requirements-validate | pass | 14 checks passed, 0 failed | Jane Smith | orchestrator [a1b2c3] |
-| 2026-02-22 16:00 | /wire:requirements-review | approved | Reviewed by Jane Smith | Jane Smith | typed |
+| Timestamp | Command | Result | Detail | By | Session | Duration | Tokens | Cost (USD) |
+|-----------|---------|--------|--------|----|---------|----------|--------|------------|
+| 2026-02-22 14:40 | /wire:requirements-generate | complete | Generated requirements spec (3 files) | Jane Smith | orchestrator [a1b2c3] | 18m 05s | 412876 | $3.18 |
+| 2026-02-22 15:12 | /wire:requirements-validate | pass | 14 checks passed, 0 failed | Jane Smith | orchestrator [a1b2c3] | 6m 22s | 156430 | $1.02 |
+| 2026-02-22 16:00 | /wire:requirements-review | approved | Reviewed by Jane Smith | Jane Smith | typed | 24m 10s | 98764 | $0.74 |
 ```
 
-**Since v4.0.0** the log carries two more columns. `By` is the git user. `Session` says what invoked the run: `typed`, `orchestrator [id]`, a lane label such as `dbt-developer [staging 1/2]`, or `autopilot`. Rows written before 4.0.0 have four data columns; they stay valid, are never rewritten, and an old row is treated as unknown rather than assumed to be typed. Rows are append-only and never re-sorted — `/wire:status-sync` reports a row whose timestamp precedes the one above it rather than repairing it, because re-ordering an append-only log destroys the evidence of what happened in what order.
+**Since v4.0.0** the log carries five more columns. `By` is the git user. `Session` says what invoked the run: `typed`, `orchestrator [id]`, a lane label such as `dbt-developer [staging 1/2]`, or `autopilot`. `Duration`, `Tokens`, and `Cost (USD)` record what the run took: duration is measured by the command itself, while token count and estimated cost are backfilled after the turn by the plugin's metrics hook on Claude Code, which reads the measured usage from the session transcript — the values are never estimated by the model, and on runtimes without the hook (Gemini CLI) they stay `n/a`. Rows written before 4.0.0 have four data columns; they stay valid, are never rewritten, and an old row is treated as unknown rather than assumed to be typed. Rows are append-only and never re-sorted — `/wire:status-sync` reports a row whose timestamp precedes the one above it rather than repairing it, because re-ordering an append-only log destroys the evidence of what happened in what order.
 
 ## The chain of derivation
 

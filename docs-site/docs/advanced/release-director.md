@@ -187,12 +187,16 @@ budget:
 | Setting | Effect |
 |---|---|
 | `lanes_max` | `/wire:delegate` refuses to dispatch beyond it. Work queues in the runnable set's order. |
+| `model_tier: economy` | Lanes dispatch on a lower-tier model. The consolidation pass runs regardless — the model choice changes how much it finds, not whether it runs. Independent of per-command [workload routing](./model-routing). |
 | `warehouse_spend: none` | Refuses any lane whose command queries a warehouse, and says which and why. It never silently drops them. |
 | `warehouse_spend: estimate_required` | The dry-run bound is the authorisation figure; overruns are disclosed in the lane's report. |
 | `stop_at` | Where to stop: at the first parked decision, at the end of the phase, or not at all. |
 
 An absent block means the defaults, not a budget of zero. Token and API spend
-are not observable in-session and are out of scope.
+are not observable in-session, so the budget cannot gate on them; measured
+per-command token and cost figures land in the execution log after each turn
+(see [the execution log](../getting-started/core-concepts#the-execution-log))
+and inform the next budget, not the current dispatch.
 
 ## The lane contract
 

@@ -1,6 +1,7 @@
 ---
 description: Show help for Wire Framework commands
 argument-hint: [<command>]
+model: claude-haiku-4-5
 ---
 
 # Show help for Wire Framework commands
@@ -113,6 +114,7 @@ with open('.wire/releases/<release_folder>/trace.jsonl', 'a') as f:
 ---
 description: Show help for Wire Framework commands
 argument-hint: [<command>]
+workload: mechanical
 ---
 
 # Wire Help Command
