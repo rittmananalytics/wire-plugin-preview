@@ -305,11 +305,15 @@ From the plan's permission map, for each row:
 
 Do not add users to groups. Membership is a cutover step, group by group, so nobody sees Omni content before parity is proven.
 
+### Step 6b: Derive the dashboard theme
+
+Derive one dashboard theme JSON from the client's brand (key colour, background, tile border radius, fonts) so every migrated document styles consistently from its first draft. The theme property vocabulary and six worked examples are in `wire/bi_pairs/looker_to_omni/omni_patterns.md`, section "Dashboard themes". Write the JSON to `.wire/releases/$ARGUMENTS/migration/omni_dashboard_theme.json` and note in the setup document that it is imported per dashboard through the editor's Import button (there is no instance-wide theme API surface; confirm against the instance before promising otherwise). Where the plan already carries a theme ruling, apply it instead of deriving one. Per-dashboard visual fidelity beyond the theme stays in the content batches' `hand_finish` list.
+
 ### Step 7: Write the setup document
 
 **Output location**: `.wire/releases/$ARGUMENTS/migration/omni_target_setup.md`
 
-Include: CLI profile and instance URL; connection verification (both sides, match confirmed); model id and git-connection state; branch id and name; schema refresh time and table count; groups and user attributes (created, existing); name collisions parked; every write made, in order, with the reversing action.
+Include: CLI profile and instance URL; connection verification (both sides, match confirmed); model id and git-connection state; branch id and name; schema refresh time and table count; groups and user attributes (created, existing); name collisions parked; the derived dashboard theme (or the plan's ruling); every write made, in order, with the reversing action.
 
 ### Step 8: Update status
 

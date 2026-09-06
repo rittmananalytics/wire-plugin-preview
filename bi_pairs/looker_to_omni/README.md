@@ -13,6 +13,7 @@ Sibling of `wire/platform_pairs/` (warehouse pairs). Same layout, same override 
 | `feature_detection.md` | Regex patterns the audit applies to `.lkml` files to find Liquid, parameters, PDTs, access filters, refinements and other constructs that decide a row's class. |
 | `content_mapping.md` | Looker dashboards, Looks and tiles to Omni documents: tile types to `chartType`, dashboard filters to controls, `listen` maps to control maps, what stays manual. |
 | `tooling.md` | Omni's dashboard migration skill and scripts, the Omni CLI branch workflow, `omni-sync`, and how partner converters fit as an optional first pass. |
+| `omni_patterns.md` | Omni-side idioms for `needs_human` and `redesign` items, sourced from Omni's community Patterns category: mustache replacements for common Liquid uses, filtered-measure and control patterns for parameter-driven tiles, merged-results alternatives, navigation and theme recipes. Read by the agent when working `needs_human.json`; never implemented by the converter. |
 | `examples/` | Six before-and-after pairs. Each `after/` directory is exactly what the converter emits for its `before/` directory, and the test suite checks that on every run. |
 
 ## The converter
@@ -53,7 +54,7 @@ Pass the directory with `--overrides`. Overrides win where they name the same ke
 
 ## What this pair does not cover
 
-- Liquid. There is no Liquid-to-Mustache translator; Liquid is `redesign`.
+- Liquid. There is no Liquid-to-Mustache translator; Liquid is `redesign`. For the common uses (condition defaults, `_in_query`, parameter-driven grain and windows), `omni_patterns.md` documents the Omni idiom the agent rebuilds by hand.
 - Styling, text and markdown tiles. Listed for hand finishing by `omni-content`.
 - Looker users and permissions beyond groups and user attributes.
 - Other pairs. The release type is built for them; only `looker_to_omni` ships in 4.0.0.

@@ -5,7 +5,7 @@ description: Connect to an Omni Analytics instance and work with its semantic mo
 
 # Omni
 
-Connection details and object hierarchy for cataloguing, modeling, and migrating an Omni Analytics reporting layer. Used by `/wire:omni-audit-*` and `/wire:omni-migration-*`, by `dashboards-generate`/`semantic_layer-generate` when `migration.reporting_tool: omni` (or the equivalent non-migration `reporting_tool` setting), and by any reporting-layer work that reads or edits Omni content.
+Connection details and object hierarchy for cataloguing, modeling, and migrating an Omni Analytics reporting layer. Analytical authoring idioms (table calcs, LoD cohorting, date spines, sessionization, multi-tenant patterns) are in `patterns.md` beside this file — read it when building or reviewing Omni content rather than deriving a technique from scratch. Used by `/wire:omni-audit-*` and `/wire:omni-migration-*`, by `dashboards-generate`/`semantic_layer-generate` when `migration.reporting_tool: omni` (or the equivalent non-migration `reporting_tool` setting), and by any reporting-layer work that reads or edits Omni content.
 
 ## Imported upstream skills
 
@@ -31,7 +31,7 @@ Nine upstream skills ship in the package. The ones relevant to Wire migration an
 - **omni-query** — run queries against the semantic layer, interpret results, chain multi-step analysis. Used for equivalency comparison during migration validation.
 - **omni-admin** — manage connections, users, groups, user attributes, permissions, and schedules. The surface for `omni-migration-generate`'s connection repoint and permission remap.
 
-Two further skills exist upstream but aren't relevant to migration work: **omni-ai-optimizer** and **omni-ai-eval** (tuning and evaluating Omni's Blobby AI assistant — a post-migration enablement concern, not a migration one). **omni-embed** matters only if the client embeds Omni dashboards in an external application.
+Two further skills, **omni-ai-optimizer** and **omni-ai-eval** (tuning and evaluating Omni's AI assistant), are not migration surfaces but are the enablement ones: `specs/utils/omni_ai_quality.md` drives them during the enablement phase to tune topic scoping, labels, `all_values`, synonyms and `ai_context`, and to run the question-set gate. **omni-embed** matters only if the client embeds Omni dashboards in an external application.
 
 The `omni-integrations` sub-plugin (`omni-to-databricks-metric-views`, `omni-to-snowflake-semantic-view`) is relevant only when the target platform is Databricks or Snowflake and the client wants Omni's model expressed as native metric views/semantic views on that platform — check before installing it.
 
