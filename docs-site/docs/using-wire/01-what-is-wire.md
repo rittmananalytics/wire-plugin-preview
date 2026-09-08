@@ -11,7 +11,7 @@ Wire is Rittman Analytics' analytics engineering assistant, an agent that runs i
 
 This chapter covers what makes Wire different from a coding assistant, the work you can ask it to do, how a session unfolds, what you have at the end of a release, and installing Wire ready for Chapter 2. Let's start with what Wire knows that a coding assistant does not.
 
-## So What Makes Wire Different?
+## What Problem Does It Solve?
 
 A general coding assistant will write you a valid SQL model, and it will do so quickly. What it will not do is write the model the way the rest of the project expects it: named to the project's convention, with its tests, its documentation and a note of the requirement it satisfies, and only once the design it implements has been approved. Wire does all of that, because Wire knows how a data platform engagement is run. It knows which documents come first, what has to be approved before the next step can start, how a warehouse is laid out in layers, which tests every table needs and what the client should be handed at the end, and it knows these things because they are Rittman Analytics' delivery method, built over more than 20 years of consulting and written down in a form that an agent can follow rather than guess at.
 
