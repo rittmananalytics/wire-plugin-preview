@@ -142,7 +142,7 @@ function Nav() {
           <span className="ver">v4.0</span>
         </span>
         <div className="nav-links">
-          <Link to="/docs/intro">Documentation</Link>
+          <Link to="/docs/using-wire/what-is-wire">Documentation</Link>
           <a
             className="nav-gh"
             href="https://github.com/rittmananalytics/wire-plugin">
@@ -171,7 +171,7 @@ function Hero() {
             AI-accelerated delivery for data platform engagements
           </p>
           <div className="cta-row">
-            <Link className="btn btn-pri" to="/docs/intro">
+            <Link className="btn btn-pri" to="/docs/using-wire/what-is-wire">
               Get started
               <Arrow />
             </Link>
@@ -409,7 +409,7 @@ function Footer() {
               <h4>Documentation</h4>
               <ul>
                 <li>
-                  <Link to="/docs/intro">Getting Started</Link>
+                  <Link to="/docs/using-wire/what-is-wire">Getting Started</Link>
                 </li>
                 <li>
                   <Link to="/docs/release-types/discovery-shape-up">

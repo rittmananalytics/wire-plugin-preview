@@ -9,7 +9,7 @@ title: dbt Development
 
 Since v4.0.0, on Claude Code, you can direct this release in plain language
 instead: say what you want done and Wire works out which command that is from
-this release type's definition, names it before it runs, runs it, and stops at
+this release type's definition, runs it, tells you what it did and stops at
 every review gate for your decision. The commands, the artifacts and the record
 on disk are identical either way, and typing them still works. See
 [The Release Director Model](../advanced/release-director).
@@ -17,11 +17,13 @@ on disk are identical either way, and typing them still works. See
 :::
 
 
-Use this when data is already in the warehouse (e.g. via Fivetran, Stitch, or manual loads) and you need to build or extend the dbt transformation layer.
+Often the data is already in the warehouse, loaded by Fivetran, Stitch or manual loads, and what the client needs is the dbt transformation layer built or extended on top of it. Use this release type for that case, where the loading is done and the work is in the models.
 
 **In-scope artifacts**: `requirements`, `conceptual_model`, `data_model`, `dbt`, `data_quality`
 
 ## Workflow
+
+At a high level, the release runs as follows, with the business rules step optional and the rest in order:
 
 ```
 /wire:new                                         # release_type: dbt_development
@@ -56,39 +58,27 @@ Use this when data is already in the warehouse (e.g. via Fivetran, Stitch, or ma
 
 :::info[Tutorial available]
 
-A worked example of a dbt Development engagement — using a fictional client scenario with realistic command output, agent delegation, and reviewer decisions — is available in the [Tutorial: dbt Development](../tutorials/dbt-development).
+A worked example of a dbt Development engagement, using a fictional client scenario with realistic command output, agent delegation and reviewer decisions, is available in the [Tutorial: dbt Development](../tutorials/dbt-development).
 
 :::
 
 
 **Tips for dbt-only releases**:
-- Add any existing dbt project files (existing `schema.yml`, source definitions, SQL examples) to `requirements/` before running `data_model:generate` — the AI will use them to understand the existing model structure and extend it correctly
-- Store SQL examples from the source database (schema introspection results, sample queries) so the AI understands actual column names and types
+- Add any existing dbt project files (existing `schema.yml`, source definitions, SQL examples) to `requirements/` before running `data_model:generate`, so that the AI can use them to understand the existing model structure and extend it correctly
+- Store SQL examples from the source database (schema introspection results, sample queries) so that the AI understands the actual column names and types
 
 > **Tip**: Run `/wire:playbook-generate <release-folder>` after requirements are approved.
 
 ## Business rules discovery (optional first phase)
 
-New in 4.0. `/wire:business-rules-generate` runs before design and establishes what
-the numbers mean, one business domain at a time.
+Before the design work begins, there is a question that is easy to skip and expensive to leave open: what do the numbers actually mean? New in 4.0, `/wire:business-rules-generate` runs before design and establishes this, one business domain at a time.
 
-It reads the definitions that already exist — in dbt, in LookML, and through
-`--import` from systems Wire cannot read such as SAP BW, Hana or SAC — then asks
-the people who own the numbers to settle the ones that disagree. The output is a
-register: one entry per rule, holding every competing definition with the file it
-came from, what they disagree on, the decision, the named approver, and a
-reconciliation query that runs at generate time rather than in QA.
+It reads the definitions that already exist, in dbt, in LookML and, through `--import`, from systems Wire cannot read such as SAP BW, Hana or SAC, and then asks the people who own the numbers to settle the ones that disagree. The output is a register with one entry per rule, holding every competing definition with the file it came from, what they disagree on, the decision, the named approver and a reconciliation query that runs at generate time rather than in QA.
 
-A rule nobody has decided is recorded with status `unknown`, which passes
-validate. That is the point of it: a register has to be able to say "nobody has
-agreed whether in-store orders are in this figure", because that sentence is what
-stops the number being wrong nine months later.
+A rule nobody has decided is recorded with status `unknown`, which passes validate. That is the point of it: a register has to be able to say "nobody has agreed whether in-store orders are in this figure", because that sentence is what stops the number being wrong nine months later.
 
-**The gate is advisory.** ``data_model-generate`` warns when the register has not been
-reviewed, asks for a one-line reason, records it as an `advisory_skip`, and
-proceeds. Skipping is a real choice; what matters is that the choice is visible.
+**The gate is advisory.** ``data_model-generate`` warns when the register has not been reviewed, asks for a one-line reason, records it as an `advisory_skip` and proceeds. Skipping is a real choice; what matters is that the choice is visible.
 
-A transformation-only release is the case where this matters most: the models being
-built or rebuilt are where a definition becomes permanent.
+A transformation-only release is the case where this matters most, because the models being built or rebuilt are where a definition becomes permanent.
 
 Full reference: [Business rules discovery](../advanced/business-rules.md).

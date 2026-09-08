@@ -93,7 +93,7 @@ const config = {
           {
             title: 'Documentation',
             items: [
-              {label: 'Getting Started', to: '/docs/intro'},
+              {label: 'Getting Started', to: '/docs/using-wire/what-is-wire'},
               {label: 'Release Types', to: '/docs/release-types/discovery-shape-up'},
               {label: 'FAQ', to: '/docs/reference/faq'},
             ],

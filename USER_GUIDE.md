@@ -356,7 +356,7 @@ Plugin and extension users get updates automatically when a new version is publi
 
 **Since v4.0.0, on Claude Code.** Wire has 313 commands. You do not have to know
 which one comes next. Say what you want done and Wire computes the answer from
-the release type's own definition, names the command, runs it, and stops where a
+the release type's own definition, runs it, tells you what it did, and stops where a
 decision is yours.
 
 ```

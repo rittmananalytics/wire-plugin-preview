@@ -5,11 +5,11 @@ title: "Tutorial: Looker to Omni Migration"
 
 # Tutorial: Looker to Omni Migration
 
-This walkthrough runs a complete `bi_migration` release, Looker to Omni, from an empty engagement repo to Looker being switched off. It uses a fictional UK retailer whose warehouse and dbt project stay exactly where they are. Only the reporting layer moves.
+Suppose your Looker contract is coming to an end, your BigQuery warehouse and dbt project are in good shape and the only thing that needs to move is the reporting layer that sits on top of them. Wouldn't it be useful to move that layer to Omni without touching the warehouse, and to prove, tile by tile, that every migrated dashboard returns the same numbers before any client user sees it? That is what the `bi_migration` release type is for, and in this tutorial we run a complete release of it, Looker to Omni, from an empty engagement repo through to Looker being switched off, using a fictional UK retailer whose warehouse and dbt project stay exactly where they are. Only the reporting layer moves.
 
-The release is driven the way v4.0.0 intends: the consultant is the **release director** and gives direction in prose. The **orchestrating session** works out what is runnable from the release-type graph, runs the Wire commands, dispatches batches to lanes, and stops at every decision that is the director's to make. Every step still runs a real `/wire:` command, so this tutorial names the command Wire runs at each point, what it reads, what it writes, and where it stops. Read [The Release Director Model](../advanced/release-director) first if the terms director, lane, ruling and parked decision are new.
+We drive the release the way v4.0.0 intends, which is to say that the consultant acts as the **release director** and gives direction in prose, while the **orchestrating session** works out what is runnable from the release-type graph, runs the Wire commands, dispatches batches to lanes and stops at every decision that is the director's to make. Every step still runs a real `/wire:` command behind the scenes, and so at each point in the walkthrough we name the command Wire runs, what it reads, what it writes and where it stops, so that you learn the commands as you go rather than up front. If the terms director, lane, ruling and parked decision are new to you, read [The Release Director Model](../advanced/release-director) first and then come back here.
 
-Nothing here needs you to type a command. Everything here can be typed if you prefer. The record on disk is the same either way.
+Nothing in this tutorial needs you to type a command, although everything in it can be typed if you prefer, and the record on disk is the same either way.
 
 ## Statement of Work
 
@@ -84,7 +84,7 @@ then retire Looker.
 
 ## What is a BI migration release?
 
-The `bi_migration` release type ([reference page](../release-types/bi-migration)) moves a reporting layer between BI tools while the warehouse stays put. In 4.0.0 the only pair is `looker_to_omni`. Nine phases, six of them gated by a director ruling:
+So what does a BI migration release consist of? The `bi_migration` release type ([reference page](../release-types/bi-migration)) moves a reporting layer between BI tools while the warehouse stays put, and in 4.0.0 the only pair it supports is `looker_to_omni`. It has nine phases, six of them gated by a director ruling, as follows:
 
 | Phase | Artifact | Gate before the next phase |
 |---|---|---|
@@ -98,13 +98,13 @@ The `bi_migration` release type ([reference page](../release-types/bi-migration)
 | Cutover | `cutover` | cutover **review** approved |
 | Enablement (optional) | `training`, `documentation` | |
 
-Two things make it different from the linear release types. It is **batched**: the plan cuts the model into batches of views and explores, and the content into batches of dashboards, and each batch is one lane. And it has a **deterministic core**: a Python converter turns LookML into Omni YAML with no AI call, and refuses anything it cannot translate into a `needs_human.json` list. The agent's job is the list, not the YAML.
+Two things set it apart from the linear release types, and both shape how the work is divided up. First, it is **batched**: the plan cuts the model into batches of views and explores and the content into batches of dashboards, and each batch becomes one lane, which is what allows several batches to run at the same time. Second, it has a **deterministic core**: a Python converter turns LookML into Omni YAML with no AI call at all, and it refuses anything it cannot translate, putting each refusal into a `needs_human.json` list. It follows, therefore, that the agent's job is the list, not the YAML.
 
 ## The scenario
 
-Halcyon's Looker estate has grown for six years. The client's analytics lead, Tom Askew, knows roughly a third of the dashboards are dead. Two client modellers will keep editing LookML until cutover, and will start editing the Omni model as soon as there is one. The consultant, Priya Menon, is the release director. She has one engagement repo, one session per working day, and no intention of typing 80 commands.
+Halcyon's Looker estate has grown for six years, and the client's analytics lead, Tom Askew, knows that roughly a third of the dashboards are dead. Two client modellers will keep editing LookML until cutover, and they will start editing the Omni model as soon as there is one, which is a situation we will need to watch throughout the release. The consultant, Priya Menon, is the release director, and she has one engagement repo, one session per working day and no intention of typing 80 commands.
 
-What the numbers turn out to be:
+Here is what the numbers turn out to be:
 
 | Object | Count | Kept | Dropped |
 |---|---|---|---|
@@ -118,6 +118,8 @@ What the numbers turn out to be:
 | Groups and user attributes | 5 and 2 | all | |
 
 ## What you will produce
+
+By the end of the release the folder under `.wire/releases/` will look like this, and we refer back to these paths throughout the walkthrough:
 
 ```
 .wire/releases/01-looker-to-omni/
@@ -154,7 +156,7 @@ What the numbers turn out to be:
 
 ## Tutorial playbook
 
-The whole release in one table. **You say** is the director. **Wire runs** is what the orchestrating session executes, named before it runs, and recorded in `execution_log.md` with `Session: orchestrator` or a lane label. **Stops at** is where the session parks and waits.
+Before we walk through the release step by step, here is the whole of it in one table, so that you can see the shape of the 14 steps before we look at each in detail. **You say** is what the director says. **Wire runs** is what the orchestrating session executes, named in the closing line of its report and recorded in `execution_log.md` with `Session: orchestrator` or a lane label. **Stops at** is where the session parks and waits for a decision.
 
 | Step | You say | Wire runs | Stops at |
 |---|---|---|---|
@@ -173,17 +175,19 @@ The whole release in one table. **You say** is the director. **Wire runs** is wh
 | 13 | Client signed; switch the first group | `/wire:cutover-review`; access switch step 1 recorded in the runbook | Next group |
 | 14 | Training and a model handbook | `/wire:training-generate`, `/wire:documentation-generate`, auto-validate, reviews | Done |
 
+Let's now take a look at these steps in more detail.
+
 ## Walkthrough
 
 ### 1. Setup: the engagement and the two repos
 
-Priya opens a session in an empty repo with the SOW in `docs/sow.md`.
+Priya opens a session in an empty repo with the SOW saved in `docs/sow.md`, and her first message is a description of what she wants rather than a command.
 
 | You say | Wire does |
 |---|---|
 | "New engagement for Halcyon Outdoor, Looker to Omni on the same BigQuery warehouse. SOW in `docs/sow.md`. Two lanes max. No warehouse queries until I say. Stop at every decision." | Reads the SOW. Proposes release type `bi_migration`, profile `looker_to_omni`, **with the reason** (the warehouse stays, the source is Looker, the target is Omni). Shows one confirmation block. Asks the setup questions `/wire:new` needs for this type. |
 
-The questions are the ones in the `/wire:new` spec for `bi_migration`: where the LookML is checked out (default `./lookml`), the Looker base URL, the Omni base URL, the Omni model id, which Omni CLI profile to use, the LookML GitHub URL, the Omni model repo URL, and the parallel-run length.
+The questions Wire asks are the ones in the `/wire:new` spec for `bi_migration`, namely where the LookML is checked out (default `./lookml`), the Looker base URL, the Omni base URL, the Omni model id, which Omni CLI profile to use, the LookML GitHub URL, the Omni model repo URL and the parallel-run length, and you will see most of the answers reflected in the confirmation block that follows.
 
 ```
 [wire] Proposed: bi_migration / looker_to_omni
@@ -203,7 +207,11 @@ Confirm, or change anything above.
 |---|---|
 | "Confirm." | Runs `/wire:new`. Writes `status.md` from the BI migration template with `project_type: bi_migration`, `bi_pair: looker_to_omni`, the `bi_migration:` block and the `budget:` block (`lanes_max: 2`, `warehouse_spend: none`, `stop_at: decisions`). Claims the release: `agents.mode: orchestrated`, `coordinator_session` with Priya's name, session id and branch. Then runs `/wire:migration-source-register 01-looker-to-omni lookml <url>` and `/wire:migration-source-register 01-looker-to-omni omni_model <url>`, and `/wire:migration-source-refresh 01-looker-to-omni`. |
 
-The refresh clones both repos into `migration/source_snapshot/lookml/` and `migration/source_snapshot/omni_model/` and records each `last_commit` in `status.md`. Every audit row and register row will carry that commit. Without the LookML URL the audit still runs from the local checkout, but drift detection later is not possible.
+Why register the two repos at all? The refresh clones both into `migration/source_snapshot/lookml/` and `migration/source_snapshot/omni_model/` and records each `last_commit` in `status.md`, and every audit row and register row written from here on will carry that commit, which is what makes the drift check in step 6 possible.
+
+:::note
+Without the LookML URL the audit still runs from the local checkout, but drift detection later is not possible, so give the URL at setup if the client will keep editing LookML during the engagement.
+:::
 
 ```
 [wire] migration-source-refresh: lookml   54 .lkml files   commit 7c1e4a2
@@ -212,7 +220,7 @@ The refresh clones both repos into `migration/source_snapshot/lookml/` and `migr
 Runnable now: looker_audit (generate).   Blocked: bi_migration_plan (looker_audit review not approved).
 ```
 
-The session's first report after setup is the **runnable set**: what the graph allows now, and what is blocked by which unmet gate.
+The session's first report after setup is the **runnable set**, which is to say what the graph allows to run now and what is blocked by which unmet gate, and you will see this report at the start of every session from here on.
 
 ### 2. Audit
 
@@ -220,7 +228,7 @@ The session's first report after setup is the **runnable set**: what the graph a
 |---|---|
 | "Audit it." | Runs `/wire:looker-audit-generate 01-looker-to-omni`. Auto-validate follows. Reports once. |
 
-The audit reads the LookML snapshot, not the live repo. It applies the feature-detection patterns from `bi_pairs/looker_to_omni/feature_detection.md` to every construct and assigns one class per row: `mechanical` (the converter will emit it), `assisted` (emitted with a note, or withheld where a wrong emission would change a number), or `redesign` (not emitted; the Omni alternative is recorded). It catalogs content through the Looker API and reads usage from System Activity. It never infers usage from folder names.
+What does the audit actually look at? It reads the LookML snapshot rather than the live repo, and it applies the feature-detection patterns from `bi_pairs/looker_to_omni/feature_detection.md` to every construct, assigning one class per row: `mechanical` (the converter will emit it), `assisted` (emitted with a note, or withheld where a wrong emission would change a number) or `redesign` (not emitted; the Omni alternative is recorded). It catalogues content through the Looker API and reads usage from System Activity, and it never infers usage from folder names, which matters because the "drop list" in the next step rests on those usage figures.
 
 ```
 [wire] looker-audit-generate: 01-looker-to-omni   (LookML at 7c1e4a2)
@@ -241,13 +249,15 @@ Files     audit/looker_audit.md, audit/looker_model_catalog.csv, audit/looker_co
 Review gate: looker_audit. Approve now, changes, or park for client sign-off?
 ```
 
-A review edge is never runnable on its own. Wire presents the summary, the validate result and any Fathom meeting context the review spec gathers, then asks for one of three answers.
+A review edge is never runnable on its own, however clean the validate result, and so Wire presents the summary, the validate result and any Fathom meeting context the review spec gathers, and then asks you for one of three answers.
 
 | You say | Wire does |
 |---|---|
 | "Approve. Tom has seen the stale list and agrees it." | Runs `/wire:looker-audit-review 01-looker-to-omni` and records the approval under Priya's name. `bi_migration_plan` becomes runnable. |
 
 ### 3. Plan: where most rulings close
+
+This is the step where most of the director's rulings are given, and Priya gives several of them in a single message.
 
 | You say | Wire does |
 |---|---|
@@ -267,16 +277,16 @@ Applies to: bi_migration_plan (ruling: PDT disposition)
 Ruling: customer_ltv_daily, customer_ltv_monthly -> dbt model. order_facts_pdt, returns_pdt, stock_pdt, web_sessions_pdt -> Omni query view.
 ```
 
-The plan reads its rulings from `decisions.md`. A ruling that is missing is not guessed: it becomes a `parked_decisions` entry in `status.md` (kind `ruling`) and the plan records `ruling: parked`. Here two rulings were not given, so the plan parks them.
+Notice that the plan reads its rulings from `decisions.md` and not from the conversation, and that a ruling which is missing is never guessed: it becomes a `parked_decisions` entry in `status.md` (kind `ruling`) and the plan records `ruling: parked` against it. Here two rulings were not given, and so the plan parks them, as we will see in its report.
 
-What the plan does, in order:
+What does the plan do with the rulings it has? Six things, in this order:
 
 1. **Ranks content by usage.** Sorts dashboards and Looks by `views_90d`. The smallest set that reaches 80% of views is tier 1 (16 dashboards, 80.4%). The rest with any views is tier 2 (27). Zero views and last viewed over 180 days ago is stale (31 and 22).
 2. **Captures rulings.** Five present, two parked: the permission map (the plan proposes a one-to-one map and needs confirmation) and parity scope.
 3. **Decides model scope.** Every view and explore referenced by kept content, plus every view those explores join: 47 views, 11 explores. Seven views go under "Model not carried".
-4. **Cuts batches.** One permissions batch first (`b01`), five model batches of 9 or 10 views each ordered so a topic's views are all emitted before it (`b02` to `b06`), then content batches: tier 1 by usage rank (`b07`, `b08`), tier 2 (`b09` to `b11`), Looks (`b12`, `b13`). Each content batch's `depends_on_batch` is the last model batch it needs.
-5. **Bootstraps the register.** `migration/migration_register.csv` gets one row per in-scope object: 512 rows. Every view and topic row carries `last_migrated_commit: 7c1e4a2`; every dashboard and Look row carries `source_updated_at` from the catalog. Those are the baselines drift will compare against.
-6. **Writes `baseline.yaml` and the evidence file.** The baseline records the LookML commit, the Looker deployed revision, the Omni model id and branch, the warehouse, the converter, pair ruleset and comparator versions, and the pinned `parity_as_of` (set here if it was null). Every tile and view gets a row in `migration/parity/evidence.csv` with an `evidence_fingerprint` over what its future verdict will be measured against, so a later drift finding can mark exactly the evidence that a change invalidates rather than leave a stale pass in place.
+4. **Cuts batches.** One permissions batch first (`b01`), five model batches of nine or ten views each ordered so a topic's views are all emitted before it (`b02` to `b06`), then content batches: tier 1 by usage rank (`b07`, `b08`), tier 2 (`b09` to `b11`), Looks (`b12`, `b13`). Each content batch's `depends_on_batch` is the last model batch it needs.
+5. **Bootstraps the register.** `migration/migration_register.csv` gets one row per in-scope object: 512 rows. Every view and topic row carries `last_migrated_commit: 7c1e4a2`; every dashboard and Look row carries `source_updated_at` from the catalogue. Those are the baselines drift will compare against.
+6. **Writes `baseline.yaml` and the evidence file.** The baseline records the LookML commit, the Looker deployed revision, the Omni model id and branch, the warehouse, the converter, pair ruleset and comparator versions, together with the pinned `parity_as_of` (set here if it was null). Every tile and view gets a row in `migration/parity/evidence.csv` with an `evidence_fingerprint` over what its future verdict will be measured against, so that a later drift finding can mark exactly the evidence that a change invalidates rather than leave a stale pass in place.
 
 ```
 [wire] bi-migration-plan-generate: 01-looker-to-omni
@@ -299,7 +309,7 @@ Review gate: bi_migration_plan. Two parked decisions are open. Approve now, chan
 |---|---|
 | "Permission map as proposed. Parity scope tier 1 only; tier 2 gets a spot check by hand. Approve the plan." | Records R-6 and R-7, clears PD-1 and PD-2, sets `bi_migration.parity_scope: prioritised`. Runs `/wire:bi-migration-plan-review 01-looker-to-omni`. `omni_target_setup` becomes runnable. |
 
-Parity scope is a budget decision. Every compared tile is two warehouse queries, one from each tool. Tier 1 is 119 comparable tiles, so 238 queries per run. All 372 tiles would be 744.
+Why does parity scope need a ruling at all? Because it is a budget decision: every compared tile is two warehouse queries, one from each tool, so tier 1 at 119 comparable tiles is 238 queries per run, whereas all 372 tiles would be 744.
 
 ### 4. Target setup
 
@@ -307,14 +317,14 @@ Parity scope is a budget decision. Every compared tile is two warehouse queries,
 |---|---|
 | "Set up the Omni side. Warehouse spend still none." | Runs `/wire:omni-target-setup-generate 01-looker-to-omni`. This command writes to Omni, so validate does not auto-run; Wire runs `/wire:omni-target-setup-validate` as the next step and says so. |
 
-What the generate step does, each write recorded with its reversing action:
+This command writes to Omni rather than to the release folder, which is why each write is recorded with its reversing action, and the generate step does six things in order:
 
 1. Confirms CLI access (`omni config show`, `omni whoami`).
-2. Verifies the Omni model's connection reads the **same** BigQuery project and dataset as Looker's connection. If they differ it stops. A BI migration assumes the warehouse does not move.
+2. Verifies the Omni model's connection reads the **same** BigQuery project and dataset as Looker's connection. If they differ it stops, because a BI migration assumes the warehouse does not move.
 3. Records that `hal-analytics` is git-connected, so the model will merge through `omni models commit` and a pull request in the client's repo, not `merge-branch`.
-4. Creates the model branch `wire-01-looker-to-omni` (`omni models create-branch`). Every model write in the release goes to this branch. Nothing merges without a ruling at cutover.
-5. Refreshes the schema (`omni models refresh`) so plain column dimensions the converter emits by name will resolve.
-6. Creates the 5 groups and 2 user attributes from the permission map. It does not add any users. Membership is a cutover step.
+4. Creates the model branch `wire-01-looker-to-omni` (`omni models create-branch`). Every model write in the release goes to this branch, and nothing merges without a ruling at cutover.
+5. Refreshes the schema (`omni models refresh`) so that plain column dimensions the converter emits by name will resolve.
+6. Creates the five groups and two user attributes from the permission map. It does not add any users, because membership is a cutover step.
 
 ```
 [wire] omni-target-setup-generate: connection_verified true (bq: halcyon-analytics-prod / analytics, both sides)
@@ -331,7 +341,7 @@ Review gate: omni_target_setup. Approve now, changes, or park?
 
 ### 5. Model batches as lanes
 
-Each model lane gets a brief: the batch id, the tree it owns (`migration/omni_model/<batch>/`), its state file (`lanes/omni-model-b02.md`), the budget line (none: the converter does not query the warehouse), and the lane contract verbatim. The lane does not write `status.md` or `execution_log.md`. The orchestrator writes both from the lane's state file.
+How does a lane know what to do? Each model lane gets a brief containing the batch id, the tree it owns (`migration/omni_model/<batch>/`), its state file (`lanes/omni-model-b02.md`), the budget line (none, because the converter does not query the warehouse) and the lane contract verbatim. The lane never writes `status.md` or `execution_log.md`; instead, the orchestrator writes both from the lane's state file, which is the single-writer rule we will see enforced in the consolidation pass below.
 
 ```mermaid
 flowchart LR
@@ -354,7 +364,7 @@ flowchart LR
     classDef lane fill:#2d4a1e,stroke:#6abf4b,color:#fff
 ```
 
-A lane runs three commands for its batch.
+A lane runs three commands for its batch, and we take each in turn.
 
 **`/wire:omni-model-generate 01-looker-to-omni --batch b02`.** Runs the converter on the batch's views and explores against the LookML snapshot:
 
@@ -370,13 +380,13 @@ python3 <plugin-root>/scripts/lookml_to_omni.py \
 
 The converter writes `ANALYTICS/<view>.view` files, one `<explore>.topic` per explore, `relationships.yaml`, an `ir/` directory (the intermediate form of every construct it read, with a namespaced identity like `looker:hal:view:orders`), `dependencies.jsonl` (which topic uses which view, which field uses which field), `needs_human.json` and `conversion_summary.json`. Same input, identical output, no AI call.
 
-The lane then reads `needs_human.json` and applies the plan's rulings to each item in order: a ruling that names the view or field resolves it (R-3 sends `order_facts_pdt` to a hand-written Omni query view, the one place hand-written YAML is expected); an `assisted` item that was emitted stays open until validate confirms it; anything else becomes a **parked decision** for the director. It does not guess a redesign. A guessed redesign passes validate and returns wrong numbers at parity, which is the most expensive place to find it.
+The lane then reads `needs_human.json` and applies the plan's rulings to each item in order: a ruling that names the view or field resolves it (R-3 sends `order_facts_pdt` to a hand-written Omni query view, the one place hand-written YAML is expected); an `assisted` item that was emitted stays open until validate confirms it; anything else becomes a **parked decision** for the director. It does not guess a redesign, and for good reason: a guessed redesign passes validate and returns wrong numbers at parity, which is the most expensive place to find it.
 
-Then it writes every emitted file to the branch with `omni models yaml-create`, views first, then relationships, then topics, reads each back with `yaml-get`, and writes `manifest.json` with a SHA-256 per file. It never runs `merge-branch` or `commit`.
+Then it writes every emitted file to the branch with `omni models yaml-create`, views first, then relationships, then topics, reads each back with `yaml-get` and writes `manifest.json` with a SHA-256 per file. It never runs `merge-branch` or `commit`.
 
-**`/wire:omni-model-lint 01-looker-to-omni --batch b02`.** Ten deterministic checks on the emitted files: no `${TABLE}`, no Liquid, only Omni timeframes, only Omni aggregate types, measure filters as operator objects, a primary key on every view in a relationship, every topic view resolves, valid relationship and join types, no duplicate names, and no emitted counterpart for any `redesign` item.
+**`/wire:omni-model-lint 01-looker-to-omni --batch b02`.** Ten deterministic checks on the emitted files: no `${TABLE}`, no Liquid, only Omni timeframes, only Omni aggregate types, measure filters as operator objects, a primary key on every view in a relationship, every topic view resolves, valid relationship and join types, no duplicate names and no emitted counterpart for any `redesign` item.
 
-**`/wire:omni-model-validate 01-looker-to-omni --batch b02`.** Runs `omni models validate` on the branch, confirms every emitted field resolves, and closes each `assisted` item as `confirmed`, `changed` or `parked`. An item still `open` is a FAIL.
+**`/wire:omni-model-validate 01-looker-to-omni --batch b02`.** Runs `omni models validate` on the branch, confirms every emitted field resolves and closes each `assisted` item as `confirmed`, `changed` or `parked`. An item still `open` is a FAIL.
 
 The lane reports once:
 
@@ -388,23 +398,23 @@ Lane omni-model [b02]: complete.
   PD-4  customers.cohort: case with a LIKE condition. Omni alternative: hand-written sql.
 ```
 
-**Consolidation pass.** Before the orchestrator tells Priya a batch is ready it re-runs `omni models validate` on the branch itself, reads the `needs_human` open count from the file rather than the lane's summary, and confirms the lane did not write `status.md`. Then it writes the register rows for the batch (`state: migrated`, `last_migrated_commit: 7c1e4a2`) and the status block, dispatches `b04` into the freed lane slot, and reports.
+**Consolidation pass.** Before the orchestrator tells Priya a batch is ready it re-runs `omni models validate` on the branch itself, reads the `needs_human` open count from the file rather than the lane's summary and confirms the lane did not write `status.md`. Then it writes the register rows for the batch (`state: migrated`, `last_migrated_commit: 7c1e4a2`) and the status block, dispatches `b04` into the freed lane slot and reports.
 
 | You say | Wire does |
 |---|---|
 | "PD-3: groups dimension, four buckets as in the Liquid. PD-4: write the sql by hand, `LIKE` stays. Carry on." | Records R-8 and R-9. Re-dispatches `b02` to apply them (`omni-model-generate --batch b02` again is an edit on the branch, not a create; lint and validate follow). Continues `b04`, `b05`, `b06` as slots free. |
 
-Five batches take four working sessions. Each session's first line is the count of open parked decisions and their questions.
+Five batches take four working sessions in all, and each session's first line is the count of open parked decisions together with their questions, so that Priya always knows what is waiting on her before anything else happens.
 
 ### 6. Drift: the client kept editing LookML
 
-Before the model review, Priya asks for a drift check. The client's modellers merged two LookML pull requests during the model phase.
+Remember that the client's two modellers kept editing LookML during the model phase? They merged two LookML pull requests while the batches were running, and so before the model review Priya asks for a drift check.
 
 | You say | Wire does |
 |---|---|
 | "Check for LookML drift before I approve the model." | Runs `/wire:migration-source-refresh 01-looker-to-omni lookml` (new commit `b41d90f`), then `/wire:migration-drift-generate 01-looker-to-omni`. |
 
-The drift gate diffs the refreshed snapshot against each register row's `last_migrated_commit`, re-classifies changed constructs, and follows `dependencies.jsonl` to find what is affected downstream.
+The drift gate diffs the refreshed snapshot against each register row's `last_migrated_commit`, re-classifies changed constructs and follows `dependencies.jsonl` to find what is affected downstream.
 
 ```
 [wire] migration-drift-generate: lookml 7c1e4a2 -> b41d90f
@@ -424,7 +434,7 @@ Evidence invalidated: 2 view rows, 17 tile rows (evidence_fingerprint changed; p
 
 ### 7. Model review
 
-`/wire:omni-model-review` requires `artifacts.omni_model.validate: pass` for every batch. Approval means content may be built on these topics. A field or topic changed after approval sends its content batch back to generate.
+With the drift resolved we come to the model review. `/wire:omni-model-review` requires `artifacts.omni_model.validate: pass` for every batch, and approval means that content may be built on these topics, so a field or topic changed after approval sends its content batch back to generate.
 
 ```
 Model review: 5 batches, 47 views, 11 topics, 38 relationships on branch wire-01-looker-to-omni
@@ -440,7 +450,7 @@ Approve now, changes, or park?
 
 ### 8. Keeping the Omni side in sync
 
-The client's two modellers start working on the Omni branch as soon as topics exist. `/wire:omni-model-reverse-port` reads what is on the branch (from the git-connected model repo registered as `omni_model`, refreshed, or live with `yaml-get`) and compares it to each emitted file's SHA in `manifest.json`:
+The LookML repo is not the only thing that moves under us. The client's two modellers start working on the Omni branch as soon as topics exist, and so `/wire:omni-model-reverse-port` reads what is on the branch (from the git-connected model repo registered as `omni_model`, refreshed, or live with `yaml-get`) and compares it to each emitted file's SHA in `manifest.json`, placing every file in one of six classes:
 
 | Class | Meaning | Action |
 |---|---|---|
@@ -451,13 +461,13 @@ The client's two modellers start working on the Omni branch as soon as topics ex
 | `client_new` | Exists in Omni only | reported; ported only with `--adopt-new` |
 | `client_removed` | Deleted in Omni | reported; register row noted |
 
-`omni-model-generate` runs the reverse port itself before every batch once an earlier batch is complete, so a re-translation never overwrites a client edit. Priya also asks for it before parity. A conflict blocks lint and parity for that batch until she rules.
+`omni-model-generate` runs the reverse port itself before every batch once an earlier batch is complete, so that a re-translation never overwrites a client edit, and Priya also asks for it before parity. A conflict blocks lint and parity for that batch until she rules.
 
 ### 9. Content batches as lanes
 
-Each content lane owns `migration/omni_content/<batch>/`. Content is split into a **plan** that writes nothing to Omni, a **validate** of the plan, and a **write** that only runs on a validated plan. The plan is the dry run.
+Each content lane owns `migration/omni_content/<batch>/`. Content is split into a **plan** that writes nothing to Omni, a **validate** of the plan and a **write** that only runs on a validated plan, so the plan is, in effect, the "dry run".
 
-**`/wire:omni-content-generate 01-looker-to-omni --batch b07`** (plan). For each of the 8 dashboards: fetches the definition from the Looker API and saves it under `source/<dashboard_id>.json`; maps every tile field to the Omni `view.field` on the branch (a dimension group timeframe `created_month` becomes `created_at[month]`); turns tile and dashboard filters into Omni filter objects; maps table calculations; maps the visualisation type through `content_mapping.md`; turns dashboard filters into `controls` and the `listen` map into control maps with `false` where a tile is excluded; authors the full `containers` layout tree. A tile whose field is not on the branch is **skipped with reason `unmapped_field`**, never given a similar field. Writes `plan.json` and `manifest.csv` with `state: planned`.
+**`/wire:omni-content-generate 01-looker-to-omni --batch b07`** (plan). For each of the eight dashboards it: fetches the definition from the Looker API and saves it under `source/<dashboard_id>.json`; maps every tile field to the Omni `view.field` on the branch (a dimension group timeframe `created_month` becomes `created_at[month]`); turns tile and dashboard filters into Omni filter objects; maps table calculations; maps the visualisation type through `content_mapping.md`; turns dashboard filters into `controls` and the `listen` map into control maps with `false` where a tile is excluded; authors the full `containers` layout tree. A tile whose field is not on the branch is **skipped with reason `unmapped_field`**, never given a similar field. Writes `plan.json` and `manifest.csv` with `state: planned`.
 
 **`/wire:omni-content-validate --batch b07`** (pre-write). Every planned field exists on the branch, every control id appears in every tile's map, no quarter-grained date key, every skip has a reason from the closed set.
 
@@ -472,11 +482,11 @@ Lane omni-content [b07]: complete.
   https://halcyon.omniapp.co/dashboards/...  (8 URLs in manifest.csv)
 ```
 
-Content batches `b09` to `b13` follow as slots free. `b12` and `b13` are Looks, each a single-tile document in the same folder as the Look.
+Content batches `b09` to `b13` follow as slots free, and `b12` and `b13` are Looks, each a single-tile document in the same folder as the Look.
 
 ### 10. Parity
 
-Parity is the cutover gate. It compares each tile's result in Looker against the same tile in Omni, at the tile grain, with the date filter pinned on both sides so a difference in data vintage cannot masquerade as a translation error.
+Now for the step the whole release has been building towards. Parity is the cutover gate: it compares each tile's result in Looker against the same tile in Omni, at the tile grain, with the date filter pinned on both sides so that a difference in data vintage cannot masquerade as a translation error.
 
 | You say | Wire does |
 |---|---|
@@ -484,10 +494,10 @@ Parity is the cutover gate. It compares each tile's result in Looker against the
 
 For each tile the lane:
 
-1. Reads the parity **contract** for the tile at `migration/parity/contracts/<dashboard_id>/<tile_key>.yaml`, written from the plan and `source/<dashboard_id>.json`: the two sides' queries, the execution settings (principal, timezone, as-of, filters, limit), the comparison rules (row semantics, key fields, field map, a comparator per measure), and any accepted difference from `decisions.md`.
+1. Reads the parity **contract** for the tile at `migration/parity/contracts/<dashboard_id>/<tile_key>.yaml`, written from the plan and `source/<dashboard_id>.json`: the two sides' queries, the execution settings (principal, timezone, as-of, filters, limit), the comparison rules (row semantics, key fields, field map, a comparator per measure) and any accepted difference from `decisions.md`.
 2. Runs the Looker side through `run_inline_query` and the Omni side through `omni query run` with `branchId` set to the release branch, then `omni query wait`.
 3. Compares with `scripts/bi_parity.py`: row count exactly; the row set keyed by the tile's dimensions; each measure with its comparator (exact for sums and counts, within tolerance for averages, ratios and calculations, default 0.5% relative); pivots unpivoted then the pivot set; top-N under the tile's sort where there is a limit.
-4. Writes the tile's verdict to its own file under `migration/verdicts/run_1/` after **each** tile, so a killed lane resumes at the first tile not in its file.
+4. Writes the tile's verdict to its own file under `migration/verdicts/run_1/` after **each** tile, so that a killed lane resumes at the first tile not in its file.
 
 The comparator's outcomes map to the migration verdict taxonomy the register uses:
 
@@ -501,7 +511,7 @@ The comparator's outcomes map to the migration verdict taxonomy the register use
 | INCONCLUSIVE | no verdict | Truncated by the row limit, or both sides empty where rows were expected |
 | NOT_RUN | `not_compared` | Skipped tile, or outside parity scope |
 
-Only `pass`, `pass_qualified` and `pass_declared_deviation` satisfy the cutover gate. A tile with no verdict counts as unresolved.
+Only `pass`, `pass_qualified` and `pass_declared_deviation` satisfy the cutover gate, and a tile with no verdict counts as unresolved.
 
 The orchestrator merges the verdict files into `migration_verdict_log.csv` and the register (single writer) and rolls each dashboard up: `pass` only when every compared tile passes; `pass_qualified` when every tile is pass or pass_qualified; otherwise the worst tile.
 
@@ -536,7 +546,7 @@ Tier 2 is outside `parity_scope`, so its tiles are `not_compared` in the report 
 |---|---|
 | "Approve content. Cutover plan: 60 days, groups in the plan's order, finance first." | Runs `/wire:omni-content-review`, then `/wire:cutover-generate 01-looker-to-omni` and `-validate`. |
 
-On a `bi_migration` release the cutover runbook is about access and content, not connections. Its sections, in order:
+What does cutover mean when the warehouse has not moved? On a `bi_migration` release the cutover runbook is about access and content rather than connections, and its six sections run in this order:
 
 1. **Parity gate.** Every dashboard in scope at `pass`, `pass_qualified` or `pass_declared_deviation`, and none uncompared. One `fail`, `diff_*` or unresolved tile and the runbook stops here and lists them.
 2. **Parallel run.** Both tools live for 60 days. Omni content is published; Looker is untouched.
@@ -545,7 +555,7 @@ On a `bi_migration` release the cutover runbook is about access and content, not
 5. **Looker read-only** on 1 March 2027. Nothing deleted.
 6. **Decommission** on 31 March 2027, a separate scheduled step: export and archive the LookML repo and content, then remove access.
 
-Rollback is re-enabling Looker for the affected group. Nothing in the warehouse changed and Looker content was never edited. The decommission step never runs while any group is still on Looker.
+Rollback, should it be needed, is simply re-enabling Looker for the affected group, because nothing in the warehouse changed and Looker content was never edited, and the decommission step never runs while any group is still on Looker.
 
 The cutover review is a client sign-off, so Priya parks it.
 
@@ -556,13 +566,15 @@ The cutover review is a client sign-off, so Priya parks it.
 
 ### 12. Enablement
 
+With the first group switched, what remains is enablement.
+
 | You say | Wire does |
 |---|---|
 | "Training for report builders, and a model handbook for the two modellers." | Runs `/wire:training-generate` and `/wire:documentation-generate` as two lanes (no dependency between them), auto-validate on each, then presents both reviews. |
 
 ## The session shape
 
-Fourteen weeks, 23 working sessions, one release, one branch. Every session opened with the count of parked decisions and their questions, then the runnable set.
+So what did the release look like from the director's chair? Fourteen weeks, 23 working sessions, one release and one branch, with every session opening with the count of parked decisions and their questions and then the runnable set.
 
 | Measure | Value |
 |---|---|
@@ -573,11 +585,11 @@ Fourteen weeks, 23 working sessions, one release, one branch. Every session open
 | Lanes that stalled and were re-dispatched | 1 (a usage-limit outage; it resumed at the in-flight dashboard) |
 | Parked decisions at close | 0 |
 
-Two people contributed without being the director. A client modeller edited the Omni branch; the reverse port picked it up and recorded it. Tom Askew signed off the cutover; the parked decision named him and the review row carries his sign-off. Neither typed a Wire command. Neither wrote `status.md`.
+Two people contributed without being the director, and the record shows both. A client modeller edited the Omni branch, and the reverse port picked the edit up and recorded it; Tom Askew signed off the cutover, and the parked decision named him and the review row carries his sign-off. Neither typed a Wire command and neither wrote `status.md`.
 
 ## Command reference for this release type
 
-What the orchestrating session runs, in the order the graph releases it. Every one of these can be typed instead.
+For reference, here is what the orchestrating session runs, in the order the graph releases it, together with what each command reads and writes, and every one of these can be typed instead if you would rather drive by hand.
 
 | Command | Phase | Reads | Writes | Runs as |
 |---|---|---|---|---|
@@ -585,9 +597,9 @@ What the orchestrating session runs, in the order the graph releases it. Every o
 | `/wire:migration-source-register <release> lookml <url>` | setup | | `migration_sources.lookml` | foreground |
 | `/wire:migration-source-register <release> omni_model <url>` | setup | | `migration_sources.omni_model`, `client_repos` | foreground |
 | `/wire:migration-source-refresh <release> [lookml\|omni_model]` | any | the repos | `migration/source_snapshot/`, `last_commit` | foreground |
-| `/wire:looker-audit-generate` (auto-validate) | audit | LookML snapshot, Looker API, System Activity | `audit/*.md`, two catalogs | foreground |
+| `/wire:looker-audit-generate` (auto-validate) | audit | LookML snapshot, Looker API, System Activity | `audit/*.md`, two catalogues | foreground |
 | `/wire:looker-audit-review` | audit | | approval | on ruling |
-| `/wire:bi-migration-plan-generate` (auto-validate) | plan | catalogs, `decisions.md` | plan, batches CSV, register, `baseline.yaml`, parked rulings | foreground |
+| `/wire:bi-migration-plan-generate` (auto-validate) | plan | catalogues, `decisions.md` | plan, batches CSV, register, `baseline.yaml`, parked rulings | foreground |
 | `/wire:bi-migration-plan-review` | plan | | approval | on ruling |
 | `/wire:migration-drift-generate` | plan (optional, repeatable) | refreshed snapshot, register, `dependencies.jsonl` | drift report, register notes, invalidated evidence | foreground or scheduled |
 | `/wire:omni-target-setup-generate`, `-validate` | target | plan permission map, Omni CLI | branch, groups, attributes, setup doc | foreground |
@@ -610,6 +622,8 @@ What the orchestrating session runs, in the order the graph releases it. Every o
 
 ## Three rules to remember
 
+If you take three things away from this tutorial, make them these.
+
 - **Nothing merges to the Omni model, and no client user is added to a group, without a ruling.** The branch, the parity gate and the group-by-group switch exist so that the client never sees a wrong number.
 - **The converter never guesses.** Anything it cannot translate is in `needs_human.json`, and anything the plan did not rule on is a parked decision with your name on the answer.
 - **Lanes write their tree and their state file. The orchestrating session writes the record.** If you read a claim in a lane report, the consolidation pass has already re-checked it against the branch and the register.
@@ -618,7 +632,7 @@ What the orchestrating session runs, in the order the graph releases it. Every o
 
 | Artifact | Where |
 |---|---|
-| Audit with two catalogs | `audit/` |
+| Audit with two catalogues | `audit/` |
 | Plan, 13 batches, 512-row register, baseline | `migration/` |
 | 47 views, 11 topics, 38 relationships on branch `wire-01-looker-to-omni`; 4 hand-written query views; 2 PDTs replaced by dbt models in the client's dbt repo | Omni branch; `migration/omni_model/` |
 | 59 Omni documents (43 dashboards, 16 Looks) with identifiers and URLs | Omni; `migration/omni_content/*/manifest.csv` |
@@ -631,5 +645,6 @@ What the orchestrating session runs, in the order the graph releases it. Every o
 ## See also
 
 - [BI Tool Migration](../release-types/bi-migration): the reference page for this release type
+- [Looker to Omni: A Real Run](./looker-to-omni-real-run): the same release type run for real on Rittman Analytics' own estate, with the prompts as typed and every ruling
 - [The Release Director Model](../advanced/release-director): rulings, budget, lanes, the claim
 - [Platform Migration](./platform-migration): the same batched, register-driven pattern applied to a warehouse move

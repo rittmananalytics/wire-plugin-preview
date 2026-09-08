@@ -25,6 +25,8 @@ Gemini CLI and other agents: `npx skills add exploreomni/omni-agent-skills`. Wir
 
 ## Omni CLI (required)
 
+Source: https://github.com/exploreomni/cli. On a Claude Code machine the simplest install is the prompt "Install the Omni CLI from https://github.com/exploreomni/cli"; verify with `omni --version`.
+
 Authenticated through a named profile (`omni config use <profile>`) or `OMNI_BASE_URL` plus `OMNI_API_TOKEN`. The migration never writes to the production model: everything goes to the branch created by `omni-target-setup`, and merging (`omni models merge-branch`, or `omni models commit` for a git-connected model) happens only on the release director's ruling at cutover.
 
 `omni-sync` (Omni's local development package) streams validation errors while editing model YAML locally. Useful during a batch's `needs_human` work; not required.

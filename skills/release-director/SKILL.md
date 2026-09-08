@@ -136,9 +136,11 @@ would ask for:
 | Budget | The director's own words ("two lanes, nothing against a warehouse") |
 
 Then present **one confirmation block** covering all of it, and run `/wire:new`
-with those answers (its Step 0b). Anything you cannot derive, ask — one
-question, before the confirmation block, never a guess dressed up as a
-confirmation.
+with those answers (its Step 0b). Write the block in plain words ("Set up the
+engagement for Northwind Retail as a dashboard-first release, seeded profile,
+two lanes, nothing against a warehouse") and end it with one line naming the
+command: `Will run: new`. Anything you cannot derive, ask: one question, before
+the confirmation block, never a guess dressed up as a confirmation.
 
 ## Step 7: Run what is runnable
 
@@ -146,15 +148,18 @@ confirmation.
    It returns, per artifact: `runnable: generate`, `runnable: validate`,
    `parked: needs ruling`, `blocked: <unmet precondition>`, `not applicable` or
    `complete`, plus the order and what may run in parallel.
-2. **Say what will run, in one line, before running it.** Name the commands and
-   why:
+2. **Say what will happen, in one plain sentence, before it happens.** Name the
+   work and the reason in plain words, not the command or artifact identifiers:
    ```
-   Running conceptual_model-generate (requirements approved; business_rules
-   waived by R-1) as a lane, and mockups-generate in the foreground — they have
-   no dependency between them.
+   Drafting the conceptual model in the background (requirements approved;
+   business rules waived by R-1) and starting the mockups with you now. The two
+   do not depend on each other.
    ```
-   The command name always appears. A director who has never typed a Wire
-   command should still learn what the thing they approved is called.
+   The command names appear once, in the last line of the report that follows
+   (point 8). They are never hidden: a director who has never typed a Wire
+   command should still be able to learn what the thing they approved is
+   called. They are never the headline either: the body of every reply is about
+   the work, in words the client could read.
 3. **Apply the budget** from `status.md` (`lanes_max`, `warehouse_spend`,
    `stop_at`, `model_tier`). Report anything you did not run because of it,
    naming the setting. Never silently drop work.
@@ -175,9 +180,20 @@ confirmation.
    Files exist, validate ran and its result matches the lane's claim, the lane
    did not write `status.md`, warehouse results re-checked against the
    warehouse rather than the claim, and a sample spot-checked at depth.
-8. **Report once.** One terminal report when the work is done or a decision is
-   needed. No running commentary, and do not poll lanes for progress — read
-   their state files.
+8. **Report once: outcome first, commands last.** One terminal report when the
+   work is done or a decision is needed. Lead with what was produced, what the
+   checks found and what the director must decide, in plain words. Close with a
+   single line naming the commands that ran:
+   ```
+   Requirements drafted: 14 requirements, all checks pass, 2 need clarifying
+   at kickoff. Approve now, or park for the client?
+
+   Ran: requirements-generate, requirements-validate
+   ```
+   A blocked step is reported the same way: what is waiting, and on what, in
+   plain words, with the recorded precondition value in the closing line. No
+   running commentary, and do not poll lanes for progress: read their state
+   files.
 
 ## Step 8: Rulings and review gates
 
@@ -215,7 +231,10 @@ Step 3, given by a person at the time.
 - Run a review command on your own judgment.
 - Write `status.md` on a lane's behalf without reading its state file first.
 - Spawn sub-agents below a lane. Lanes are flat.
-- Hide the command names. Every run is named before it happens.
+- Hide the command names. Every report ends with the commands that ran.
+- Lead with the command names. The body of a reply is plain words about the
+  work; identifiers such as `conceptual_model` or `requirements-generate`
+  belong in the closing `Ran:` line, not the headline.
 - Keep driving after "you drive".
 
 ## On activation

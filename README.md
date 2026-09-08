@@ -27,8 +27,8 @@ Wire does not replace consultants or developers. It gives them an AI that works 
 
 ## Key Features
 
-- **Direct the work, don't memorise the commands** (v4.0.0) — on Claude Code, say what you want done and Wire works out which command that is from the release type's own definition, names it before it runs, runs it, and stops where a decision is yours. Every step runs the real command, so `status.md`, the execution log, the precondition gate and the artifacts on disk are identical to typing it. Reviews are never run without your ruling; parked decisions are listed at the start of every session; and `orchestration.mode: manual` in the engagement context restores the pre-4.0 behaviour exactly. Three tiers: one human directs, one session orchestrates, and the specialist agents run as flat lanes with their own state files
-- **331 slash commands** covering the full delivery lifecycle: Discovery (Shape Up + RA Canonical SOP), Requirements, Design, Development, Testing, Deployment, Enablement, Platform Migration, Agentic Data Stack
+- **Direct the work, don't memorise the commands** (v4.0.0) — on Claude Code, say what you want done and Wire works out which command that is from the release type's own definition, runs it, reports what it did in plain words with the command named in the closing line, and stops where a decision is yours. Every step runs the real command, so `status.md`, the execution log, the precondition gate and the artifacts on disk are identical to typing it. Reviews are never run without your ruling; parked decisions are listed at the start of every session; and `orchestration.mode: manual` in the engagement context restores the pre-4.0 behaviour exactly. Three tiers: one human directs, one session orchestrates, and the specialist agents run as flat lanes with their own state files
+- **334 slash commands** covering the full delivery lifecycle: Discovery (Shape Up + RA Canonical SOP), Requirements, Design, Development, Testing, Deployment, Enablement, Platform Migration, Agentic Data Stack
 - **12 release types** matching common engagement shapes: Shape Up discovery, SOP / Canonical discovery (sponsor-facing Findings Playback), full platform builds, pipeline-only, dbt development, dashboard extensions, dashboard-first rapid dev, enablement, platform migration (BigQuery ↔ Snowflake), agentic data stack (governed self-service analytics with eval suite), droughty (schema introspection and base-layer generation from live warehouses), and custom (bespoke deliverables defined from SoW documents) — every release type is now backed by a machine-readable process definition (see Precondition Gate below), not just documentation
 - **Two-tier engagement structure** separating long-running client context from individual scoped releases
 - **Generate / validate / review lifecycle** for every artifact: structured generation, automated checks, stakeholder sign-off
@@ -218,7 +218,7 @@ The engagement folder holds everything that spans the whole client relationship.
 
 ### Two ways to run it
 
-**Direct it.** Say what you want done — "new engagement from this SOW", "run what's next", "approve it and carry on" — and Wire computes what is runnable from the release type's definition, names the command, runs it, and stops at every review gate for your decision. This is the default on Claude Code from v4.0.0.
+**Direct it.** Say what you want done — "new engagement from this SOW", "run what's next", "approve it and carry on" — and Wire computes what is runnable from the release type's definition, runs it, tells you what it did (naming the command in the closing line), and stops at every review gate for your decision. This is the default on Claude Code from v4.0.0.
 
 **Type it.** Every command still works exactly as before, and the command name is printed before each directed run so you learn them as you go. Set `orchestration.mode: manual` in `.wire/engagement/context.md` for a whole engagement, or say "you drive" for one session. Gemini CLI stays command-driven throughout.
 
@@ -325,7 +325,7 @@ A VS Code extension (`wire-vscode/`) is in early development. The intention is t
 
 - [Documentation site](https://wire-plugin-preview.readthedocs.io/) — full documentation with search, covering all release types, commands, skills, and MCP servers
 - [User Guide](USER_GUIDE.md) — full operational guide covering all release types, worked examples, Autopilot, and troubleshooting
-- [Command Registry](wire/COMMANDS.md) — command catalog and conventions (run `/wire:help` for the full, current list of all 331 commands)
+- [Command Registry](wire/COMMANDS.md) — command catalog and conventions (run `/wire:help` for the full, current list of all 334 commands)
 - [Changelog](CHANGELOG.md)
 - [Release Notes](RELEASE_NOTES.md)
 - [Framework Source README](wire/README.md) — internals, build process, package structure

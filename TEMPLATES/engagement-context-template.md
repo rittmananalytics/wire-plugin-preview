@@ -20,12 +20,14 @@ docstore:
     parent_page_url: null
 
 data_model_registry:
-  vertical: null  # education | insurance | manufacturing | marketplace | retail | subscription-commerce | null
+  vertical: null  # any directory name under the registry's verticals/ (13 at the time
+                  # of writing). Run `ls ~/.wire/data-model-registry/verticals/` for
+                  # the current set, or leave null.
                   # May be a confident match, or the closest adjacent match when no vertical is an
                   # exact industry fit (e.g. subscription-commerce for a SaaS client's MRR/NRR model).
                   # Advisory only — see wire/schemas/data-model-registry.md. null (the default)
                   # means data_model-generate/validate behave exactly as if this didn't exist.
-  cross_vertical_schemas: []  # e.g. [crm_identity_resolution, revenue_recognition] — accepted independently
+  cross_vertical_schemas: []  # e.g. [crm_identity_resolution, finance_revenue_recognition] — accepted independently
                   # of any vertical match; a client can need these whether or not `vertical` above is set.
 
 # How Wire is driven on this engagement (specs/utils/director_operating_model.md).
