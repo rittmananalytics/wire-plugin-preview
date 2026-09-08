@@ -160,7 +160,7 @@ Before we walk through the release step by step, here is the whole of it in one 
 
 | Step | You say | Wire runs | Stops at |
 |---|---|---|---|
-| 1 | New engagement, SOW attached, two lanes max, nothing against the warehouse yet | `/wire:new` (proposes `bi_migration` / `looker_to_omni`, asks the five setup questions), `/wire:migration-source-register` twice, `/wire:migration-source-refresh` | Confirmation block |
+| 1 | New engagement, SOW attached, two lanes max, nothing against the warehouse yet | `/wire:new` (proposes `bi_migration` / `looker_to_omni`, asks the setup questions), `/wire:migration-source-register` twice, `/wire:migration-source-refresh` | Confirmation block |
 | 2 | Audit it | `/wire:looker-audit-generate`, auto-validate | Audit review (parked: needs ruling) |
 | 3 | Approve. Rulings on drop list, PDTs, topics, parallel run | `/wire:looker-audit-review`, `/wire:bi-migration-plan-generate`, auto-validate | Plan review, with the rulings it could not make |
 | 4 | Approve; parity scope tier 1; permission map as proposed | `/wire:bi-migration-plan-review`, `/wire:omni-target-setup-generate`, `-validate` | Target review |

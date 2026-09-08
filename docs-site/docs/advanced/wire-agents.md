@@ -5,7 +5,7 @@ title: Wire Agents
 
 # Wire Agents: Specialist Subagents
 
-**Introduced**: v3.8.6 (orchestrate command) → v3.9.2 (12 specialists + `/wire:delegate`) → v3.9.2 (14 specialists, adds `dashboard-mock-developer` and `mock-data-developer`) → v3.9.3 (migration generate commands auto-delegate to `migration-specialist`) → v3.9.5 (all 44 non-migration generate commands auto-delegate) → v3.9.6 (intra-batch parallelism for dbt migration: groups of ~5 models per agent) → v3.9.7 (post-execution hooks, stale artifact detection, Data Safety blocks on all migration specs)
+**Introduced**: v3.8.6 (orchestrate command) → v3.9.2 (12 specialists + `/wire:delegate`) → v3.9.2 (adds `dashboard-mock-developer` and `mock-data-developer`) → v3.9.3 (migration generate commands auto-delegate to `migration-specialist`) → v3.9.5 (all 44 non-migration generate commands auto-delegate) → v3.9.6 (intra-batch parallelism for dbt migration: groups of ~5 models per agent) → v3.9.7 (post-execution hooks, stale artifact detection, Data Safety blocks on all migration specs)
 
 Ask a single Claude Code agent to do the requirements, the dbt development, the LookML authoring, the data quality work and the migration audits across a full engagement and its context fills up with all of them at once, so that by the time it reaches the LookML it is reasoning with a head full of requirements and the output turns generic. Wire Agents is the answer to that. It replaces the single-agent pattern with thirteen named specialist agents, each with a focused skill set, dispatched by the `/wire:delegate` command, and the core insight behind it is that a specialist with a narrow brief ("your job is dbt models and nothing else") operates with a much cleaner context and makes better decisions within its domain.
 

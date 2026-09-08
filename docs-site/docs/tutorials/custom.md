@@ -261,8 +261,8 @@ The `data-designer` agent produces an RFM-style segmentation framework adapted f
 | Champions | < 7 days | ≥ 8 streams/month | High |
 | Loyal | < 14 days | 4–7 streams/month | Medium-High |
 | At-Risk | 15–45 days | 1–3 streams/month | Any |
-| Hibernating | 46–90 days | < 1 stream/month | Any |
-| Lost | > 90 days | 0 | Any |
+| Hibernating | 46–180 days | < 1 stream/month | Any |
+| Lost | > 180 days | 0 | Any |
 
 Segment boundaries are configurable via dbt project variables rather than fixed in the SQL, and the design spec includes a rationale section explaining why hard-coding them into SQL would make tuning painful after the first model run.
 

@@ -175,7 +175,7 @@ With the design approved, development is where the models get built. `/wire:dbt-
 
 `/wire:semantic_layer-generate` generates LookML views, explores, measures and dimension definitions from the approved dbt models.
 
-**Ready criteria**: all four development artifacts are `review: approved` and the dbt tests are passing.
+**Ready criteria**: all five development artifacts are `review: approved` and the dbt tests are passing.
 
 ## Phase 4: Testing (Days 9–10)
 

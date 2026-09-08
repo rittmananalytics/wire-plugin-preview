@@ -51,7 +51,7 @@ Alternatively, you can use the Wire command interface:
 ### Adding a server via the CLI
 
 ```bash
-# SSE transport (Atlassian, Linear, Fathom, Context7)
+# Streamable HTTP transport (Atlassian, Fathom, Context7); SSE for Linear
 claude mcp add --transport sse atlassian https://mcp.atlassian.com/v1/mcp
 
 # HTTP transport (Notion)
@@ -86,7 +86,7 @@ If your client tracks work in Jira and reads documents in Confluence, this one s
 
 ### Setup
 
-The Atlassian MCP server is the official Anthropic-hosted server, and it requires an Atlassian Cloud account.
+The Atlassian MCP server is Atlassian's own hosted server, and it requires an Atlassian Cloud account.
 
 1. Add the server to `settings.json` with the URL above
 2. On first use, Claude Code prompts for Atlassian OAuth2 authorisation

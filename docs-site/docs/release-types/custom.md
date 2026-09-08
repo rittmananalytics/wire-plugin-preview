@@ -28,7 +28,7 @@ Not every engagement produces pipelines and dashboards. Some deliver an architec
 
 ## How it works
 
-So how does Wire run a release whose artifacts it has never seen before? When you select "Custom" in `/wire:new`, Wire immediately invokes `/wire:custom-release-define`, which:
+So how does Wire run a release whose artifacts it has never seen before? When you select "Custom" in `/wire:new`, Wire immediately invokes `/wire:custom-define`, which:
 
 1. **Reads your source documents**: the SoW, kick-off notes and agreed delivery plan (PDF, Markdown, Google Drive, Confluence)
 2. **Extracts deliverables**: names, descriptions, acceptance criteria, effort estimates and timeline milestones
@@ -40,7 +40,7 @@ So how does Wire run a release whose artifacts it has never seen before? When yo
 ## Workflow
 
 ```
-/wire:new                           # select "Custom" → triggers /wire:custom-release-define
+/wire:new                           # select "Custom" → triggers /wire:custom-define
 
 # Wire prompts for source documents, then shows a proposal:
 # ┌─────────────────────────────────────────────────────────────────┐

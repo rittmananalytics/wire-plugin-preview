@@ -9,25 +9,29 @@ The [Looker to Omni Migration tutorial](./looker-to-omni-migration) walks a `bi_
 
 The run used the Wire Framework, Rittman Analytics' delivery framework, installed as a Claude Code plugin, against our own Looker estate. This page describes the process as it was run rather than as it was planned: the first two turns went through a headless harness in the engagement repo's `harness/` folder, and the rest went through an interactive Claude Code session. It is the companion to the tutorial, which walks the same release type through a fictional engagement, and this page is what one real run looked like, "warts and all". Prompts are reproduced as typed, and counts, times and ruling numbers are from the release record under `.wire/releases/01-looker-to-omni/`.
 
+:::note
+Hostnames, repository names, the warehouse project, model, branch, document and session ids and personal names on this page have been replaced with placeholders. The counts, times, ruling numbers and command output are as recorded.
+:::
+
 ## Source, target and scope
 
 | | |
 |---|---|
-| Source | Looker at `rittman.eu.looker.com`; LookML project `ra_data_warehouse_lookml` on GitHub; model `analytics.model.lkml` |
-| Target | Omni at `rittmananalytics.omniapp.co`; a git-connected shared model, repo `ra-data-warehouse-omni-target` |
-| Warehouse | BigQuery, project `ra-development`, dataset `analytics`. Unchanged. |
+| Source | Looker at `looker.example.com`; LookML project `lookml-project` on GitHub; model `analytics.model.lkml` |
+| Target | Omni at `example.omniapp.co`; a git-connected shared model, repo `omni-model` |
+| Warehouse | BigQuery, project `example-project`, dataset `analytics`. Unchanged. |
 | Scope | Three dashboards and every LookML object they reach. Everything else is dropped (R-1, R-7). Extended on 7 September to six more dashboards (R-53), not covered here. |
 | Parallel run | 14 days, 7 to 21 September 2026 (R-4, R-52) |
 | Parity | Every tile on the three dashboards: 61 tiles compared, 61 passing (run 2) |
-| Result in Omni | 3 published dashboards in folder `Looker Migration` on model `ra_data_warehouse 2`; 53 query views, 26 topics and 34 relationships added to the shared model |
+| Result in Omni | 3 published dashboards in folder `Looker Migration` on model `analytics_model 2`; 53 query views, 26 topics and 34 relationships added to the shared model |
 
 The three dashboards were these:
 
 | Id | Dashboard | Runs in 90 days | Visual tiles | Merged-results tiles | Explores used | Omni document |
 |---|---|---|---|---|---|---|
-| 267 | Business Summary | 488 | 17 | 8 | 8 | `1fd5b419` |
-| 255 | Web Performance and Marketing Attribution | 18 | 28 (27 built, 1 deferred) | 4 | 3 | `9bf547ae` |
-| 416 | Engagement RAG Status 2026 | 1 | 17 | 0 | 4 | `e92d15a9` |
+| 267 | Business Summary | 488 | 17 | 8 | 8 | `d0c00001` |
+| 255 | Web Performance and Marketing Attribution | 18 | 28 (27 built, 1 deferred) | 4 | 3 | `d0c00002` |
+| 416 | Engagement RAG Status 2026 | 1 | 17 | 0 | 4 | `d0c00003` |
 
 Why only three? The estate is a good deal larger: the audit in turn 1 counted 196 dashboards, 148 Looks, 1,636 tiles, 190 views and 39 explores, and of those 3 of the 196 dashboards carry 80 percent of the runs in the last 90 days while 159 have not been opened in that window. It follows, therefore, that the scope is three dashboards and not the estate.
 
@@ -35,11 +39,11 @@ Why only three? The estate is a good deal larger: the audit in turn 1 counted 19
 
 Before the first directive there are six things to do, each done once, and steps 4 and 5 need admin access to Looker and Omni.
 
-**1. An engagement repo.** Clone an empty repo (ours is `ra-omni-migration-delivery`) and open Claude Code in it, because Wire writes its record under `.wire/` here. Do not clone the LookML or Omni repos by hand, since Wire snapshots both itself in turn 1; what you do need to check is that your git credentials can reach them:
+**1. An engagement repo.** Clone an empty repo (ours is `example-migration-delivery`) and open Claude Code in it, because Wire writes its record under `.wire/` here. Do not clone the LookML or Omni repos by hand, since Wire snapshots both itself in turn 1; what you do need to check is that your git credentials can reach them:
 
 ```bash
-git ls-remote https://github.com/rittmananalytics/ra_data_warehouse_lookml
-git ls-remote https://github.com/rittmananalytics/ra-data-warehouse-omni-target
+git ls-remote https://github.com/example/lookml-project
+git ls-remote https://github.com/example/omni-model
 ```
 
 Each command should print lines of commit hashes and branch names.
@@ -65,7 +69,7 @@ Each command should print lines of commit hashes and branch names.
 **4. Looker API credentials.** Create an API key in Looker under Admin, Users. The user needs to read content and, for the usage figures, to query System Activity. Export three variables in the shell you start Claude Code from:
 
 ```bash
-export LOOKERSDK_BASE_URL="https://rittman.eu.looker.com"
+export LOOKERSDK_BASE_URL="https://looker.example.com"
 export LOOKERSDK_CLIENT_ID="<client id>"
 export LOOKERSDK_CLIENT_SECRET="<client secret>"
 ```
@@ -168,18 +172,18 @@ Open Claude Code in the engagement repo; no slash command is needed to begin. Tu
 I want to migrate part of our Looker estate to Omni. Set up the engagement and drive it;
 I am the release director, park anything that needs a ruling.
 
-Source: the Looker instance at https://rittman.eu.looker.com, LookML in
-https://github.com/rittmananalytics/ra_data_warehouse_lookml, model analytics.model.lkml.
+Source: the Looker instance at https://looker.example.com, LookML in
+https://github.com/example/lookml-project, model analytics.model.lkml.
 
-Target: the Omni instance at https://rittmananalytics.omniapp.co, model id <MODEL_ID>.
+Target: the Omni instance at https://example.omniapp.co, model id <MODEL_ID>.
 The git-connected Omni model repo is
-https://github.com/rittmananalytics/ra-data-warehouse-omni-target.
+https://github.com/example/omni-model.
 
 Scope ruling: migrate only what these three dashboards need, including the dashboards
 themselves:
-- Business Summary, https://rittman.eu.looker.com/dashboards/267
-- Engagement RAG Status 2026, https://rittman.eu.looker.com/dashboards/416
-- Web Performance and Marketing Attribution, https://rittman.eu.looker.com/dashboards/255
+- Business Summary, https://looker.example.com/dashboards/267
+- Engagement RAG Status 2026, https://looker.example.com/dashboards/416
+- Web Performance and Marketing Attribution, https://looker.example.com/dashboards/255
 That means every explore, view and other LookML object they reference from the analytics
 model, plus the views those explores join. Everything else in the Looker estate is the
 drop list, no exceptions. Tier 1 is these three dashboards; parity scope is all their
@@ -197,7 +201,7 @@ What ran, from the execution log:
 |---|---|---|
 | `/wire:new` | Engagement and release `01-looker-to-omni` created | 2m 06s |
 | `/wire:migration-source-register`, twice | LookML repo and Omni model repo registered as sources | |
-| `/wire:migration-source-refresh`, twice | Both repos cloned into the release's snapshot folder (165 LookML files at commit `82b3ab5`; 1,000 Omni YAML files) | 39s |
+| `/wire:migration-source-refresh`, twice | Both repos cloned into the release's snapshot folder (165 LookML files at commit `1a2b3c4`; 1,000 Omni YAML files) | 39s |
 | `/wire:looker-audit-generate` | Audit report, two catalogues, dependency graph | 27m 24s |
 | `/wire:looker-audit-validate` | 8 of 8 checks passed | 1m 52s |
 | `/wire:bi-migration-plan-generate` | Plan, batches, register with 156 rows, baseline `b001` | 4m 40s |
@@ -237,7 +241,7 @@ The turn ended with 12 decisions waiting:
 
 | Id | Question, shortened | Ruled by |
 |---|---|---|
-| PD-1 | Confirm the Omni model is `67716e96`, the one git-connected to the target repo. The id in the directive was in API-key format and matched nothing. | R-6 |
+| PD-1 | Confirm the Omni model is `9f1e2d3c`, the one git-connected to the target repo. The id in the directive was in API-key format and matched nothing. | R-6 |
 | PD-2 | Approve the Looker audit | R-23 |
 | PD-3 | Permission map: carry the All Users group and one access grant, nothing else? | R-10, later R-40 |
 | PD-4 | 11 views pick their BigQuery dataset with a user attribute. Bind them to one schema and drop per-user switching? | R-16 |
@@ -256,7 +260,7 @@ Nothing was written to Looker or Omni, and nothing was committed to git.
 
 ```
 Rulings:
-- Omni model (PD-1): 67716e96-520d-402a-88ad-89f97f9bc2a0, the shared model 'ra_data_warehouse 2'.
+- Omni model (PD-1): 9f1e2d3c-4b5a-4c6d-8e7f-0a1b2c3d4e5f, the shared model 'analytics_model 2'.
 - Drop list: confirmed, drop everything not needed by the three dashboards.
 - PDTs: rebuild as Omni query views unless the plan proposes a dbt model; park any you are unsure about.
 - View naming: keep LookML view names (the converter default).
@@ -269,9 +273,9 @@ Rulings R-6 to R-12 went into `decisions.md`, and the approval ran `/wire:bi-mig
 
 | Action | What happened |
 |---|---|
-| Verify the connection | The Omni model's connection reads `ra-development.analytics`, the same as Looker's. |
-| Create a model branch | `wire-01-looker-to-omni`, id `13dc8819`. Every model write in the release went here. |
-| Refresh the schema | 3 in-scope datasets soft-refreshed (job `5b7f1237`). |
+| Verify the connection | The Omni model's connection reads `example-project.analytics`, the same as Looker's. |
+| Create a model branch | `wire-01-looker-to-omni`, id `a1b2c3d4`. Every model write in the release went here. |
+| Refresh the schema | 3 in-scope datasets soft-refreshed (job `c3d4e5f6`). |
 | Create groups and user attributes | None created. All Users maps to the organisation default; the Omni CLI cannot create user attributes. |
 | Derive a dashboard theme | `migration/omni_dashboard_theme.json`, applied to every document built later. |
 
@@ -313,7 +317,7 @@ Three things happened in this turn that the plan had not predicted, and we take 
 
 Each batch was validated the same way before it was reported: `omni models validate` on the branch with 0 blocking issues, every mechanical or assisted field in the audit catalogue present in the emitted YAML, one smoke query per topic through the Omni CLI, the register rows moved to `migrated` and a manifest per batch with the hash of every file written.
 
-The model review (R-42, 07:54 on 7 September) approved 42 query views, 15 topics and 34 relationships on branch `13dc8819`, with 31 views removed under the trim and 0 open items. Two data-model defects went to the dbt owners: `meeting_contact_lines_fact.meeting_contact_line_pk` and `delivery_projects_dim.delivery_project_pk` are not unique.
+The model review (R-42, 07:54 on 7 September) approved 42 query views, 15 topics and 34 relationships on branch `a1b2c3d4`, with 31 views removed under the trim and 0 open items. Two data-model defects went to the dbt owners: `meeting_contact_lines_fact.meeting_contact_line_pk` and `delivery_projects_dim.delivery_project_pk` are not unique.
 
 ### Turn 4: content (7 September, 08:27 to 11:01)
 
@@ -346,9 +350,9 @@ The director's next message was not a ruling but a question: "when will I be abl
 
 ### An unplanned finding: two Omni models (7 September, 11:00 to 14:19)
 
-A teammate had run a separate Looker-to-Omni migration in June 2026 on a different model, `ra_data_warehouse` (`f66e38ec`), model-led rather than dashboard-led, with no dashboards. The director asked for a comparison of the two approaches, written up as a document in the engagement repo. Five topics existed in both models under the same name with different joins, so users who can see both would get two answers.
+A teammate had run a separate Looker-to-Omni migration in June 2026 on a different model, `analytics_model` (`2b3c4d5e`), model-led rather than dashboard-led, with no dashboards. The director asked for a comparison of the two approaches, written up as a document in the engagement repo. Five topics existed in both models under the same name with different joins, so users who can see both would get two answers.
 
-The first ruling made the June model the model of record and asked for a plan to move the Wire additions into it (R-47), then a design to converge the two models' views (R-48), and both plans were written and shown. On the director's question "Why do you need to change the ra_data_warehouse model when we're working with ra_data_warehouse 2?", it was clear the first answer had been a mis-click between two similar names. R-49 withdrew R-47 and R-48, confirmed `ra_data_warehouse 2` as the model of record, kept both plans as record and parked the overlap as PD-16 for a ruling before cutover. Nothing had been written to the June model.
+The first ruling made the June model the model of record and asked for a plan to move the Wire additions into it (R-47), then a design to converge the two models' views (R-48), and both plans were written and shown. On the director's question "Why do you need to change the analytics_model model when we're working with analytics_model 2?", it was clear the first answer had been a mis-click between two similar names. R-49 withdrew R-47 and R-48, confirmed `analytics_model 2` as the model of record, kept both plans as record and parked the overlap as PD-16 for a ruling before cutover. Nothing had been written to the June model.
 
 ### Turn 5: parity (7 September, 15:10 to 17:00)
 
@@ -451,11 +455,11 @@ Where did all of this end up? At the content review the release folder held:
 Two execution log rows from the run, showing the shape:
 
 ```
-| 2026-09-06 21:58 | /wire:new                   | created  | Release created (type: bi_migration, profile: looker_to_omni); PD-1 parked | Mark Rittman | orchestrator [7bb027f9] | 2m 06s  |
-| 2026-09-07 17:00 | /wire:bi-equivalency-validate | pass   | run 2: 61 tiles, 37 pass, 22 pass_qualified (rounding), 2 pass_declared_deviation (R-50, R-51), 0 fail | Mark Rittman | orchestrator [cd516d5f] | n/a |
+| 2026-09-06 21:58 | /wire:new                   | created  | Release created (type: bi_migration, profile: looker_to_omni); PD-1 parked | Jane Smith | orchestrator [0a1b2c3d] | 2m 06s  |
+| 2026-09-07 17:00 | /wire:bi-equivalency-validate | pass   | run 2: 61 tiles, 37 pass, 22 pass_qualified (rounding), 2 pass_declared_deviation (R-50, R-51), 0 fail | Jane Smith | orchestrator [4e5f6a7b] | n/a |
 ```
 
-The session column says who ran it: `orchestrator [id]` for work the session ran, `typed` for a command you typed yourself. Two session ids appear: `7bb027f9`, the harness session of turns 1 and 2, and `cd516d5f`, the interactive session from turn 3.
+The session column says who ran it: `orchestrator [id]` for work the session ran, `typed` for a command you typed yourself. Two session ids appear: `0a1b2c3d`, the harness session of turns 1 and 2, and `4e5f6a7b`, the interactive session from turn 3.
 
 ## Where a person decided
 

@@ -68,7 +68,7 @@ You can also read the installed copies locally at:
 
 ### How a command fits into a release type
 
-Wire commands are not standalone tools; instead, each one is a step in a release type's prescribed sequence. The `dbt_development` release type, for example, positions `dbt-generate` as the third artifact in a chain that begins with requirements and ends with a deployed semantic layer, and the command knows which upstream artifacts it needs (the data model) and which downstream step follows (validate).
+Wire commands are not standalone tools; instead, each one is a step in a release type's prescribed sequence. The `dbt_development` release type, for example, positions `dbt-generate` as the third artifact in a chain that begins with requirements and ends with the data quality tests, and the command knows which upstream artifacts it needs (the data model) and which downstream step follows (validate).
 
 ```mermaid
 flowchart TD
@@ -350,7 +350,7 @@ Validate is not a substitute for running dbt: it catches naming violations, docu
 
 ### Prerequisites check
 
-Step 1 reads `status.md` and checks `dbt.validate == pass`. If validation has not passed, it warns you and asks whether to proceed; it does not hard-block, because there are valid reasons to review with outstanding warnings, but it makes the state visible.
+Step 1 reads `status.md` and checks `dbt.validate == pass`, which since 4.0.0 is enforced by the precondition gate: if validation has not passed the review blocks, and the only way past is an override recorded with your name and a reason, so that reviewing with an outstanding failure is a visible decision rather than a quiet one.
 
 ### External context retrieval
 

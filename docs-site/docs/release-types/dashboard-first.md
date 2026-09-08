@@ -7,7 +7,7 @@ title: Dashboard-First
 
 Two things can hold up a dashboard project before any data work begins: stakeholders who have not yet seen what they are getting, and client data access that has not yet been granted. Use this release type when you want early stakeholder feedback through interactive dashboard mocks before the data layer is built. It is especially effective when the SOW is well defined but client data access may be delayed, because you can have a working prototype on seed data before the client provides database credentials.
 
-**In-scope artifacts**: `requirements`, `mockups`, `viz_catalog`, `data_model`, `seed_data`, `dbt`, `semantic_layer`, `dashboards`, `data_refactor`, `data_quality`, `uat`, `deployment`, `training`, `documentation`
+**In-scope artifacts**: `requirements`, `conceptual_model`, `mockups`, `viz_catalog`, `data_model`, `seed_data`, `dbt`, `semantic_layer`, `dashboards`, `data_refactor`, `data_quality`, `uat`, `deployment`, `training`, `documentation`
 
 The release runs through four groups of artifacts, design, prototype, build and deploy, with the mockup driving everything downstream of it:
 

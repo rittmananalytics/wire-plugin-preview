@@ -17,7 +17,7 @@ This is the same command that `.github/workflows/spec-lint.yml` runs on every pu
 
 ## Why Wire has a test suite at all
 
-Why test a set of Markdown files? Wire's specs are markdown files that an LLM reads and follows, and there is no compiler to catch a broken cross-reference, a contradictory naming rule or a missing command registration. Left unchecked, specs "drift": two files state a naming convention differently, a template is missing a field a command tries to write, a command is documented but never registered so that `/wire:foo-generate` does not actually install. The test suite exists to catch exactly that class of bug, through structural corpus-wide checks (Tier 0) together with real, runnable Python that re-implements a spec's own decision logic and checks it against fixtures (Tier 1), rather than relying on manual review to notice when 263 command specs drift out of sync with each other.
+Why test a set of Markdown files? Wire's specs are markdown files that an LLM reads and follows, and there is no compiler to catch a broken cross-reference, a contradictory naming rule or a missing command registration. Left unchecked, specs "drift": two files state a naming convention differently, a template is missing a field a command tries to write, a command is documented but never registered so that `/wire:foo-generate` does not actually install. The test suite exists to catch exactly that class of bug, through structural corpus-wide checks (Tier 0) together with real, runnable Python that re-implements a spec's own decision logic and checks it against fixtures (Tier 1), rather than relying on manual review to notice when 333 command specs drift out of sync with each other.
 
 ## The four tiers
 

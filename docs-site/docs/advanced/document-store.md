@@ -23,7 +23,7 @@ Would you like to replicate artifacts to a document store for client review?
 You can also configure it after setup, using:
 
 ```
-/wire:utils-docstore-config <release-folder>
+/wire:utils-docstore-setup <release-folder>
 ```
 
 ### Confluence

@@ -40,7 +40,7 @@ Since the cause is missing inputs, the fix is to establish which input is missin
 
 ## dbt validation failures
 
-**Symptom**: `/wire:dbt-models-validate` reports failures but the SQL looks correct.
+**Symptom**: `/wire:dbt-validate` reports failures but the SQL looks correct.
 
 When the SQL itself looks right, the cause is usually one of the four listed below, all of which are about what dbt can find rather than what you wrote, and so the first step is to get the exact error from dbt itself.
 

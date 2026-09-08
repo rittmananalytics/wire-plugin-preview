@@ -64,6 +64,22 @@ applicable_when:
   - "Scope is limited to getting data reliably into the warehouse"
 
 phases:
+  # Optional. Discover, define and agree what the numbers mean before design
+  # bakes a definition in. Warning-level: the gate on the artifact below asks and
+  # records a skip reason rather than blocking, because a hard gate on a team that
+  # skips gates produces a skipped gate.
+  - id: business_rules
+    name: "Business Rules Discovery"
+    description: "Extract and agree the business rules for the domain in scope, from legacy systems and from the people who own the definitions"
+    required: false
+    requires_phase: null
+    artifacts:
+      - id: business_rules
+        command: business-rules
+        required: false
+        sequence: 1
+        depends_on: []
+
   - id: requirements
     name: "Requirements"
     description: "Capture and sign off the requirements specification from the SoW and stakeholder input"
@@ -75,6 +91,18 @@ phases:
         required: true
         sequence: 1
         depends_on: []
+      # Optional. Runs when requirements carry [NEEDS CLARIFICATION] markers or a
+      # design choice needs a stakeholder decision. It was in 3.11.9's
+      # full_platform sequence and fell out of every release type when the
+      # sequences became YAML (wire#248), so no release type could produce it.
+      - id: workshops
+        command: workshops
+        required: false
+        sequence: 2
+        depends_on:
+          - artifact: requirements
+            action: review
+            outcome: approved
 
   - id: design
     name: "Design"
@@ -90,6 +118,10 @@ phases:
           - artifact: requirements
             action: review
             outcome: approved
+          - artifact: business_rules
+            action: review
+            outcome: approved
+            enforcement: advisory
 
   - id: development
     name: "Development"

@@ -84,49 +84,6 @@ Archived releases remain in `.wire/releases/` and are shown in `/wire:status` wi
 
 ---
 
-## `/wire:status-report`
-
-Generates a formatted status report for sharing with the client or internally, so that you are not assembling one by hand from `/wire:status` output.
-
-```
-/wire:status-report <release-folder>
-/wire:status-report <release-folder> --format pdf
-/wire:status-report <release-folder> --format confluence
-```
-
-Formats:
-- **markdown** (default): writes to `.wire/releases/<release>/status_report_YYYYMMDD.md`
-- **pdf**: renders to PDF via headless Chrome (requires Playwright installed)
-- **confluence**: publishes to the configured Confluence space (requires Atlassian MCP)
-
-The report includes:
-- Engagement summary and current phase
-- Artifact status table (phase, artifact, state, last updated)
-- Open items (validation failures, pending reviews, stakeholder actions)
-- Recent decisions log (last ten entries from the execution log)
-- Next steps
-
----
-
-## `/wire:execution-log`
-
-Views or searches the execution log for a release, which is useful when you want the history of one kind of event rather than the whole file.
-
-```
-/wire:execution-log <release-folder>
-/wire:execution-log <release-folder> --filter decisions
-/wire:execution-log <release-folder> --filter failures
-/wire:execution-log <release-folder> --since 2024-01-15
-```
-
-Filters:
-- `decisions`: show only review decisions and stakeholder feedback
-- `failures`: show only validation failures and their resolutions
-- `approvals`: show only approved artifacts with their approvers
-- `all` (default): show everything
-
----
-
 ## `/wire:utils-linear-create`
 
 Creates the Linear project hierarchy for an engagement.
@@ -158,12 +115,12 @@ It is useful for scoping an engagement before running `/wire:new`, as well as fo
 
 ---
 
-## `/wire:utils-docstore-config`
+## `/wire:utils-docstore-setup`
 
 Configures or reconfigures the document store integration for a release.
 
 ```
-/wire:utils-docstore-config <release-folder>
+/wire:utils-docstore-setup <release-folder>
 ```
 
 This is the same configuration step that is offered during `/wire:new` Step 9.5, made available separately for releases that were set up without a document store.

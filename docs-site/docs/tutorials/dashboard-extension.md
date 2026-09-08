@@ -340,4 +340,4 @@ Finally, the deployment runbook sets out the promotion to the Looker production 
 | Dashboard definitions | 3 | LookML format, 4–6 tiles each |
 | Deployment runbook | 1 | Production branch promotion + share settings |
 
-No dbt models were written and no Fivetran connectors were created or modified: the entire scope was LookML, 84 new fields across three explores, three dashboards and a deployment runbook, with all field naming consistent with the existing Looker project conventions detected at the start of the `semantic_layer-generate` step. Once the pull request merges, the one check left is the last step of the runbook, confirming dashboard load times in production.
+No dbt models were written and no Fivetran connectors were created or modified: the entire scope was LookML, 78 new fields across three explores, three dashboards and a deployment runbook, with all field naming consistent with the existing Looker project conventions detected at the start of the `semantic_layer-generate` step. Once the pull request merges, the one check left is the last step of the runbook, confirming dashboard load times in production.

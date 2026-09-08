@@ -64,7 +64,7 @@ A worked example of a dbt Development engagement, using a fictional client scena
 
 
 **Tips for dbt-only releases**:
-- Add any existing dbt project files (existing `schema.yml`, source definitions, SQL examples) to `requirements/` before running `data_model:generate`, so that the AI can use them to understand the existing model structure and extend it correctly
+- Add any existing dbt project files (existing `schema.yml`, source definitions, SQL examples) to `requirements/` before running `data_model-generate`, so that the AI can use them to understand the existing model structure and extend it correctly
 - Store SQL examples from the source database (schema introspection results, sample queries) so that the AI understands the actual column names and types
 
 > **Tip**: Run `/wire:playbook-generate <release-folder>` after requirements are approved.

@@ -108,7 +108,7 @@ Once the requirements are approved, the design phase turns them into a technical
 | `conceptual_model` | `generate` `validate` `review` | Entity-relationship diagram, domain definitions and grain decisions |
 | `pipeline_design` | `generate` `validate` `review` | Source-system selection, ingestion tool choice (Fivetran/Airbyte/dlt/custom), connector config |
 | `data_model` | `generate` `validate` `review` | Full dbt project structure design: staging schemas, integration layer, marts, naming conventions |
-| `mockups` | `generate` `validate` `review` | Interactive HTML dashboard mockups with sample data |
+| `mockups` | `generate` `review` | Interactive HTML dashboard mockups with sample data |
 | `viz_catalog` | `generate` | Catalogue of charts and visualisations referenced in mockups |
 
 ```
@@ -171,7 +171,7 @@ Finally, before anything reaches its users, the testing and deployment artifacts
 
 | Artifact | Commands | What it produces |
 |---|---|---|
-| `uat` | `generate` `validate` `review` | UAT test plan: test cases per domain with expected results and source system cross-references |
+| `uat` | `generate` `review` | UAT test plan: test cases per domain with expected results and source system cross-references |
 | `deployment` | `generate` `validate` `review` | Step-by-step deployment runbook with rollback procedures for each step |
 | `documentation` | `generate` `validate` `review` | Technical documentation: data dictionary, model reference, source system notes |
 | `training` | `generate` `validate` `review` | User training materials for data team, analyst and stakeholder personas |
