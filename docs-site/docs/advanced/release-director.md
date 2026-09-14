@@ -307,8 +307,10 @@ Attribution keeps the record honest about who ran what. A second rule keeps the
 conversation honest about it, because a consultant who directs Wire meets the
 command names nowhere else. Operating rule 7 (#265): a reply that starts work
 ends with `Running: <command>`, every report ends with `Ran: <command>[, ...]`,
-and a step a gate stopped is named too (`Not run: dbt-generate, gate:
-data_model review`). A plan, whether from `/wire:session-plan` or `/wire:work`,
+and a step a gate stopped is named too (`Not run: /wire:dbt-generate
+01-dbt-foundation, gate: data_model review`). Each command is given in full,
+as it would be typed: prefix, release folder and flags, so that copying the
+line into the prompt would run the step again. A plan, whether from `/wire:session-plan` or `/wire:work`,
 names a command or skill for every step. The line is not the record, the
 execution log is; it is the part of the record the person is looking at, and it
 is how someone who has never typed a Wire command learns what the thing they

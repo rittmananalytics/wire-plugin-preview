@@ -177,9 +177,9 @@ Based on release state, research, and the stated objective, propose a focused pl
 
 | # | Step | Type | Command or skill | Scope | Produces |
 |---|------|------|------------------|-------|----------|
-| 1 | [what, in method terms] | command | /wire:<command> | [objects this step may touch] | [file, report, PR, decision] |
+| 1 | [what, in method terms] | command | /wire:<command> <release-folder> [flags] — the command in full, as it would be typed | [objects this step may touch] | [file, report, PR, decision] |
 | 2 | [what] | skill | <skill-identifier> — no command covers this because [reason] | [scope] | [output] |
-| 3 | [validation or review step] | command | /wire:<artifact>-validate | [scope] | PASS/FAIL report |
+| 3 | [validation or review step] | command | /wire:<artifact>-validate <release-folder> | [scope] | PASS/FAIL report |
 | 4 | [approval or hand-off] | human | external | decision | [who] | [what they decide] |
 
 **Left out, and why**: [steps of the method this plan does not include, with the reason]

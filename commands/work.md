@@ -243,12 +243,12 @@ Typical plan for a metric-and-tile ticket, so the shape is clear:
 ```
 | # | Step | Type | Command or skill | Scope | Produces |
 |---|---|---|---|---|---|
-| 1 | Agree the definition | command | /wire:business-rules-generate --domain returns | 1 new rule, cites BR-9 | BR-15 (proposed, owner: ops director) |
-| 2 | Change the sales fact | command | /wire:dbt-warehouse-generate | wh_sales__orders_fact only | 2 measures, schema.yml, meta.wire_business_rule: BR-15 |
-| 3 | Build and test | command | /wire:dbt-validate | state:modified+ | PASS/FAIL report |
-| 4 | Add the measure | command | /wire:semantic_layer-generate | sales explore only | LookML measure returns_rate |
-| 5 | Add the tile | command | /wire:dashboards-generate | Sales Overview, 1 tile | dashboard LookML |
-| 6 | Publish | command | /wire:utils-pr-create | this branch | PR on the client template with evidence |
+| 1 | Agree the definition | command | /wire:business-rules-generate 01-store-performance --domain returns | 1 new rule, cites BR-9 | BR-15 (proposed, owner: ops director) |
+| 2 | Change the sales fact | command | /wire:dbt-warehouse-generate 01-store-performance | wh_sales__orders_fact only | 2 measures, schema.yml, meta.wire_business_rule: BR-15 |
+| 3 | Build and test | command | /wire:dbt-validate 01-store-performance | state:modified+ | PASS/FAIL report |
+| 4 | Add the measure | command | /wire:semantic_layer-generate 01-store-performance | sales explore only | LookML measure returns_rate |
+| 5 | Add the tile | command | /wire:dashboards-generate 01-store-performance | Sales Overview, 1 tile | dashboard LookML |
+| 6 | Publish | command | /wire:utils-pr-create 01-store-performance | this branch | PR on the client template with evidence |
 | 7 | Code review | external | client analytics engineer | PR | technical acceptance |
 | 8 | Confirm the definition | decision | ops director | BR-15 | BR-15 agreed |
 ```
@@ -365,7 +365,7 @@ One row per iteration, updated in place (this table is a summary, not a log; the
 
 ## Output
 
-End every run with a plain-language report: the iteration id and state, the steps run and their results, decisions made, the PR and its state, the two acceptances and who each waits on, patches applied or deferred, and what happens next. Name the commands that ran, so the consultant can answer "which command did that?" without looking.
+End every run with a plain-language report: the iteration id and state, the steps run and their results, decisions made, the PR and its state, the two acceptances and who each waits on, patches applied or deferred, and what happens next. Name the commands that ran, in full and as they would be typed (`/wire:` prefix, release folder, flags), so the consultant can answer "which command did that?" without looking and could re-run any step by copying the line (operating model rule 7).
 
 ## Gemini CLI
 
