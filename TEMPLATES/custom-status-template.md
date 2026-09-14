@@ -117,6 +117,13 @@ ls .wire/releases/{{RELEASE_FOLDER}}/custom-commands/
 
 **Legend**: ✅ Complete | 🔄 In Progress | ❌ Failed | ⏸️ Not Started | ⚠️ Blocked
 
+## Iterations
+
+Ticket-sized work done inside this release through `/wire:work` (`specs/work.md`). One row per iteration, updated in place; the detail is in `iterations/<ticket>.md`.
+
+| Ticket | Title | Branch | PR | State | Opened | Closed |
+|--------|-------|--------|----|-------|--------|--------|
+
 ## Notes
 
 [Project-specific notes here]

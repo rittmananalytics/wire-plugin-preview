@@ -576,6 +576,13 @@ Then run:
 
 **Legend**: ✅ Complete | 🔄 In Progress | ❌ Failed | ⏸️ Not Started | ⚠️ Blocked | N/A (not applicable)
 
+## Iterations
+
+Ticket-sized work done inside this release through `/wire:work` (`specs/work.md`). One row per iteration, updated in place; the detail is in `iterations/<ticket>.md`.
+
+| Ticket | Title | Branch | PR | State | Opened | Closed |
+|--------|-------|--------|----|-------|--------|--------|
+
 ## Notes
 
 [Add project-specific notes here]

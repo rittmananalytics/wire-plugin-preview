@@ -168,31 +168,39 @@ What do you want to accomplish in this session?
 
 ### Step 5: Propose Session Plan
 
-Based on release state, research, and the stated objective, propose a focused plan:
+Based on release state, research, and the stated objective, propose a focused plan. **Every executable step names the Wire command that performs it**, or the skill when no command covers the step. A step that names neither is not a plan step; it is a description of an outcome, and it is how work ends up done by hand instead of through the command (wire#265).
 
 ```
 ## Proposed Session Plan
 
 **Objective**: [stated objective or derived from suggested next focus]
 
-**Steps**:
-1. [Specific action with file paths or Wire commands]
-2. [Next step]
-3. [Validation or review step]
+| # | Step | Type | Command or skill | Scope | Produces |
+|---|------|------|------------------|-------|----------|
+| 1 | [what, in method terms] | command | /wire:<command> | [objects this step may touch] | [file, report, PR, decision] |
+| 2 | [what] | skill | <skill-identifier> — no command covers this because [reason] | [scope] | [output] |
+| 3 | [validation or review step] | command | /wire:<artifact>-validate | [scope] | PASS/FAIL report |
+| 4 | [approval or hand-off] | human | external | decision | [who] | [what they decide] |
+
+**Left out, and why**: [steps of the method this plan does not include, with the reason]
 
 **Blocked by** (if applicable): [What needs resolving first]
 
-Does this plan look right? (yes / adjust)
+Approve / Changes / Explain <step> / Cancel?
 ```
+
+Step types: `command` (a `/wire:` command), `skill` (a Wire skill, only where no command covers the work; say why), `human` (something the consultant does), `external` (a client action, e.g. PR review), `decision` (a ruling by a named owner), `investigation` (read-only; nothing written).
+
+On **Explain**, give the consequence of skipping that step in this release's own terms, not a general principle.
 
 ### Step 6: Wait for Approval
 
-- **Yes**: exit Plan Mode and execute Step 1 of the plan
-- **Adjust**: incorporate feedback and re-present
-- **Different objective**: regenerate the plan
+- **Approve**: exit Plan Mode and execute step 1 of the plan. **The approved commands are what runs.** Do not do by hand what a named command does. If a step's result changes what should happen next, stop, propose the amendment and wait; never add a step, widen a scope or substitute a command silently. A step that ran differently from the plan is recorded in the execution log's Detail as `deviation: <what differed>` (see `specs/utils/execution_log.md`), so `/wire:status-sync` can report it.
+- **Changes**: incorporate feedback and re-present
+- **Cancel** or a different objective: regenerate the plan, or stop
 
 ## Output
 
-No files are created or modified during planning. After approval, executes the approved steps.
+No files are created or modified during planning. After approval, executes the approved steps by running the commands the plan names. When invoked from `/wire:work`, the approved plan is also written to the iteration file (see `specs/work.md`).
 
 Execute the complete workflow as specified above.
