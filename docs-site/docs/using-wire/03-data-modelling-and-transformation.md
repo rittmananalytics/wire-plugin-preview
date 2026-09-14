@@ -35,9 +35,9 @@ You start the engagement as you did in Chapter 2, but this time you ask for the 
 | You say | Wire replies |
 |---|---|
 | "New engagement for Vantage Financial Reporting, dbt project on Snowflake. Statement of work in the docs folder, schema exports for the three raw schemas in the same place. Up to four pieces of work at a time. Stop at every decision. Start with the business rules for revenue, because finance and sales disagree on MRR." | "This reads as a dbt development release: ingestion is in place and the scope is the transformation layer only. Client: Vantage Financial Reporting. Release: dbt Foundation. Limits: four pieces of work at a time, stop at every decision. Which email domain do the client's people use?" |
-| "vantagefr.com. Confirm." | "Engagement set up. Starting the business rules step for the revenue domain. I read the raw schemas, the statement of work and the finance team's definitions spreadsheet in the docs folder." |
-| *(later)* | "Business rules register for revenue: nine rules. Six are agreed, with one definition each. Two are disputed. Monthly recurring revenue has three competing definitions: the Stripe subscription amount, Salesforce annual value divided by twelve, and the finance spreadsheet's figure, which excludes discounts. Customer status has two. For each disputed rule I have written a query that shows how far the definitions differ on last month's data, and run it: the MRR definitions differ by 4.2 percent. One rule, the treatment of refunds in MRR, has no definition anywhere. It is recorded as unknown rather than left out. Approve the register now, changes or park for the finance team?" |
-| "Park it for the finance lead. She's on the call tomorrow. Draft the requirements meanwhile." | "Parked, waiting on the finance lead. Drafting the requirements." |
+| "vantagefr.com. Confirm." | "Engagement set up. Starting the business rules step for the revenue domain. I read the raw schemas, the statement of work and the finance team's definitions spreadsheet in the docs folder.<br/><br/>Ran: new. Running: business-rules-generate --domain revenue" |
+| *(later)* | "Business rules register for revenue: nine rules. Six are agreed, with one definition each. Two are disputed. Monthly recurring revenue has three competing definitions: the Stripe subscription amount, Salesforce annual value divided by twelve, and the finance spreadsheet's figure, which excludes discounts. Customer status has two. For each disputed rule I have written a query that shows how far the definitions differ on last month's data, and run it: the MRR definitions differ by 4.2 percent. One rule, the treatment of refunds in MRR, has no definition anywhere. It is recorded as unknown rather than left out. Approve the register now, changes or park for the finance team?<br/><br/>Ran: business-rules-generate, business-rules-validate" |
+| "Park it for the finance lead. She's on the call tomorrow. Draft the requirements meanwhile." | "Parked, waiting on the finance lead. Drafting the requirements.<br/><br/>Ran: business-rules-review (parked). Running: requirements-generate" |
 
 The register is where the argument gets settled once. Every rule in it has its source, every disputed rule has a query that shows the size of the disagreement in real numbers rather than in opinions, and the rule that nobody has ever defined is on the record as unknown, because a rule nobody has decided is far more useful written down than silently missing. Furthermore, once the register is approved, the models that implement each rule cite it, so that the definition and the code that carries it can never quietly drift apart.
 
@@ -45,8 +45,8 @@ The register is where the argument gets settled once. Every rule in it has its s
 
 | You say | Wire replies |
 |---|---|
-| *(later)* | "Requirements drafted: 11 requirements, all checks pass. One clarification: whether the MRR fact needs movement between months, or only the month-end position. Approve now, changes or park?" |
-| "Approve. The finance lead can answer the MRR question tomorrow too." | "Approved. The clarification is recorded as an open item for tomorrow. The next step, the data model, is released by the requirements approval, but its business rules gate is still open: the register is parked. That gate is advisory, so I can proceed with a reason, or wait. Which?" |
+| *(later)* | "Requirements drafted: 11 requirements, all checks pass. One clarification: whether the MRR fact needs movement between months, or only the month-end position. Approve now, changes or park?<br/><br/>Ran: requirements-generate, requirements-validate" |
+| "Approve. The finance lead can answer the MRR question tomorrow too." | "Approved. The clarification is recorded as an open item for tomorrow. The next step, the data model, is released by the requirements approval, but its business rules gate is still open: the register is parked. That gate is advisory, so I can proceed with a reason, or wait. Which?<br/><br/>Ran: requirements-review. Not run: data_model-generate, gate: business rules (advisory)" |
 | "Wait." | "Waiting. Nothing else can start, so I will stop here. Two decisions are open for tomorrow." |
 
 Notice the distinction Wire draws in that second reply. The requirements approval is a hard condition for the data model, and it is met. The business rules gate is an "advisory" one, which means Wire will warn you and let you proceed with a recorded reason rather than refusing outright, since a hard gate on a step that teams routinely skip tends to produce a skipped gate rather than a followed one. You chose to wait, and that choice is on the record too.
@@ -57,13 +57,13 @@ The finance lead rules on the next day's call: MRR is the Stripe subscription am
 
 | You say | Wire replies |
 |---|---|
-| *(open a session)* | "Two decisions are waiting: the business rules register, parked for the finance lead, and the MRR grain question." |
-| "Finance lead has ruled. MRR is Stripe subscription amount less discounts. Refunds excluded. Month-end snapshot per customer, no intra-month movement. Approve the register with those answers." | "Register updated: MRR resolved to the Stripe definition less discounts, approved under the finance lead's name; refunds rule resolved from unknown to agreed; customer status resolved to the Salesforce definition. Register approved. The MRR grain is recorded as a decision. Drafting the data model now." |
-| *(later)* | "Data model drafted, all checks pass. Six staging models (Stripe charges, customers and refunds; Salesforce accounts and opportunities; product users), one integration model that resolves a customer across the three systems by matching email addresses with a fallback key for the unmatched, and four warehouse models (customer, opportunity, charge, monthly MRR snapshot). The MRR snapshot uses customer and month as its key, as ruled. Each disputed rule from the register is cited on the column that implements it. Approve now, changes or park?" |
-| "Start the dbt models." | "Not yet. The dbt models wait on the data model being approved, and it is not. It is drafted and checked. Approve now, changes or park?" |
-| "Changes: the analytics lead wants a net MRR movement column on the snapshot, for churn analysis." | "Change recorded. Redrafting the data model with a net MRR movement column on the snapshot, calculated from the previous month's row." |
-| *(later)* | "Redrafted, all checks pass. The new column is traced to the churn requirement. Approve now, changes or park?" |
-| "Approve." | "Approved under the analytics lead's name, with today's date. The dbt models are now released. Eleven models across three layers. I will build the staging layer in two pieces at the same time, then the integration model, then the warehouse layer, because each layer depends on the one before. That is within your limit of four." |
+| *(open a session)* | "Two decisions are waiting: the business rules register, parked for the finance lead, and the MRR grain question.<br/><br/>Ran: start" |
+| "Finance lead has ruled. MRR is Stripe subscription amount less discounts. Refunds excluded. Month-end snapshot per customer, no intra-month movement. Approve the register with those answers." | "Register updated: MRR resolved to the Stripe definition less discounts, approved under the finance lead's name; refunds rule resolved from unknown to agreed; customer status resolved to the Salesforce definition. Register approved. The MRR grain is recorded as a decision. Drafting the data model now.<br/><br/>Ran: business-rules-review. Running: data_model-generate" |
+| *(later)* | "Data model drafted, all checks pass. Six staging models (Stripe charges, customers and refunds; Salesforce accounts and opportunities; product users), one integration model that resolves a customer across the three systems by matching email addresses with a fallback key for the unmatched, and four warehouse models (customer, opportunity, charge, monthly MRR snapshot). The MRR snapshot uses customer and month as its key, as ruled. Each disputed rule from the register is cited on the column that implements it. Approve now, changes or park?<br/><br/>Ran: data_model-generate, data_model-validate" |
+| "Start the dbt models." | "Not yet. The dbt models wait on the data model being approved, and it is not. It is drafted and checked. Approve now, changes or park?<br/><br/>Not run: dbt-generate, gate: data_model review" |
+| "Changes: the analytics lead wants a net MRR movement column on the snapshot, for churn analysis." | "Change recorded. Redrafting the data model with a net MRR movement column on the snapshot, calculated from the previous month's row.<br/><br/>Ran: data_model-review (changes requested). Running: data_model-generate" |
+| *(later)* | "Redrafted, all checks pass. The new column is traced to the churn requirement. Approve now, changes or park?<br/><br/>Ran: data_model-generate, data_model-validate" |
+| "Approve." | "Approved under the analytics lead's name, with today's date. The dbt models are now released. Eleven models across three layers. I will build the staging layer in two pieces at the same time, then the integration model, then the warehouse layer, because each layer depends on the one before. That is within your limit of four.<br/><br/>Ran: data_model-review. Running: dbt-staging-generate (two lanes)" |
 
 The refusal is the point of that exchange. Wire will not start work whose approval is missing, and it tells you exactly which approval, so that you are never left guessing at what it is waiting for. You could have approved and started in one message; you chose to ask for changes instead, which is a perfectly normal answer at a gate rather than an exception, and the record now shows the first draft, your change and the redraft in order.
 
@@ -77,9 +77,9 @@ A dbt project is built in layers because each layer reads from the one below it:
 
 | You say | Wire replies |
 |---|---|
-| *(later)* | "Staging layer done: six models, documented, each with its tests. Starting the integration model." |
-| *(later)* | "Integration model done. Customer resolution matches 91 percent of Stripe customers to a Salesforce account by email; the rest carry a fallback key and are flagged. Starting the warehouse layer." |
-| *(later)* | "Warehouse layer done. Eleven models in total, 38 tests written, every model and column documented. Two decisions I made are on the record for you: the MRR snapshot's key is built from customer and month, and soft-deleted rows from Stripe are excluded in staging. Now building the models in Snowflake and running the checks, because for dbt the checks run the tests for real against the warehouse." |
+| *(later)* | "Staging layer done: six models, documented, each with its tests. Starting the integration model.<br/><br/>Ran: dbt-staging-generate, dbt-staging-validate. Running: dbt-integration-generate" |
+| *(later)* | "Integration model done. Customer resolution matches 91 percent of Stripe customers to a Salesforce account by email; the rest carry a fallback key and are flagged. Starting the warehouse layer.<br/><br/>Ran: dbt-integration-generate, dbt-integration-validate. Running: dbt-warehouse-generate" |
+| *(later)* | "Warehouse layer done. Eleven models in total, 38 tests written, every model and column documented. Two decisions I made are on the record for you: the MRR snapshot's key is built from customer and month, and soft-deleted rows from Stripe are excluded in staging. Now building the models in Snowflake and running the checks, because for dbt the checks run the tests for real against the warehouse.<br/><br/>Ran: dbt-warehouse-generate, dbt-warehouse-validate. Running: dbt-validate" |
 
 Wire made two modelling decisions of its own during the build and told you what they were. Anything it decides goes on the record next to the decisions you made, so that nothing it chose is hidden in the code for a later developer to stumble over.
 
@@ -89,9 +89,9 @@ For most of what Wire produces, the checks are a matter of reading files: does t
 
 | You say | Wire replies |
 |---|---|
-| *(later)* | "Build complete. 11 models built, 38 of 38 tests pass, no warnings. Naming, structure, key and documentation checks all pass. From the recording of Tuesday's call: the analytics lead asked whether refunds appear as negative charges. They do, in the charge fact, and they are excluded from MRR as ruled. Approve the models now, changes or park?" |
-| "Approve." | "Approved. This kind of release can also produce a semantic layer. Your statement of work leaves it out. Skip it?" |
-| "Skip. Out of scope." | "Recorded as your decision. The data quality tests are released. Starting them." |
+| *(later)* | "Build complete. 11 models built, 38 of 38 tests pass, no warnings. Naming, structure, key and documentation checks all pass. From the recording of Tuesday's call: the analytics lead asked whether refunds appear as negative charges. They do, in the charge fact, and they are excluded from MRR as ruled. Approve the models now, changes or park?<br/><br/>Ran: dbt-validate" |
+| "Approve." | "Approved. This kind of release can also produce a semantic layer. Your statement of work leaves it out. Skip it?<br/><br/>Ran: dbt-review" |
+| "Skip. Out of scope." | "Recorded as your decision. The data quality tests are released. Starting them.<br/><br/>Running: data_quality-generate" |
 
 That reference to Tuesday's call is Wire reading the recording of the review meeting and bringing the relevant question to the review, so that you are reminded of it at the moment it matters rather than three weeks later.
 
@@ -103,10 +103,10 @@ The dbt checks need a working Snowflake connection and they use warehouse time, 
 
 | You say | Wire replies |
 |---|---|
-| *(later)* | "Data quality tests written and checked. Freshness: Stripe within six hours, Salesforce within 24, product database within six. A daily row count reconciliation between staged Stripe charges and the raw table, within one percent. Any failure alerts the client's data channel. All pass. Approve now, changes or park?" |
-| "Approve." | "Approved. Writing the deployment runbook." |
-| *(later)* | "Runbook written and checked. Two dbt Cloud jobs: a daily production run at 04:00 UTC that builds then tests, and a job that runs on every pull request and builds only what changed. Failure alerts go to the client's data channel. Approve now, changes or park?" |
-| "Approve, and hand over to the analytics lead." | "Approved. The release is complete: every step done, every approval named. Summary written for the handover." |
+| *(later)* | "Data quality tests written and checked. Freshness: Stripe within six hours, Salesforce within 24, product database within six. A daily row count reconciliation between staged Stripe charges and the raw table, within one percent. Any failure alerts the client's data channel. All pass. Approve now, changes or park?<br/><br/>Ran: data_quality-generate, data_quality-validate" |
+| "Approve." | "Approved. Writing the deployment runbook.<br/><br/>Ran: data_quality-review. Running: deployment-generate" |
+| *(later)* | "Runbook written and checked. Two dbt Cloud jobs: a daily production run at 04:00 UTC that builds then tests, and a job that runs on every pull request and builds only what changed. Failure alerts go to the client's data channel. Approve now, changes or park?<br/><br/>Ran: deployment-generate, deployment-validate" |
+| "Approve, and hand over to the analytics lead." | "Approved. The release is complete: every step done, every approval named. Summary written for the handover.<br/><br/>Ran: deployment-review, utils-session-summary" |
 
 ## What You Should Now Have
 

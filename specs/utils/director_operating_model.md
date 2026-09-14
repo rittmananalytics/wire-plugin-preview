@@ -88,6 +88,7 @@ convention is still binding; the difference is only who catches the violation.
 | 4 | Every lane writes **incremental state with a resume contract** (below) | Convention (lane brief template carries it) | Two hard outages resumed with near-zero loss only because every lane had incremental state |
 | 5 | Every lane's spend counts against the release **budget** | Mechanical: `specs/delegate.md`'s budget check plus the cost governance rules below | A single unguarded build day cost four figures |
 | 6 | **Single writer of `status.md` and `execution_log.md`: the orchestrating session.** Lanes write only their own artifact tree and their own state file | Convention (lane brief; orchestrator's consolidation check) | Concurrent writes corrupted rows; 46 commits in 24 hours across 4 people silently discarded 54 models of completed work |
+| 7 | **Name the command, before and after.** A reply that starts work ends with `Running: <command>[, <command>]`; every report ends with `Ran: <command>[, <command>]`; a step a gate stopped is named as well (`Not run: <command>, gate: <precondition>`). A plan names a command or skill for every step (`specs/session/plan.md`) | Convention (every orchestrator reply; the consolidation pass compares each `Ran:` line with the execution-log rows it wrote) | Consultants directing Wire could not say which command had done the work, could not learn the commands by using Wire, and could not answer a client who asked which command to use (wire#265). `specs/start.md` already keeps the command name in its output for this reason; this rule extends it to every reply |
 
 **Rule 6 is the change for linear release types.** Outside orchestrated mode,
 a delegated subagent updates `status.md` itself and that behaviour is
@@ -96,6 +97,17 @@ file; the orchestrator reads the state file and writes `status.md`. The
 orchestrator sets `WIRE_INVOKED_BY=lane` in the lane's environment, and the
 lane brief states the rule; a lane that finds itself with `WIRE_INVOKED_BY=lane`
 does not write `status.md` or `execution_log.md`.
+
+**Rule 7 is what makes direction teachable.** Direction drives typed-command
+counts down by design, so the only place a consultant meets the command names
+is in Wire's own replies. The form is one trailing line, command names without
+arguments (`Ran: requirements-generate, requirements-validate`), the `/wire:`
+prefix optional. `Running:` goes on the reply that starts the work, `Ran:` on
+the report that ends it, and a reply that both closes one step and starts the
+next carries both. Gates are named the same way: `Not run: dbt-generate, gate:
+data_model review`. The line is not the record (the execution log is); it is
+the part of the record the person is looking at. Hiding it is how a director
+model becomes a black box.
 
 ## Lane state and resume contract
 

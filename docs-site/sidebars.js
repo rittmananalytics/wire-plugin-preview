@@ -1,7 +1,9 @@
 // @ts-check
 
-// Two parts. Part 1 is read in order and uses plain language only: no Wire
-// command names, agent names or release-type identifiers until chapter 6.
+// Two parts. Part 1 is read in order and uses plain language only: no agent
+// names or release-type identifiers until chapter 6, and Wire command names
+// only where Wire itself says them (the Running:/Ran: line on each reply, and
+// the command beside each step of a plan), never in the prose.
 // Part 2 is the technical reference, kept at its existing paths so links from
 // the 3.x docs still resolve.
 

@@ -38,7 +38,7 @@ Let's now take a look at each of these in turn.
 | "Park for Laura. Draft the requirements." | "Parked, waiting on Laura Hennessy. Drafting the requirements from the statement of work and the recording of the discovery call." |
 | *(later)* | "Requirements drafted: seven functional requirements with acceptance criteria and four non-functional (data by 07:00 daily, row-level security by role, dashboards under three seconds, 99.5 percent pipeline uptime). Two decisions I made are on the record: sales modelled at product-per-day grain rather than order line, because order-line grain multiplies the ingestion volume twelve times for no reporting benefit; and wholesale identified by HubSpot deal stage, because the custom field is unreliable. All checks pass. Approve now, changes or park?<br/><br/>Ran: requirements-generate, requirements-validate" |
 
-That last line, "Ran:", is new to this guide but it has been on every report Wire made in Chapters 2 to 5, and Chapter 6 explained what it means: it names the commands that ran, and everything Wire does is a command. It follows, therefore, that you could have typed that one yourself,
+That last line, "Ran:", has ended every report Wire made since Chapter 1, and Chapter 6 explained what it means: it names the commands that ran, and everything Wire does is a command. It follows, therefore, that you could have typed that one yourself,
 
 ```
 /wire:requirements-generate 01-eversholt-analytics-platform

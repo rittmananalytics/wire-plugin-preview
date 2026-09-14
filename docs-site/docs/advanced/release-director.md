@@ -301,6 +301,19 @@ Telemetry replaces the old hardcoded `autopilot: "false"` property with
 `invoked_by`, carrying the same four values, read from the `WIRE_INVOKED_BY`
 environment variable and defaulting to `typed`.
 
+## Naming the command, before and after
+
+Attribution keeps the record honest about who ran what. A second rule keeps the
+conversation honest about it, because a consultant who directs Wire meets the
+command names nowhere else. Operating rule 7 (#265): a reply that starts work
+ends with `Running: <command>`, every report ends with `Ran: <command>[, ...]`,
+and a step a gate stopped is named too (`Not run: dbt-generate, gate:
+data_model review`). A plan, whether from `/wire:session-plan` or `/wire:work`,
+names a command or skill for every step. The line is not the record, the
+execution log is; it is the part of the record the person is looking at, and it
+is how someone who has never typed a Wire command learns what the thing they
+just approved is called. Part 1 shows it on every reply from Chapter 1 onward.
+
 ## What existing engagements get
 
 `/wire:upgrade` adds `parked_decisions`, the expanded `agents` block and
