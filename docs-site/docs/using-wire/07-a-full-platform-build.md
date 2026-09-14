@@ -1,5 +1,5 @@
 ---
-sidebar_position: 6
+sidebar_position: 7
 title: "A Full Platform Build, with Commands"
 ---
 
@@ -7,7 +7,7 @@ title: "A Full Platform Build, with Commands"
 
 Every Monday morning Laura Hennessy, the finance director at Eversholt Brewing Co, exports last week's orders from the Shopify store, last week's production costs from the BrewMan ERP and last week's wholesale deals from HubSpot, and spends two hours in Excel turning the three exports into the margin and revenue figures the board reads on Tuesday. The three systems have never been connected. Tom Barnard, the brewery's one data engineer, has been asked to fix this for two years and has never had the six clear weeks it would take. Rittman Analytics has been engaged to deliver, in twelve days on a fixed price, a platform on BigQuery, dbt Cloud and Looker that makes margin by product and revenue by channel available every morning without anybody exporting anything.
 
-This is a "full platform" release, the largest kind Wire runs, with pipelines, a dbt project, a semantic layer, dashboards, scheduled jobs, tests, deployment and training all in scope, and you will direct it in plain language exactly as you directed the smaller releases in Chapters 2 to 4. But now that Chapter 5 has shown you that everything Wire does is a command, a fair question arises: if Wire runs the commands for you, why would you ever type one? The answer is that on most releases there are a handful of moments when typing is quicker, clearer or leaves a better record than describing what you want, and this chapter shows seven of them, each with the reason it was the better choice at that point.
+This is a "full platform" release, the largest kind Wire runs, with pipelines, a dbt project, a semantic layer, dashboards, scheduled jobs, tests, deployment and training all in scope, and you will direct it in plain language exactly as you directed the smaller releases in Chapters 2 to 5. But now that Chapter 6 has shown you that everything Wire does is a command, a fair question arises: if Wire runs the commands for you, why would you ever type one? The answer is that on most releases there are a handful of moments when typing is quicker, clearer or leaves a better record than describing what you want, and this chapter shows seven of them, each with the reason it was the better choice at that point.
 
 We will follow the twelve days in order, and along the way we will start a session with a command rather than a sentence, recover from a hand edit, repair the record after a colleague worked outside Wire, take the wheel for a review and hand it back, raise the pull request and close the release. Let's start with what you need before you begin.
 
@@ -38,7 +38,7 @@ Let's now take a look at each of these in turn.
 | "Park for Laura. Draft the requirements." | "Parked, waiting on Laura Hennessy. Drafting the requirements from the statement of work and the recording of the discovery call." |
 | *(later)* | "Requirements drafted: seven functional requirements with acceptance criteria and four non-functional (data by 07:00 daily, row-level security by role, dashboards under three seconds, 99.5 percent pipeline uptime). Two decisions I made are on the record: sales modelled at product-per-day grain rather than order line, because order-line grain multiplies the ingestion volume twelve times for no reporting benefit; and wholesale identified by HubSpot deal stage, because the custom field is unreliable. All checks pass. Approve now, changes or park?<br/><br/>Ran: requirements-generate, requirements-validate" |
 
-That last line, "Ran:", is new to this guide but it has been on every report Wire made in Chapters 2 to 4, and Chapter 5 explained what it means: it names the commands that ran, and everything Wire does is a command. It follows, therefore, that you could have typed that one yourself,
+That last line, "Ran:", is new to this guide but it has been on every report Wire made in Chapters 2 to 5, and Chapter 6 explained what it means: it names the commands that ran, and everything Wire does is a command. It follows, therefore, that you could have typed that one yourself,
 
 ```
 /wire:requirements-generate 01-eversholt-analytics-platform
@@ -244,6 +244,7 @@ Drawing the seven occasions in this chapter together, together with two that did
 | Wanting the full state of every artifact | `/wire:status <release>` |
 | You edited a dbt model by hand | `/wire:utils-run-dbt <release>`, then `/wire:dbt-validate <release>` |
 | Someone worked outside Wire and the record is behind | `/wire:status-sync <release>` |
+| A ticket against a release that is already live (Chapter 4) | `/wire:work <release> <ticket>` |
 | You want to answer a review's questions yourself | "You drive", then `/wire:<artifact>-review <release>`, then "I'll drive" |
 | Committing and raising the pull request | `/wire:utils-commit <release> <artifact> <step>`, `/wire:utils-pr-create <release>` |
 | Closing a finished release | `/wire:archive <release>` |

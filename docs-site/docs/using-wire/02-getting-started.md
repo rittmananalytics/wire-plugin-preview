@@ -11,7 +11,7 @@ The same problem turns up on most dashboard engagements, whatever the industry: 
 
 That is what a "dashboards-first" release does. The dashboards are designed and approved first, as working prototypes that open in a browser; the data model is derived from the approved designs rather than the other way round; the whole platform is then built on generated sample data, so that the client is using real dashboards in Looker before any warehouse access exists; and when the real data arrives, Wire switches the platform over to it. At Northwind, where client IT is still two weeks away from having a BigQuery project ready, it is the obvious choice.
 
-In this chapter we will follow that release from an empty repository to live dashboards, in the words you say to Wire and the replies it gives. We will not look at how Wire does the work underneath, which is the subject of Chapter 5, and we will not type a single command, which is the subject of Chapter 6. Let's start though with what you need before you begin, and the shape of the release as a whole.
+In this chapter we will follow that release from an empty repository to live dashboards, in the words you say to Wire and the replies it gives. We will not look at how Wire does the work underneath, which is the subject of Chapter 6, and we will not type a single command, which is the subject of Chapter 7. Let's start though with what you need before you begin, and the shape of the release as a whole.
 
 ## Before You Begin
 

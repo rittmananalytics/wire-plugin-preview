@@ -1,7 +1,7 @@
 // @ts-check
 
 // Two parts. Part 1 is read in order and uses plain language only: no Wire
-// command names, agent names or release-type identifiers until chapter 5.
+// command names, agent names or release-type identifiers until chapter 6.
 // Part 2 is the technical reference, kept at its existing paths so links from
 // the 3.x docs still resolve.
 
@@ -16,6 +16,7 @@ const sidebars = {
         'using-wire/what-is-wire',
         'using-wire/getting-started',
         'using-wire/data-modelling-and-transformation',
+        'using-wire/working-a-ticket',
         'using-wire/running-discovery',
         'using-wire/how-wire-works',
         'using-wire/a-full-platform-build',

@@ -55,6 +55,22 @@ With a specific release folder the output is expanded to show every artifact and
 
 ---
 
+## `/wire:work`
+
+Most work on a live platform arrives as a ticket against a release that already exists, not as a statement of work. `/wire:work` (v4.0.0, #265) is the front door for that work, and it adds no lifecycle of its own: it composes commands Wire already has.
+
+```
+/wire:work <release-folder> [ticket-key-or-description]
+```
+
+It reads the release for what bears on the ticket (the decisions log, the business rules register, the design documents, earlier iterations and the conventions) and says what it found before planning. It then checks the request against seven triggers that make a change larger than a ticket (a new source system, a new business concept, a grain change with downstream consumers, a security or data-residency change, a production cutover, work spanning several deliverables, a request that cannot be bounded) and, if any applies, refuses to plan it as an iteration and offers a formal release or phase instead. Otherwise it proposes a plan through `/wire:session-plan` in which every executable step names the Wire command or skill that performs it, its scope and what it produces, states what the plan leaves out and why, and offers Approve, Changes, Explain or Cancel. On approval the named commands run, scoped as written, through their ordinary precondition gates and validate steps; a design-document precondition the release never produced is presented as the gate's normal override, pre-filled with the ticket, and a technical precondition is never pre-filled. Anything that ran differently from the plan is logged as a deviation.
+
+Publication goes through `/wire:utils-commit` and `/wire:utils-pr-create` on the client repository's own template, with the validate result, the rules cited and the decisions made attached. Technical acceptance (the client's PR review and merge) and business acceptance (a named owner confirming a definition or a number) are recorded separately, and a PR approval never satisfies the second. The iteration closes in two stages: a document patch pass that finds the release documents the change made stale and proposes the smallest patch to each, applied only with confirmation and never by regenerating; then `/wire:status-sync`. An iteration is closed only when the patch pass is clean or deferred with a reason, every validate step passed, every acceptance is satisfied by its owning role and the sync has run. Re-running the command on an open ticket resumes it, reads the PR state and looks in meeting recordings for an owner's confirmation, which it proposes and never records unasked.
+
+The record is `iterations/<ticket>.md` in the release folder (ticket text, what the release already held, each plan version, what ran, decisions, patches, both acceptances) and an `## Iterations` table in `status.md`. A release is the durable work stream, an epic or a deliverable; a ticket is an iteration inside it. Do not create a release per ticket. On Gemini CLI the command presents the plan and the consultant types the commands. Chapter 4 of Part 1 walks one ticket through end to end; the deterministic rules (boundary, plan-step, acceptance, definition of done) are tested by `wire/tests/core/validate_work_iteration.py`.
+
+---
+
 ## `/wire:status-sync`
 
 What happens to the record when work is done outside a command run? Status tracking updates automatically only when work runs through Wire commands, and work done conversationally or with an agent's help, which is common in `custom` releases, leaves `status.md`, the execution log and the sprint plan behind. `/wire:status-sync` is the repair path for that (v3.11.8, #204): it reconciles a release's recorded state against evidence and then repairs the record with your confirmation, so that where `/wire:status` reports the record as it stands, `status-sync` fixes it when it has drifted.

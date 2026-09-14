@@ -15,7 +15,7 @@ This chapter covers what makes Wire different from a coding assistant, the work 
 
 A general coding assistant will write you a valid SQL model, and it will do so quickly. What it will not do is write the model the way the rest of the project expects it: named to the project's convention, with its tests, its documentation and a note of the requirement it satisfies, and only once the design it implements has been approved. Wire does all of that, because Wire knows how a data platform engagement is run. It knows which documents come first, what has to be approved before the next step can start, how a warehouse is laid out in layers, which tests every table needs and what the client should be handed at the end, and it knows these things because they are Rittman Analytics' delivery method, built over more than 20 years of consulting and written down in a form that an agent can follow rather than guess at.
 
-It follows, therefore, that Wire does not improvise a structure and hope it holds together. It follows the method, it shows you the result at each stage and, where the method calls for a human decision, it stops and asks for one. As we will see in Chapter 5, the method is written down as data that Wire reads rather than as advice it might forget, which is what makes the difference between the third model and the thirtieth.
+It follows, therefore, that Wire does not improvise a structure and hope it holds together. It follows the method, it shows you the result at each stage and, where the method calls for a human decision, it stops and asks for one. As we will see in Chapter 6, the method is written down as data that Wire reads rather than as advice it might forget, which is what makes the difference between the third model and the thirtieth.
 
 ## What Can You Ask It To Do?
 
@@ -33,7 +33,7 @@ Releases belong to an "engagement", which is the client contract, and most engag
 
 ## How Do You Work With It?
 
-The short answer is that you direct, and Wire does the work and reports back. The slightly longer answer is that a session with Wire is a loop, and it is worth seeing the whole loop once before we look at each part of it.
+The short answer is that you direct, and Wire does the work and reports back. There are two ways in: a new engagement, planned from the statement of work, and a ticket against a platform that is already live, planned from the ticket inside the release that built it. Chapters 2 and 3 show the first; Chapter 4 shows the second. The slightly longer answer is that a session with Wire is a loop, and it is worth seeing the whole loop once before we look at each part of it.
 
 ```mermaid
 flowchart LR
@@ -66,7 +66,7 @@ Alongside all of that, and just as valuable, Wire keeps a record of the work its
 
 ## Where Does It Run, and What Does It Connect To?
 
-Wire runs in Claude Code, Anthropic's command-line coding assistant, inside a git repository. Directing it in plain English, which is what this part of the guide describes, works in Claude Code only. Wire also works in Gemini CLI, Google's equivalent, but there you type Wire's commands yourself; [Part 2 documents every command](../reference/commands.md), and [Chapter 6](./06-a-full-platform-build.md) shows where typing one directly is the better choice even in Claude Code.
+Wire runs in Claude Code, Anthropic's command-line coding assistant, inside a git repository. Directing it in plain English, which is what this part of the guide describes, works in Claude Code only. Wire also works in Gemini CLI, Google's equivalent, but there you type Wire's commands yourself; [Part 2 documents every command](../reference/commands.md), and [Chapter 7](./07-a-full-platform-build.md) shows where typing one directly is the better choice even in Claude Code.
 
 :::note
 The commands, the artifacts and the record on disk are identical whichever way you run Wire. Only the way you drive it differs, so nothing you learn in Part 1 is wasted if you later find yourself typing.
@@ -112,15 +112,16 @@ With Wire installed, open Claude Code in the git repository for your engagement 
 
 ## What Is in This Guide?
 
-Part 1 of this guide is meant to be read in order. It shows how you work with Wire, in plain language, through three releases of increasing size, and then explains what was happening underneath before showing the largest kind of release with commands typed at the points where that helps.
+Part 1 of this guide is meant to be read in order. It shows how you work with Wire, in plain language, through three releases of increasing size and a ticket against one of them once it is live, and then explains what was happening underneath before showing the largest kind of release with commands typed at the points where that helps.
 
 | Chapter | What it covers |
 |---|---|
 | 1. What Wire Is | This page |
 | 2. Getting Started | A first release from an empty repository: dashboards designed and approved before any data work |
 | 3. Data Modelling and Transformation | A dbt build across three source systems, with the definitions agreed first |
-| 4. Running Discovery | A discovery with seven stakeholders that ends in a roadmap the sponsor signs off |
-| 5. How Wire Works | The orchestration agent, the lane agents and the commands behind the steps you have seen |
-| 6. A Full Platform Build, with Commands | The largest kind of release, with commands typed directly where it helps |
+| 4. Working a Ticket | A change request against the live Northwind dashboards, worked inside the release that built them |
+| 5. Running Discovery | A discovery with seven stakeholders that ends in a roadmap the sponsor signs off |
+| 6. How Wire Works | The orchestration agent, the lane agents and the commands behind the steps you have seen |
+| 7. A Full Platform Build, with Commands | The largest kind of release, with commands typed directly where it helps |
 
 Part 2 is the reference: installation and upgrading, every kind of release, command-level walkthroughs, the integrations and the full command list. Let's begin, then, with a first release.

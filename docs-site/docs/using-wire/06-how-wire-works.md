@@ -1,5 +1,5 @@
 ---
-sidebar_position: 5
+sidebar_position: 6
 title: "How Wire Works"
 ---
 
@@ -115,7 +115,7 @@ Wire has 334 commands in total, of which the great majority are these generate, 
 | The runbook | `deployment-generate`, `-validate`, `-review` |
 | The training session | `training-generate` |
 
-Since version 4.0 every report Wire makes ends with a line naming the commands that ran, so that you learn the names as you go rather than up front, and Chapter 6 shows that line and the occasions on which typing a command yourself is the better choice.
+Since version 4.0 every report Wire makes ends with a line naming the commands that ran, so that you learn the names as you go rather than up front, and Chapter 7 shows that line and the occasions on which typing a command yourself is the better choice.
 
 ## What Does the Orchestration Agent Actually Do?
 
@@ -201,6 +201,14 @@ It is the gate, and not the orchestration agent's discretion, that refused "star
 A ruling never satisfies a blocking gate, however sensible the ruling. If you find yourself wanting to override a blocking gate, the recorded override with your name and reason is the route, and it is deliberately more effort than approving the upstream artifact properly.
 :::
 
+## And When the Work Is a Ticket?
+
+Everything above describes a release planned from its release-type graph: Wire works out what is runnable from the definition and the record, and dispatches it. Chapter 4 showed a different starting point, a ticket against a release that is already live, and the machinery is the same with one substitution. The ticket, not the graph, is what Wire plans from.
+
+The command is `/wire:work <release> <ticket>`. It reads the release's record for what bears on the ticket (the decisions log, the business rules register, the design documents and the earlier tickets), checks that the request is a ticket and not a redesign in disguise, and then runs the session-plan step with one rule that now applies to every plan Wire makes: each step names the Wire command that performs it, or the skill where no command covers the work, together with the scope the step may touch. Approve the plan and those commands are what runs, scoped as written, through the same gates and validate steps as any other run; a step done any other way is recorded as a deviation. The ticket is an **iteration** of the release, recorded in an `iterations/` file beside the artifacts and summarised in a table in `status.md`, so that the release keeps one record from the statement of work to the latest change and no ticket needs a release of its own.
+
+Two rules from the operating model carry over unchanged. The client's pull request review is technical acceptance and is recorded as such, but it never stands in for a business owner's confirmation of a definition, which stays open until that person gives it. And an iteration is not closed until Wire has shown you which release documents the change made stale and you have approved the patches, after which `/wire:status-sync` brings the record into line. [Part 2 describes the command](../reference/management-commands.md#wirework).
+
 ## What If You Would Rather Type?
 
 Nothing about the record changes if you do, and there are four ways to take the wheel. You can simply type a command, which always works in any session, after which the orchestration agent re-reads the record and carries on from wherever that left things. You can say "you drive", which stops the orchestration agent dispatching anything for the rest of the session while it still answers questions and runs what you ask, and "I'll drive" (or any instruction to do work) hands control back, with both recorded. You can set manual mode for a whole engagement, one setting in the engagement context that restores the pre-4.0 behaviour exactly, so that you type commands and `/wire:start` prints the next one rather than offering to run it. And if you are on Gemini CLI, which has no agents or skills, you are always in manual mode; the commands, the gate and the record are the same, as we noted in Chapter 1.
@@ -213,6 +221,6 @@ The release-type definitions and the command specifications together are the met
 
 ## What Does Wire Connect To?
 
-Wire uses Model Context Protocol servers (a standard way for an assistant to call an external tool, usually shortened to MCP) for everything outside the repository. When they are configured, review commands read meeting recordings from Fathom for relevant decisions, which is how Chapter 4's playback checklist was filled from the sponsor's own words; generate, validate and review commands update Jira or Linear as each step completes; generated documents are published to Confluence or Notion and reviewer comments are read back into the review; and the specialist agents read from and write to BigQuery, Snowflake, Looker, Omni, Fivetran, dbt Cloud and others. If a server is unavailable the command proceeds without it and says so. [Part 2 lists them](../reference/mcp-servers.md).
+Wire uses Model Context Protocol servers (a standard way for an assistant to call an external tool, usually shortened to MCP) for everything outside the repository. When they are configured, review commands read meeting recordings from Fathom for relevant decisions, which is how Chapter 5's playback checklist was filled from the sponsor's own words; generate, validate and review commands update Jira or Linear as each step completes; generated documents are published to Confluence or Notion and reviewer comments are read back into the review; and the specialist agents read from and write to BigQuery, Snowflake, Looker, Omni, Fivetran, dbt Cloud and others. If a server is unavailable the command proceeds without it and says so. [Part 2 lists them](../reference/mcp-servers.md).
 
 For the operating rules in full, including the claim, sessions and parked decisions, see [the operating model](../advanced/release-director.md) in Part 2; for each specialist and the lane contract, see [the agents](../advanced/wire-agents.md); and for how a single command file is structured and read, see [Anatomy of a command](../getting-started/how-wire-works.md). In the next chapter we run the largest kind of release and, now that you know what the commands are, look at the occasions on which typing one yourself is the better choice.

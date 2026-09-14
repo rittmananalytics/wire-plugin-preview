@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3.5
+sidebar_position: 4
 title: "Working a Ticket"
 ---
 
@@ -52,7 +52,7 @@ Wire proposes a plan before it touches anything, and the plan names each step in
 
 Three things are worth noticing. The plan is small, because the release already holds the requirements and the design and Wire could see that the ticket does not disturb either. It says what it leaves out and why, which is how you know Wire has considered the whole method and not just the part in front of it. And when you asked for the reasoning behind a step, you got the consequence of skipping it in Northwind's own numbers rather than a general principle.
 
-In Chapter 6 you will see this same kind of plan with the command that runs each step written beside it. The steps are the method; the commands are how each one is invoked, and the plan is the same either way.
+In Chapter 7 you will see this same kind of plan with the command that runs each step written beside it. The steps are the method; the commands are how each one is invoked, and the plan is the same either way.
 
 ## Stage 3: The Build, and a Test That Fails
 

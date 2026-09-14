@@ -142,6 +142,10 @@ A new release type, `bi_migration` (issue #258), for the case where the BI tool 
 
 See [BI Tool Migration](../release-types/bi-migration) and the tutorial [Looker to Omni Migration](../tutorials/looker-to-omni-migration), written for the release director model.
 
+**`/wire:work` is the front door for ticket-sized work on a live platform (#265).** Most work after go-live arrives as a ticket against a release that already exists, and the team's feedback was that Wire assumed a release-shaped, sequenced piece of work every time, that session plans did not say which command each step would use, and that a release per ticket lost the context of earlier changes. `/wire:work <release> <ticket>` reads the release for what bears on the ticket, refuses requests larger than a ticket (new source, new concept, grain change, security, cutover, cross-deliverable, unbounded) and offers a formal release instead, plans with a Wire command or skill named for every step (a rule `/wire:session-plan` now follows everywhere), runs only the approved plan through the real commands and their gates, publishes through the client's PR with technical and business acceptance kept separate, then closes with a document patch pass and `/wire:status-sync`. A ticket is an iteration of its release, recorded in `iterations/<ticket>.md` and a new `## Iterations` table in `status.md`. Part 1 gains a chapter, [Working a Ticket](../using-wire/04-working-a-ticket.md); the deterministic rules are tested by `wire/tests/core/validate_work_iteration.py`.
+
+---
+
 ## v3.11.9 — Three carve-out closes from live client review
 
 **Released**: August 2026

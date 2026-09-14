@@ -47,9 +47,12 @@ So where does all of this live? Every Wire engagement uses this structure in the
       test/
       deploy/
       enablement/
+      iterations/        ← one file per ticket worked inside this release (/wire:work)
   research/
     sessions/            ← persisted technical research (auto-populated)
 ```
+
+A release is the durable unit of work: an epic, a deliverable or a platform. Once it is live, changes arrive as tickets, and a ticket is worked inside the release that built the thing it changes rather than in a release of its own, so that the requirements, design documents, definitions and decisions the ticket depends on are in front of Wire when it plans. `/wire:work <release> <ticket>` opens one, and each is recorded as an iteration: a file under `iterations/` and a row in the release's `status.md`. See [`/wire:work`](../reference/management-commands.md#wirework).
 
 ```mermaid
 graph TD
