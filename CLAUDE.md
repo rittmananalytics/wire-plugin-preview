@@ -451,7 +451,7 @@ Agent definitions live in `wire/agents/<name>/AGENT.md` (bundled into the plugin
 
 **Review gates remain human-in-the-loop**: delegation pauses before every `*-review` step. Run the review command, approve, then re-run `/wire:delegate` to continue.
 
-Full documentation: `wire/docs/AGENTS.md`
+Full documentation: the Wire Agents and Agent Architecture pages of the Wire docs site (`docs-site/docs/advanced/wire-agents.md` and `wire-agent-architecture.md` in the Wire repository).
 
 ## User Guide
 

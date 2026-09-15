@@ -325,7 +325,7 @@ A VS Code extension (`wire-vscode/`) is in early development. The intention is t
 
 - [Documentation site](https://wire-plugin-preview.readthedocs.io/) — full documentation with search, covering all release types, commands, skills, and MCP servers
 - [User Guide](USER_GUIDE.md) — full operational guide covering all release types, worked examples, Autopilot, and troubleshooting
-- [Command Registry](wire/COMMANDS.md) — command catalog and conventions (run `/wire:help` for the full, current list of all 334 commands)
+- [Command Reference](docs-site/docs/reference/commands.md) — command catalog and conventions (run `/wire:help` for the full, current list of all 334 commands)
 - [Changelog](CHANGELOG.md)
 - [Release Notes](RELEASE_NOTES.md)
 - [Framework Source README](wire/README.md) — internals, build process, package structure
