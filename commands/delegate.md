@@ -340,6 +340,8 @@ Then determine which agent tasks can run in parallel and which must be sequentia
 - `data-quality-engineer` and `semantic-layer-developer` can run concurrently once `dbt-developer` is complete
 - `qa-agent` validate tasks can run as soon as their corresponding generate is complete — do not wait for all generates to finish
 
+This plan is the run plan of `specs/utils/director_operating_model.md` rule 8, grouped by agent. Every command in it is written in full, as it would be typed (`/wire:` prefix, release folder, flags), never as a bare name.
+
 Format the plan as a numbered sequence with parallel steps as lettered sub-steps. When fan-out applies to a step, use a multi-wave block inside that step — waves are sequential, agents within each wave are parallel:
 
 ```
@@ -347,12 +349,12 @@ Delegation plan — [engagement_name] / [release_folder]
 ──────────────────────────────────────────────────────
 
 Step 1 (sequential):
-  discovery-analyst → requirements-generate, workshops-generate
+  discovery-analyst → /wire:requirements-generate [release_folder], /wire:workshops-generate [release_folder]
   Subagent: discovery-analyst
 
 Step 2 (parallel, starts after step 1):
-  2a  data-designer    → conceptual_model-generate, pipeline_design-generate, mockups-generate
-  2b  pipeline-engineer → pipeline-generate (connectors)
+  2a  data-designer    → /wire:conceptual_model-generate [release_folder], /wire:pipeline_design-generate [release_folder], /wire:mockups-generate [release_folder]
+  2b  pipeline-engineer → /wire:pipeline-generate [release_folder] (connectors)
   Subagents: 2 parallel
 
 Step 3 (multi-wave fan-out, starts after step 2):
@@ -371,15 +373,15 @@ Step 3 (multi-wave fan-out, starts after step 2):
   Total dbt-developer agents: 5  (2 + 1 + 2)
 
 Step 4 (parallel, starts after step 3):
-  4a  semantic-layer-developer → semantic_layer-generate, dashboards-generate
-  4b  data-quality-engineer    → data_quality-generate
+  4a  semantic-layer-developer → /wire:semantic_layer-generate [release_folder], /wire:dashboards-generate [release_folder]
+  4b  data-quality-engineer    → /wire:data_quality-generate [release_folder]
   Subagents: 2 parallel
 
 Step 5 (sequential, starts after step 4):
-  qa-agent → validate all artifacts from steps 1–4
+  qa-agent → /wire:<artifact>-validate [release_folder] for every artifact from steps 1–4
 
 Step 6 (sequential, starts after step 5):
-  delivery-lead → deployment-generate, documentation-generate, training-generate
+  delivery-lead → /wire:deployment-generate [release_folder], /wire:documentation-generate [release_folder], /wire:training-generate [release_folder]
 
 Total: [N] steps, [N] with parallelism. Blocked items: [list any blocked artifacts]
 ```
@@ -394,7 +396,7 @@ All artifacts are complete or approved. Nothing to delegate.
 
 ### Step 4: Confirm with User
 
-Present the plan and ask:
+Present the plan and ask. This is the go / adjust / cancel step of operating model rule 8: nothing is dispatched until the director answers, and silence is not a yes.
 
 ```
 Ready to dispatch the above plan to specialist subagents?

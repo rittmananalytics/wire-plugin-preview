@@ -139,7 +139,7 @@ Then present **one confirmation block** covering all of it, and run `/wire:new`
 with those answers (its Step 0b). Write the block in plain words ("Set up the
 engagement for Northwind Retail as a dashboard-first release, seeded profile,
 two lanes, nothing against a warehouse") and end it with one line naming the
-command: `Will run: new`. Anything you cannot derive, ask: one question, before
+command in full: `Running: /wire:new`. Anything you cannot derive, ask: one question, before
 the confirmation block, never a guess dressed up as a confirmation.
 
 ## Step 7: Run what is runnable
@@ -148,34 +148,73 @@ the confirmation block, never a guess dressed up as a confirmation.
    It returns, per artifact: `runnable: generate`, `runnable: validate`,
    `parked: needs ruling`, `blocked: <unmet precondition>`, `not applicable` or
    `complete`, plus the order and what may run in parallel.
-2. **Say what will happen, in one plain sentence, before it happens.** Name the
-   work and the reason in plain words, not the command or artifact identifiers:
+2. **Apply the budget** from `status.md` (`lanes_max`, `warehouse_spend`,
+   `stop_at`, `model_tier`). Anything the budget keeps out is named in the plan
+   (point 3) with the setting, never silently dropped.
+3. **Set out the run before it starts** (operating model rule 8, "The run
+   plan"). Decide whether a plan is required:
+
+   | The directive would run | Plan |
+   |---|---|
+   | One command, no warehouse query (foreground or lane) | Not required. The `Running:` line in point 4 is the plan. |
+   | Two or more commands before the next stop point | Required |
+   | Any command that queries a warehouse | Required |
+
+   When it is required, show the plan in the `specs/session/plan.md` table:
+   one row per runnable command in the runnable set's order, each command in
+   full as it would be typed, its scope (for a lane, the `Owns:` line of the
+   brief it will get), what it produces, and a final `decision` row for the
+   stop point (the first review edge or parked decision under
+   `stop_at: decisions`). Under the table, name what is not planned and why
+   (a gate, a budget setting, a ruling id). End with `go / adjust / cancel?`
+   and **wait**. Silence is not go. On go, append the `run plan | approved`
+   row to `execution_log.md` before the first step runs. Never add a command
+   the runnable set did not return, and never reuse a plan from an earlier
+   directive: the files are re-read and the plan re-computed every time.
+
+   ```
+   Run plan — 01-store-performance, up to the conceptual model review
+
+   | # | Step | Type | Command or skill | Scope | Produces |
+   |---|---|---|---|---|---|
+   | 1 | Draft the conceptual model | command | /wire:conceptual_model-generate 01-store-performance | design/conceptual_model.md | entity model, validate report |
+   | 2 | Draft the mockups with you | command | /wire:mockups-generate 01-store-performance | design/mockups/ | HTML mockups (foreground) |
+   | 3 | Approve the conceptual model | decision | director | conceptual_model review | ruling; the run stops here |
+
+   1 and 2 run in parallel (no dependency between them).
+   Not planned: /wire:business-rules-generate 01-store-performance (ruling R-1: skip).
+
+   go / adjust / cancel?
+   ```
+4. **Say what will happen, in one plain sentence, then name the command.** The
+   body of the reply is about the work, in words the client could read; the
+   reply ends with the `Running:` line (operating model rule 7), each command
+   in full:
    ```
    Drafting the conceptual model in the background (requirements approved;
    business rules waived by R-1) and starting the mockups with you now. The two
    do not depend on each other.
+
+   Running: /wire:conceptual_model-generate 01-store-performance, /wire:mockups-generate 01-store-performance
    ```
-   The command names appear once, in the last line of the report that follows
-   (point 8). They are never hidden: a director who has never typed a Wire
+   The commands are never hidden: a director who has never typed a Wire
    command should still be able to learn what the thing they approved is
-   called. They are never the headline either: the body of every reply is about
-   the work, in words the client could read.
-3. **Apply the budget** from `status.md` (`lanes_max`, `warehouse_spend`,
-   `stop_at`, `model_tier`). Report anything you did not run because of it,
-   naming the setting. Never silently drop work.
-4. **Dispatch.** Non-interactive artifacts go to their specialist agent as
+   called, and copy the line to run it themselves. They are never the headline
+   either.
+5. **Dispatch.** Non-interactive artifacts go to their specialist agent as
    lanes, via `/wire:delegate` or the Agent tool with the agent's `AGENT.md`
    loaded. Interactive artifacts (a generate spec that waits on the user —
    `mockups` in `dashboard_first` mode is the case) run in the foreground with
-   the director.
-5. **Every dispatch carries the lane brief** from `director_operating_model.md`:
-   lane label, task, owned directories, state file path, resume contract, budget
+   the director. Every dispatch carries the lane brief from
+   `director_operating_model.md`: lane label, task, owned directories (the
+   same as the plan's scope column), state file path, resume contract, budget
    line, the flat-lane rule, the no-`status.md`-writes rule, report-once. Set
    `WIRE_INVOKED_BY=lane` in the lane's environment, and
    `WIRE_INVOKED_BY=orchestrator` for commands you run yourself.
 6. **You are the only writer of `status.md` and `execution_log.md`.** Lanes
    write their artifact tree and their state file. You read the state file and
-   write the record.
+   write the record. A step that ran differently from the plan carries
+   `deviation: <what differed>` in its execution-log row's Detail.
 7. **Run the consolidation pass before reporting a lane's work as ready.**
    Files exist, validate ran and its result matches the lane's claim, the lane
    did not write `status.md`, warehouse results re-checked against the
@@ -183,16 +222,16 @@ the confirmation block, never a guess dressed up as a confirmation.
 8. **Report once: outcome first, commands last.** One terminal report when the
    work is done or a decision is needed. Lead with what was produced, what the
    checks found and what the director must decide, in plain words. Close with a
-   single line naming the commands that ran:
+   single `Ran:` line naming the commands that ran, each in full (rule 7); a
+   step a gate stopped is named as `Not run:` with the gate:
    ```
    Requirements drafted: 14 requirements, all checks pass, 2 need clarifying
    at kickoff. Approve now, or park for the client?
 
-   Ran: requirements-generate, requirements-validate
+   Ran: /wire:requirements-generate 01-store-performance, /wire:requirements-validate 01-store-performance
+   Not run: /wire:conceptual_model-generate 01-store-performance, gate: requirements review
    ```
-   A blocked step is reported the same way: what is waiting, and on what, in
-   plain words, with the recorded precondition value in the closing line. No
-   running commentary, and do not poll lanes for progress: read their state
+   No running commentary, and do not poll lanes for progress: read their state
    files.
 
 ## Step 8: Rulings and review gates
@@ -232,9 +271,14 @@ Step 3, given by a person at the time.
 - Write `status.md` on a lane's behalf without reading its state file first.
 - Spawn sub-agents below a lane. Lanes are flat.
 - Hide the command names. Every report ends with the commands that ran.
+- Write a bare command name. `Ran: requirements-generate` tells the director
+  nothing they can type; `Ran: /wire:requirements-generate 01-store-performance` does.
+- Dispatch a run of two or more commands, or a warehouse query, without
+  showing the run plan and getting a go. Silence is not go.
 - Lead with the command names. The body of a reply is plain words about the
   work; identifiers such as `conceptual_model` or `requirements-generate`
-  belong in the closing `Ran:` line, not the headline.
+  belong in the plan table and the closing `Running:`/`Ran:` lines, not
+  the headline.
 - Keep driving after "you drive".
 
 ## On activation

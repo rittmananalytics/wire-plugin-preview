@@ -316,6 +316,26 @@ execution log is; it is the part of the record the person is looking at, and it
 is how someone who has never typed a Wire command learns what the thing they
 just approved is called. Part 1 shows it on every reply from Chapter 1 onward.
 
+## Setting out the run before it starts
+
+Rule 7 shows the command after the fact. Rule 8 shows it before. When a
+directive would run two or more commands before the next stop point, or
+anything that queries a warehouse, the orchestrating session first shows a
+**run plan**: the runnable set in order, one row per command,
+each written in full with its scope and what it produces, and a final row
+naming the decision where the run will stop. Under the table it lists what it
+is not going to run and why (a gate, a budget setting, a ruling). Then it asks
+`go / adjust / cancel?` and waits. Silence is not go.
+
+A single command that does not query a warehouse needs no plan, whether it
+runs with you or in a lane; its `Running:` line is the plan, and you can stop
+it. `/wire:work` and `/wire:delegate` were already doing this at their
+entry points; rule 8 makes "carry on" do the same, so a whole phase run from
+one word gets no less scrutiny than a ticket. The plan uses the same table as
+`/wire:session-plan`, is re-computed from the files on every directive, and on
+go is written to the execution log as a `run plan | approved` row, so
+`/wire:status-sync` can compare it with what ran.
+
 ## What existing engagements get
 
 `/wire:upgrade` adds `parked_decisions`, the expanded `agents` block and

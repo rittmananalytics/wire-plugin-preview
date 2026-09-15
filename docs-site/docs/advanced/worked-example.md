@@ -395,7 +395,7 @@ Delegation plan — Barton Peveril Live Pastoral Analytics / 01-barton-peveril-l
 ───────────────────────────────────────────────────────────────────────────────────────────
 
 Step 1 (sequential):
-  pipeline-engineer  →  pipeline-generate
+  pipeline-engineer  →  /wire:pipeline-generate 01-barton-peveril-live-pastoral
                         (ProSolution SQL Server CDC + Focus REST API connectors)
 
 Step 2 (multi-wave fan-out, starts after Step 1):
@@ -421,11 +421,15 @@ Step 2 (multi-wave fan-out, starts after Step 1):
   Total dbt-developer agents: 5  (2 + 1 + 2)
 
 Step 3 (parallel, starts after Step 2):
-  3a  orchestration-engineer    →  orchestration-generate  (dbt Cloud job config)
-  3b  semantic-layer-developer  →  semantic_layer-generate  (LookML views + explores)
+  3a  orchestration-engineer    →  /wire:orchestration-generate 01-barton-peveril-live-pastoral  (dbt Cloud job config)
+  3b  semantic-layer-developer  →  /wire:semantic_layer-generate 01-barton-peveril-live-pastoral  (LookML views + explores)
 
 Total: 8 specialist agents across 4 execution stages. Review commands stay in this session.
+
+Proceed? (yes / adjust / cancel)
 ```
+
+Nothing is dispatched until you answer. This is the run plan of the operating model's rule 8: every command is written in full, as you would type it, and `adjust` re-presents the whole plan with your change while `cancel` runs nothing. Here you answer `yes`.
 
 ### What the agents produce
 

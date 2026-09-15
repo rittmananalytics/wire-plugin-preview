@@ -54,6 +54,10 @@ Archive the existing release (`/wire:archive <release-folder>`) and create a new
 
 No, not on Claude Code. Say what you want done ("run what's next", "approve it and carry on", "start an engagement from this SOW") and Wire works out which command that is from the release-type definition, runs it, names it in the closing line of its report and stops where a decision is yours. See [The Release Director Model](../advanced/release-director).
 
+**Q: Does it tell me what it is going to run before it runs it?**
+
+Yes. Every reply that starts work ends with a `Running:` line naming the command in full. When a directive would run two or more commands before the next decision, or anything that queries a warehouse, Wire first sets the run out as a plan (one row per command, with what it may touch and where the run stops) and waits for you to say go, adjust or cancel. A single command with no warehouse query gets the `Running:` line only. `/wire:work` and `/wire:delegate` do the same at their own entry points.
+
 **Q: Is it doing something different from what my typed command would do?**
 
 No. It runs the same command file, so the precondition gate, auto-validate, `status.md`, the execution log, the artifacts on disk and telemetry are all identical whichever way the command was started. The only difference is the `Session` column in the log and the `invoked_by` telemetry property, which say what invoked the run.

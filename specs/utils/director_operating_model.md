@@ -1,5 +1,5 @@
 ---
-description: Release-type-agnostic operating model — one release director, one orchestrating session, N flat lanes; the operating rules, lane brief, release claim, session and parked-decision handling, and the co-existence controls
+description: Release-type-agnostic operating model — one release director, one orchestrating session, N flat lanes; the operating rules, run plan, lane brief, release claim, session and parked-decision handling, and the co-existence controls
 ---
 
 # Utils — Release Director Operating Model
@@ -89,6 +89,7 @@ convention is still binding; the difference is only who catches the violation.
 | 5 | Every lane's spend counts against the release **budget** | Mechanical: `specs/delegate.md`'s budget check plus the cost governance rules below | A single unguarded build day cost four figures |
 | 6 | **Single writer of `status.md` and `execution_log.md`: the orchestrating session.** Lanes write only their own artifact tree and their own state file | Convention (lane brief; orchestrator's consolidation check) | Concurrent writes corrupted rows; 46 commits in 24 hours across 4 people silently discarded 54 models of completed work |
 | 7 | **Name the command, before and after, in full.** A reply that starts work ends with `Running: <command>[, <command>]`; every report ends with `Ran: <command>[, <command>]`; a step a gate stopped is named as well (`Not run: <command>, gate: <precondition>`). Each `<command>` is the command as it would be typed: `/wire:` prefix, release folder and any flags (`/wire:business-rules-generate 01-dbt-foundation --domain revenue`), never a bare name. A plan names a command or skill for every step (`specs/session/plan.md`) | Convention (every orchestrator reply; the consolidation pass compares each `Ran:` line with the execution-log rows it wrote) | Consultants directing Wire could not say which command had done the work, could not learn the commands by using Wire, and could not answer a client who asked which command to use (wire#265). `specs/start.md` already keeps the command name in its output for this reason; this rule extends it to every reply |
+| 8 | **Set out the run before it starts.** A directive that would run two or more commands before the next stop point, or any warehouse-touching command, is first shown as a **run plan** (below): the runnable set in its order, each command in full, with its scope, what it produces, and the point where the run will stop. The orchestrator then waits for **go / adjust / cancel**. A directive that runs one command that does not query a warehouse needs no plan, whether it runs in the foreground or as a lane; its `Running:` line is the plan | Convention (orchestrator reply; `/wire:delegate` Step 4 and `/wire:work` Step 4 are the same rule at their entry points) | Lanes and warehouse spend are committed at dispatch. A director who first met the commands in a `Ran:` line had approved the work by intent alone and could not have caught a wrong scope or an unwanted build before it cost anything; a ticket got a command-level plan under `/wire:work` while a whole phase run from one word got none (wire#265) |
 
 **Rule 6 is the change for linear release types.** Outside orchestrated mode,
 a delegated subagent updates `status.md` itself and that behaviour is
@@ -112,6 +113,85 @@ next carries both. Gates are named the same way: `Not run: /wire:dbt-generate 01
 gate: data_model review`. The line is not the record (the execution log is); it is
 the part of the record the person is looking at. Hiding it is how a director
 model becomes a black box.
+
+## The run plan
+
+Rule 8 in full. Before the orchestrator dispatches a run of more than one
+command, or any warehouse-touching command, it shows the plan and waits.
+
+**When a plan is required**
+
+| Run | Plan |
+|---|---|
+| One command, no warehouse query (foreground or lane) | Not required. The `Running:` line (rule 7) is the plan. |
+| Two or more commands before the next stop point | Required |
+| Any command that queries a warehouse | Required, whatever `warehouse_spend` says |
+
+A single command dispatched to a lane is still one command: the `Running:`
+line names it in full, and the director can stop it. What the plan exists to
+catch is a run the director has not seen the shape of (several commands, or
+several lanes at once) or one that costs money before it reports.
+
+The **stop point** is the first of: a review edge or other parked decision
+(under `stop_at: decisions`, the default), the end of the phase
+(`stop_at: phase_end`), or nothing left runnable (`stop_at: never`). An
+interactive artifact that occupies the director (`runnable_set.md` Step 5.3)
+is a stop point too: the run pauses there for the director's input.
+`/wire:work` Step 4 and `/wire:delegate` Step 4 apply the same rule at their
+entry points; a plan there is always required, because both run more than one
+command.
+
+**Shape.** The same table `specs/session/plan.md` uses, so a plan reads the
+same whichever entry point produced it:
+
+```
+Run plan — 01-store-performance, up to the conceptual model review
+
+| # | Step | Type | Command or skill | Scope | Produces |
+|---|---|---|---|---|---|
+| 1 | Draft the conceptual model | command | /wire:conceptual_model-generate 01-store-performance | design/conceptual_model.md | entity model, validate report |
+| 2 | Draft the mockups with you | command | /wire:mockups-generate 01-store-performance | design/mockups/ | HTML mockups (foreground) |
+| 3 | Approve the conceptual model | decision | director | conceptual_model review | ruling; the run stops here |
+
+1 and 2 run in parallel (no dependency between them; lanes_max 4).
+Not planned: /wire:business-rules-generate 01-store-performance (ruling R-1: skip).
+
+go / adjust / cancel?
+```
+
+Rules for the content:
+
+1. **The rows are the runnable set** (`specs/utils/runnable_set.md`), in its
+   order, and nothing else. A command the runnable set did not return is not in
+   the plan. The plan is computed from the files on every directive; it is
+   never carried over from an earlier one.
+2. **Each command is in full**, as it would be typed: `/wire:` prefix, release
+   folder, flags (rule 7).
+3. **Scope names the tree the step may write.** For a lane it is the lane
+   brief's `Owns:` line, so the plan and the brief cannot disagree.
+4. **The stop point is a row** of type `decision`, so the director sees where
+   the run will end before it starts. A step a gate or the budget keeps out is
+   listed under the table by command with the precondition, setting or ruling
+   id, never dropped silently.
+5. **go** runs the plan as shown; **adjust** takes a change (drop a step,
+   narrow a scope, change the budget) and re-presents the whole plan;
+   **cancel** runs nothing. Silence is not go. A director who wants no plan
+   for a session says so ("just run it"), and the orchestrator records a `mode`
+   row and proceeds with the `Running:` line alone until the session ends.
+
+**Record.** On go, the orchestrator appends one execution-log row before the
+first step runs:
+
+```
+| YYYY-MM-DD HH:MM | run plan | approved | 2 steps to conceptual_model review: /wire:conceptual_model-generate 01-store-performance .. /wire:mockups-generate 01-store-performance | <director> | orchestrator [<id>] | n/a | n/a | n/a |
+```
+
+A step that then runs differently from the plan carries
+`deviation: <what differed>` in its own row's Detail, in the form
+`specs/session/plan.md` and `/wire:work` Step 5 already use, so
+`/wire:status-sync` can compare the plan with what ran. The plan is not the
+record; the execution log is. It is the part of the record the director sees
+before the work starts, as the `Ran:` line is the part they see after.
 
 ## Lane state and resume contract
 

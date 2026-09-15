@@ -175,7 +175,7 @@ Wire auto-detects which ingestion tool you are using and connects via MCP, falli
 | Tool | Connection | Fallback |
 |---|---|---|
 | Fivetran | claude.ai Fivetran MCP server | Pre-exported CSV at `audit/fivetran_connectors_input.csv` |
-| RudderStack | MCP server at `mcp.rudderstack.com` (OAuth) | None; authenticate via `/wire:mcp auth rudderstack` |
+| RudderStack | MCP server at `mcp.rudderstack.com` (OAuth), added per engagement in `.claude/settings.json` (not bundled with the plugin; the `rudderstack` skill has the block) | None; authenticate via `/mcp` |
 | Coupler.io | MCP server at `app.coupler.io/mcp` (personal access token) | CSV at `audit/coupler_dataflows_input.csv` |
 | Segment | Public API token (`SEGMENT_TOKEN` env var) | None; no MCP server available |
 | Airbyte | Airbyte API token (`AIRBYTE_TOKEN` env var, `api.airbyte.com/v1` or self-hosted) | Optional: Agent MCP at `mcp.airbyte.ai/mcp` |

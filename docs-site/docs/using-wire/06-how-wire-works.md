@@ -18,10 +18,11 @@ Considering a single directive from your point of view, "approve the requirement
 3. It records your approval, under your name, by running the review command for the requirements.
 4. It reads the definition of the kind of release you are running and works out, for every artifact in the release, whether it can run now, is waiting on you, is blocked by something upstream, is not part of this release or is already complete.
 5. It tells you, in one sentence, what it is about to do and why: "Requirements approval releases two: the conceptual model, in the background, and the prototype, with you here."
-6. It runs the generate command for the prototype itself, because that artifact needs your input, and it hands the conceptual model to a **lane agent**, a specialist that will do that one task in its own part of the repository.
-7. The lane agent runs the generate command for the conceptual model, writes the artifact and its own state file and reports back once: complete, stalled or in need of a ruling.
-8. The orchestration agent checks the lane's work (the files exist, the checks ran and passed, the lane wrote nothing it should not have), and then writes the record: the artifact's new state, a row in the execution log and any ruling you gave along the way.
-9. Finally, it reports back to you, outcome first and in plain words, ending with a line that names the commands that ran.
+6. Because the directive would run more than one command, it sets the run out before it starts: one line per step, each with its command written in full, what it may touch, and the decision at which the run will stop. Then it waits for your go. (A directive that runs a single command, with no warehouse query, skips this step; the sentence and the command name on the last line are the plan. A run that queries a warehouse always gets one, whatever its size.) Your "go" is written to the execution log before anything runs.
+7. It runs the generate command for the prototype itself, because that artifact needs your input, and it hands the conceptual model to a **lane agent**, a specialist that will do that one task in its own part of the repository.
+8. The lane agent runs the generate command for the conceptual model, writes the artifact and its own state file and reports back once: complete, stalled or in need of a ruling.
+9. The orchestration agent checks the lane's work (the files exist, the checks ran and passed, the lane wrote nothing it should not have), and then writes the record: the artifact's new state, a row in the execution log and any ruling you gave along the way. A step that ran differently from the plan is marked as a deviation in its log row.
+10. Finally, it reports back to you, outcome first and in plain words, ending with a line that names the commands that ran.
 
 Everything else in this chapter is a closer look at one of the things named in that list.
 

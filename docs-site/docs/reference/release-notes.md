@@ -77,13 +77,17 @@ This is only possible now because of the other four mechanisms in this release: 
 
 **Budget.** An optional `budget:` block caps concurrent lanes, refuses warehouse-querying lanes under `warehouse_spend: none`, and says where to stop. You set it in prose; Wire writes the block. An absent block means the defaults, not a budget of zero.
 
+**The run is set out before it starts.** Operating rule 8 (#265). A directive that would run two or more commands before the next stop point, or any command that queries a warehouse, is first shown as a run plan: the runnable set in order, each command in full, its scope, what it produces and the decision at which the run stops, with anything held back named alongside its gate, budget setting or ruling. The orchestrator waits for go, adjust or cancel, and the go is an execution-log row. A single command with no warehouse query gets its `Running:` line only. `/wire:work` and `/wire:delegate` already did this at their entry points; the rule makes "carry on" do the same, so a phase run from one word gets the same scrutiny as a ticket. The `release-director` skill now also follows rule 7 in full: `Running:` before, `Ran:` after, every command with its release folder and flags.
+
+**RudderStack is no longer bundled.** The plugin's `.mcp.json` declared RudderStack through a local `mcp-remote` bridge, which opened a browser sign-in on every plugin load for every consultant. It is now added per engagement in `.claude/settings.json`, where the client uses it; the `rudderstack` skill has the block.
+
 **Active release is resolved, not guessed.** Named release, then the git worktree or branch, then the only release written to in the last 7 days, then ask. The old rule — most recently modified — silently picked whichever of two in-flight releases was touched last.
 
 **Attribution.** Execution-log rows gain `By` and `Session` columns, and telemetry replaces the hardcoded `autopilot: "false"` property with `invoked_by` (`typed`, `orchestrator`, `lane`, `autopilot`). Without it, an operating model that drives typed commands toward zero would make adoption unreadable. Legacy four-column log rows stay valid and are never rewritten.
 
 **Co-existence.** No global switch. Gemini CLI stays command-driven. "You drive" hands control back for a session. `orchestration.mode: manual` in `.wire/engagement/context.md` restores pre-4.0 behaviour exactly, including `/wire:start` print-only. Typing any command always works. `/wire:upgrade` adds the new blocks to existing engagements with defaults, and nothing changes for them until a director gives a directive.
 
-Six behavioural tests under `wire/tests/core/` cover the runnable set, the claim, active-release resolution, the ruling gate, log ordering and mode precedence. `platform_migration` behaviour under the fleet model is unchanged: its spec is now the migration profile of the general operating model, keeping its lane roster and carve-out additions. See [The Release Director Model](../advanced/release-director).
+Eight behavioural tests under `wire/tests/core/` cover the runnable set, the claim, active-release resolution, the ruling gate, log ordering, mode precedence, the `/wire:work` iteration rules and the run plan. `platform_migration` behaviour under the fleet model is unchanged: its spec is now the migration profile of the general operating model, keeping its lane roster and carve-out additions. See [The Release Director Model](../advanced/release-director).
 
 ### Modelling-led discovery
 

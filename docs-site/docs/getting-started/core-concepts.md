@@ -59,7 +59,7 @@ An artifact should not progress until all three gates are passed, and downstream
 
 ## Directing rather than typing
 
-**Since v4.0.0, on Claude Code.** You do not have to know which of 334 commands comes next. Say what you want done ("run what's next", "approve it and carry on", "start a new engagement from this SOW") and Wire computes the answer from the release-type definition, says in one plain sentence what it is about to do, runs it and stops where a decision is yours. Its report leads with the outcome in plain words and ends with a line naming the commands that ran, so you learn the command names as you go rather than up front.
+**Since v4.0.0, on Claude Code.** You do not have to know which of 334 commands comes next. Say what you want done ("run what's next", "approve it and carry on", "start a new engagement from this SOW") and Wire computes the answer from the release-type definition, says in one plain sentence what it is about to do, sets the run out as a command-level plan and waits for your go when it is more than one command or touches a warehouse, runs it and stops where a decision is yours. Its report leads with the outcome in plain words and ends with a line naming the commands that ran, so you learn the command names as you go rather than up front.
 
 Three tiers do the work:
 

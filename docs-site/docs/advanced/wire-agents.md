@@ -93,28 +93,30 @@ Review commands (`*-review`) always stay in the main session, because they requi
 /wire:delegate <release-folder>
 ```
 
-Wire reads `status.md`, identifies all pending artifact work, groups it by agent type, computes a parallel and sequential execution plan and presents it for your approval before spawning any subagents. A typical full-platform plan looks like this:
+Wire reads `status.md`, identifies all pending artifact work, groups it by agent type, computes a parallel and sequential execution plan and presents it for your approval before spawning any subagents. This is the run plan of the operating model's rule 8, grouped by agent: every command is written in full, as you would type it, and nothing is dispatched until you answer yes, adjust or cancel. A typical full-platform plan looks like this:
 
 ```
 Step 1 (sequential):
-  discovery-analyst → requirements-generate, workshops-generate
+  discovery-analyst → /wire:requirements-generate <release-folder>, /wire:workshops-generate <release-folder>
 
 Step 2 (parallel, starts after step 1):
-  2a  data-designer    → conceptual_model-generate, pipeline_design-generate
-  2b  pipeline-engineer → pipeline-generate
+  2a  data-designer    → /wire:conceptual_model-generate <release-folder>, /wire:pipeline_design-generate <release-folder>
+  2b  pipeline-engineer → /wire:pipeline-generate <release-folder>
 
 Step 3 (multi-wave fan-out, starts after step 2):
-  dbt-developer → data_model-generate, dbt-generate  [fan-out — see below]
+  dbt-developer → /wire:data_model-generate <release-folder>, /wire:dbt-generate <release-folder>  [fan-out — see below]
 
 Step 4 (parallel, starts after step 3):
-  4a  semantic-layer-developer → semantic_layer-generate, dashboards-generate
-  4b  data-quality-engineer    → data_quality-generate
+  4a  semantic-layer-developer → /wire:semantic_layer-generate <release-folder>, /wire:dashboards-generate <release-folder>
+  4b  data-quality-engineer    → /wire:data_quality-generate <release-folder>
 
 Step 5 (sequential, starts after step 4):
-  qa-agent → validate all artifacts from steps 1–4
+  qa-agent → /wire:<artifact>-validate <release-folder> for every artifact from steps 1–4
 
 Step 6 (sequential, starts after step 5):
-  delivery-lead → deployment-generate, training-generate
+  delivery-lead → /wire:deployment-generate <release-folder>, /wire:training-generate <release-folder>
+
+Proceed? (yes / adjust / cancel)
 ```
 
 The plan respects Wire's artifact dependency graph: requirements must be approved before any technical agent starts, and dbt and dashboard work can proceed concurrently once design is done.

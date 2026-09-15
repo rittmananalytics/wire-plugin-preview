@@ -280,7 +280,7 @@ Build the required server list using this mapping:
 | `release_type: platform_migration`, `source_platform: snowflake` | Snowflake MCP | `mcp__claude_ai_Snowflake__authenticate` |
 | `release_type: platform_migration`, `source_platform: bigquery` OR `target_platform: bigquery` | BigQuery MCP | `mcp__claude_ai_BigQuery_MCP__list_dataset_ids` with `project_id` from `migration.target_project` |
 | `migration.ingestion_tool: fivetran` | Fivetran MCP | `mcp__fivetran__get_account_info` |
-| `migration.ingestion_tool: rudderstack` | RudderStack MCP | `mcp__plugin_wire_rudderstack__user_details` |
+| `migration.ingestion_tool: rudderstack` | RudderStack MCP (configured per engagement in `.claude/settings.json`, not bundled with the plugin) | `mcp__rudderstack__user_details` |
 | `jira.project_key` is non-null | Atlassian MCP | `mcp__claude_ai_Atlassian__getAccessibleAtlassianResources` |
 | `docstore.provider: confluence` | Atlassian MCP | (same as Jira probe — deduplicate) |
 | `docstore.provider: notion` | Notion MCP | `mcp__notion__authenticate` |
