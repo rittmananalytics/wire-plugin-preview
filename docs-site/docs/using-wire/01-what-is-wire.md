@@ -1,128 +1,450 @@
 ---
 sidebar_position: 1
-title: What Wire Is
+title: What Is Wire?
 ---
 
-# What Wire Is
+# The Wire Framework
 
 **Rittman Analytics** | Version 4.0.0
 
-Wire is Rittman Analytics' analytics engineering assistant, an agent that runs inside Claude Code and carries our delivery method with it. You direct the work in plain English while it plans the steps, produces the documents, models and dashboards, checks its own output against the method and stops whenever a decision is yours. Everything it produces and does lives as files in your engagement's git repository.
+Wire is Rittman Analytics' **agentic delivery system for data platform projects**. It combines our delivery methodology with AI coding agents to plan, build, validate and govern an engagement from initial requirements through design, development, testing, deployment and handover.
 
-This chapter covers what makes Wire different from a coding assistant, the work you can ask it to do, how a session unfolds, what you have at the end of a release, and installing Wire ready for Chapter 2. Let's start with what Wire knows that a coding assistant does not.
+You direct the work in plain English. Wire works out what can happen next, coordinates the specialist agents needed to do it, runs the required validation and quality checks and stops where a decision or approval belongs to you or the client.
 
-## What Problem Does It Solve?
+Throughout the project, Wire maintains the state of the engagement: what has been produced, what it depends on, what has passed validation, what has been approved and what remains blocked.
 
-A general coding assistant will write you a valid SQL model, and it will do so quickly. What it will not do is write the model the way the rest of the project expects it: named to the project's convention, with its tests, its documentation and a note of the requirement it satisfies, and only once the design it implements has been approved. Wire does all of that, because Wire knows how a data platform engagement is run. It knows which documents come first, what has to be approved before the next step can start, how a warehouse is laid out in layers, which tests every table needs and what the client should be handed at the end, and it knows these things because they are Rittman Analytics' delivery method, built over more than 20 years of consulting and written down in a form that an agent can follow rather than guess at.
+**Claude Code** from Anthropic and **Gemini CLI** from Google provide AI execution runtimes. Wire provides the delivery system around them: the methodology, release lifecycle, project state, specialist workflows, quality gates, approvals and audit trail that turn individual AI-generated outputs into a coherent data platform project.
 
-It follows, therefore, that Wire does not improvise a structure and hope it holds together. It follows the method, it shows you the result at each stage and, where the method calls for a human decision, it stops and asks for one. As we will see in Chapter 6, the method is written down as data that Wire reads rather than as advice it might forget, which is what makes the difference between the third model and the thirtieth.
+```mermaid
+flowchart TB
+    User["Practitioner or Delivery Team"]
 
-## What Can You Ask It To Do?
+    Wire["Wire
+    Delivery methodology
+    Project state
+    Orchestration
+    Governance
+    Validation
+    Approvals"]
 
-Wire organises work into "releases": a release is one piece of work with a defined start, a set of things it produces and a finish, and every release follows one of a small number of patterns that Wire knows, each of which says what gets produced, in what order and where the approvals fall. Some of the things you can say to Wire, each of which starts a release of one kind or another, are:
+    Claude["Claude Code"]
+    Gemini["Gemini CLI"]
 
-- "Start a new engagement from this statement of work."
-- "Design the dashboards first and get them approved before we build anything."
-- "Build the dbt project for these three source systems."
-- "Run a discovery with this client and give me a roadmap their sponsor can sign off."
-- "Migrate this Snowflake warehouse to BigQuery and prove the numbers match."
-- "Move these Looker dashboards to Omni."
-- "Prepare the training and hand-over for the client's team."
+    Agents["Specialist Agents"]
+    Skills["Skills and Workflows"]
+    Tools["Data Platform Tools
+    dbt · BigQuery · Snowflake
+    Looker · Omni · Fivetran · etc."]
 
-Releases belong to an "engagement", which is the client contract, and most engagements have more than one release: a discovery first, as a rule, then one or more builds that the discovery scoped. Part 2 has [a page for every kind of release](../getting-started/release-types.md), and Chapters 2, 3, 4 and 6 of this part each follow one of them from beginning to end.
+    User --> Wire
+    Wire --> Claude
+    Wire --> Gemini
+    Claude --> Agents
+    Gemini --> Agents
+    Agents --> Skills
+    Skills --> Tools
 
-## How Do You Work With It?
+    Tools --> Wire
+```
 
-The short answer is that you direct, and Wire does the work and reports back. There are two ways in: a new engagement, planned from the statement of work, and a ticket against a platform that is already live, planned from the ticket inside the release that built it. Chapters 2 and 3 show the first; Chapter 4 shows the second. The slightly longer answer is that a session with Wire is a loop, and it is worth seeing the whole loop once before we look at each part of it.
+Wire sits above the individual coding runtime. Claude Code or Gemini CLI supplies reasoning and execution. Wire supplies the project-level method and controls that determine what should happen, when it can happen and how the resulting work is checked.
+
+## Coding agents complete tasks. Wire delivers projects.
+
+Modern coding agents are very good at individual engineering tasks. Given the right context, they can write SQL, create a dbt model, build a pipeline, generate LookML or diagnose a failing test.
+
+A data platform project requires more than a sequence of isolated tasks.
+
+It needs to know:
+
+- why something is being built
+- which requirement it satisfies
+- which design decisions constrain it
+- whether its upstream dependencies are ready
+- which engineering standards apply
+- how the result should be validated
+- what evidence needs to be retained
+- whether a client or practitioner needs to approve it
+- which downstream work it unlocks
+- what the next person working on the project needs to know
+
+Without that project-level context and control, even individually good AI-generated outputs can drift apart. Naming conventions change. Business rules are interpreted differently between models. Tests do not reflect requirements. Downstream work starts before upstream decisions have been agreed. Important context disappears between sessions.
+
+Wire provides the structure around the coding agent that prevents this.
+
+It treats a data platform engagement as a **governed delivery process**, not simply a collection of prompts.
+
+## Engagements and releases
+
+A Wire project is organised as an **engagement** containing one or more **releases**.
+
+The engagement holds the long-lived context for the client and project.
+
+A release represents a defined piece of delivery work, with a goal, scope, expected artifacts and dependencies.
+
+Each release then contains the artifacts needed to deliver that outcome.
+
+```mermaid
+flowchart TB
+    E["Engagement
+    Client and project context"]
+
+    R1["Release
+    Data Platform MVP"]
+    R2["Release
+    Marketing Analytics"]
+    R3["Release
+    Platform Migration"]
+
+    A1["Requirements"]
+    A2["Source Assessment"]
+    A3["Data Model"]
+    A4["dbt Models"]
+    A5["Semantic Layer"]
+    A6["Dashboards"]
+    A7["Tests"]
+    A8["Deployment"]
+    A9["Handover"]
+
+    E --> R1
+    E --> R2
+    E --> R3
+
+    R1 --> A1
+    R1 --> A2
+    R1 --> A3
+    R1 --> A4
+    R1 --> A5
+    R1 --> A6
+    R1 --> A7
+    R1 --> A8
+    R1 --> A9
+```
+
+This distinction matters because project context and release state have different lifetimes.
+
+An engagement might continue for a year while individual releases deliver a new platform, a marketing data product, a migration or a dashboard extension within it.
+
+## How Wire works
+
+Each release defines the outcome being delivered and the sequence of artifacts needed to get there.
+
+Depending on the type of work, those artifacts might include requirements, source assessments, conceptual models, pipeline designs, dbt models, semantic layers, dashboards, data quality tests, deployment runbooks and training materials.
+
+Those artifacts form a dependency graph.
 
 ```mermaid
 flowchart LR
-    A["You say what you want"] --> B["Wire says what it will do,<br/>then does it"]
-    B --> C["Wire reports the result<br/>in plain words"]
-    C --> D{"Your decision"}
-    D -->|"Approve"| B
-    D -->|"Ask for changes"| B
-    D -->|"Park it for the client"| E["Wire carries on with work<br/>that does not depend on it"]
-    E --> B
+    A["SOW + Source Materials"]
+    B["Requirements"]
+    C["Design"]
+    D["Build"]
+    E["Validate + Test"]
+    F["Deploy"]
+    G["Enable + Handover"]
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+
+    style A fill:#f5f5f5,stroke:#333
+    style G fill:#e8f5e9,stroke:#333
 ```
 
-You say what you want, in a sentence or two. Wire tells you what it is about to do and why, in one sentence, and then does it, checking each piece of work against the method as it finishes. When the work is done, or when a decision is needed, it reports back in plain words: what it produced, what the checks found and what it needs from you. At every approval you have three answers available, which are to approve, to ask for changes or to "park" the decision for the client to sign off, and Wire never approves anything on your behalf (unless you switch on the unattended mode described in Part 2, in which case it says so in the record). Work that does not depend on the parked decision carries on around it.
+Wire uses that graph, together with the current project state, to determine what work is ready to begin and what is waiting on something else.
 
-So what does that look like in practice? Here are the first few minutes of the Northwind Retail engagement, exactly as you would type them and Wire would reply.
+For each stage, Wire provides the AI with the methodology and project context it needs. This can include:
 
-| You say | Wire replies |
-|---|---|
-| "New engagement for Northwind Retail and let's start with a dashboard mock for store performance dashboards. The statement of work is in the docs folder and stop at the decision points." | "This reads as a dashboards-first release: the client wants to approve the dashboard designs before any data work starts. Client Northwind Retail, one release named Store Performance. The statement of work says warehouse access is two weeks away, so the first build will run on sample data. Confirm?" |
-| "Confirm." | "Engagement set up. Requirements drafted from the statement of work: 14 requirements, all checks pass, two need clarifying with the client. Approve now, or park for the client?<br/><br/>Ran: `/wire:new`, `/wire:requirements-generate 01-store-performance`, `/wire:requirements-validate 01-store-performance`" |
-| "Approve, and carry the two questions to the kickoff." | "Approved, and the two questions are noted for kickoff. That releases two pieces of work, and neither depends on the other, so here is the run before it starts:<br/>1. The dashboard designs, with you here: `/wire:mockups-generate 01-store-performance`<br/>2. The conceptual model, in the background: `/wire:conceptual_model-generate 01-store-performance`<br/>The run stops at the conceptual model review. Go, adjust or cancel?<br/><br/>Ran: `/wire:requirements-review 01-store-performance`" |
-| "Go." | "Starting both.<br/><br/>Running: `/wire:mockups-generate 01-store-performance`, `/wire:conceptual_model-generate 01-store-performance`" |
+- upstream requirements and design decisions
+- source-system and warehouse context
+- naming and modelling conventions
+- technology-specific implementation guidance
+- expected artifact structure
+- validation criteria
+- review requirements
+- project decisions recorded earlier in the engagement
 
-The last line of each reply names the Wire command that has just done the work, or the one about to start. You do not need those names yet, and the chapters that follow keep to plain words around them; they are there so that when you do want to know what a step is called, or a client asks you, the answer has been in front of you all along. When more than one piece of work is about to start, or anything that queries a warehouse, Wire goes one step further and sets the run out first, one line per step with its command and where the run will stop, and waits for your go; a single step needs no plan beyond that last line. Four messages from you, and Wire has set up the engagement, written and checked the requirements, recorded your approval together with your instruction about the kickoff and started two pieces of work at once, because it could see that neither depended on the other. [Chapter 2](./02-getting-started.md) follows this release all the way to live dashboards.
+The agent therefore does not start each task from a blank prompt. It works inside the accumulated context and constraints of the project.
 
-## What Do You Get at the End?
+## What it looks like in practice
 
-Everything Wire produces is a file in your project's git repository, which means it is versioned, reviewable and yours. For a full platform build that comes to the requirements traced back to the statement of work, the designs (the business concepts, the data model and the pipeline design), the dbt project with tests on every table, the semantic layer and the dashboards, data quality tests and user acceptance tests and the deployment runbook, together with training material and documentation for the client's team.
+You might start with a signed Statement of Work, workshop notes, an existing warehouse and a set of source systems.
 
-Alongside all of that, and just as valuable, Wire keeps a record of the work itself: what was done and when, what was approved and by whom, together with every decision you made along the way and your reason for it. As such, a colleague who has never seen the engagement can open the repository, read the record and pick the work up where you left it, which is something no amount of well-written SQL gives you on its own.
+You ask Wire to create the engagement and release.
 
-## Where Does It Run, and What Does It Connect To?
+Wire extracts and structures the requirements, identifies missing information and creates the initial project state.
 
-Wire runs in Claude Code, Anthropic's command-line coding assistant, inside a git repository. Directing it in plain English, which is what this part of the guide describes, works in Claude Code only. Wire also works in Gemini CLI, Google's equivalent, but there you type Wire's commands yourself; [Part 2 documents every command](../reference/commands.md), and [Chapter 7](./07-a-full-platform-build.md) shows where typing one directly is the better choice even in Claude Code.
+Once the requirements are agreed, it can move into design. Approved designs become inputs to development. Generated code is validated against both engineering standards and the decisions made earlier in the project. Work that requires practitioner or client judgement stops for review before dependent work continues.
 
-:::note
-The commands, the artifacts and the record on disk are identical whichever way you run Wire. Only the way you drive it differs, so nothing you learn in Part 1 is wasted if you later find yourself typing.
+A typical release might progress like this:
+
+```mermaid
+flowchart TD
+    R["Requirements"]
+    S["Source Assessment"]
+    M["Data Model"]
+    D["Pipeline + dbt Development"]
+    L["Semantic Layer + Dashboards"]
+    Q["Data Quality + UAT"]
+    P["Deployment"]
+    H["Training + Handover"]
+
+    R --> S
+    S --> M
+    M --> D
+    D --> L
+    L --> Q
+    Q --> P
+    P --> H
+```
+
+The actual graph depends on the release type. Some activities can happen in parallel while others are deliberately blocked until upstream decisions are approved.
+
+At any point you can ask Wire what has been completed, what is currently blocked and what it recommends doing next.
+
+You can work interactively, directing individual pieces of work yourself, or use **Autopilot** once the shape of the work is sufficiently well understood.
+
+Autopilot coordinates the applicable Wire workflows through the release, pausing where validation fails or human approval is required.
+
+The practitioner remains responsible for the project. Wire handles more of the mechanics required to keep that project coherent.
+
+## More than code generation
+
+Wire does not just generate implementation code.
+
+A typical data platform engagement can require dozens of different deliverables across discovery, architecture, analytics engineering, business intelligence, testing, deployment and enablement.
+
+Wire can coordinate work across areas such as:
+
+- requirements discovery and specification
+- source-system analysis
+- data architecture and modelling
+- data pipeline design and development
+- dbt development and migration
+- data quality and testing
+- BigQuery and Snowflake engineering
+- Looker and LookML development
+- dashboard design and validation
+- semantic layer development
+- platform and warehouse migrations
+- deployment planning
+- user acceptance testing
+- documentation
+- training and handover
+
+The exact workflow depends on the release type.
+
+A focused dbt development release will therefore behave differently from a full data platform implementation or a platform migration.
+
+Wire selects the methodology appropriate to the work rather than forcing every engagement through the same sequence.
+
+## Methodology as executable project context
+
+The delivery methodology behind Wire is encoded as structured workflow specifications, specialist skills and release definitions that the AI reads as it works.
+
+These specifications tell the agent things such as:
+
+- what inputs it should inspect before starting
+- which upstream decisions constrain the task
+- what engineering patterns to follow
+- what deliverable it is expected to produce
+- what validation should be performed
+- what evidence should be recorded
+- how the result relates to the rest of the release
+
+This addresses one of the main limitations of using a general-purpose coding agent on a substantial data project.
+
+The problem is rarely that the model does not know SQL or dbt.
+
+The problem is maintaining **context, consistency and control across an entire engagement**.
+
+For example, an AI model may know perfectly well how surrogate keys should be implemented. That does not guarantee that 30 models produced across several sessions will all use the agreed pattern, implement the agreed grain and remain consistent with the requirements and semantic model.
+
+Wire carries those decisions forward.
+
+Instead of repeatedly telling the agent how the project works, the project itself becomes part of the agent's working context.
+
+## Generate, validate, review
+
+An important part of the Wire delivery model is the separation between producing an artifact and deciding that it is ready.
+
+Depending on the artifact and release type, work can move through separate **generate**, **validate** and **review** stages.
+
+```mermaid
+flowchart LR
+    U["Approved Upstream Context"]
+    G["Generate
+    Produce or update artifact"]
+    V["Validate
+    Technical and methodological checks"]
+    R["Review
+    Practitioner or stakeholder judgement"]
+    A["Approved"]
+    F["Fix Required"]
+
+    U --> G
+    G --> V
+
+    V -->|Pass| R
+    V -->|Fail| F
+    F --> G
+
+    R -->|Approved| A
+    R -->|Changes requested| F
+
+    A --> N["Unlock downstream work"]
+```
+
+**Generate** produces or updates the deliverable using the approved upstream context.
+
+**Validate** checks it against the applicable technical rules, project requirements and quality criteria.
+
+**Review** handles the judgement and approval needed before the project moves forward.
+
+Not every check can or should be delegated to an AI agent. Wire is designed around the idea that automation should accelerate delivery without removing the points where practitioner or stakeholder judgement matters.
+
+A requirements specification can be generated and checked for completeness, for example, but a client may still need to confirm that it accurately represents what they want.
+
+A data model can pass technical validation while still requiring an architect to approve an important modelling decision.
+
+Wire keeps those distinctions explicit.
+
+## Project state controls what happens next
+
+Wire does not simply execute a fixed checklist from beginning to end.
+
+The current state of the release determines what work is available.
+
+An artifact may be:
+
+- ready to generate
+- waiting on an upstream dependency
+- generated but awaiting validation
+- failed validation
+- awaiting review
+- approved
+- complete
+
+That state affects downstream work.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Blocked
+
+    Blocked --> Ready: dependencies satisfied
+    Ready --> Generated: generate
+    Generated --> ValidationFailed: validation fails
+    Generated --> Validated: validation passes
+    ValidationFailed --> Generated: regenerate / fix
+    Validated --> AwaitingReview: review required
+    Validated --> Approved: no review required
+    AwaitingReview --> Generated: changes requested
+    AwaitingReview --> Approved: approved
+    Approved --> Complete
+    Complete --> [*]
+```
+
+This allows Wire to reason about the project as a connected delivery system rather than treating every instruction as an independent prompt.
+
+It also makes orchestration possible. Several independent artifacts can be worked on concurrently while work with unresolved dependencies remains blocked.
+
+## Persistent project state
+
+AI coding sessions are temporary. Projects are not.
+
+Wire therefore stores the important state of an engagement in the project's git repository rather than relying on the coding agent to remember what happened in an earlier conversation.
+
+That state includes the artifacts produced by the project, their status, relevant decisions and the information needed to continue the work.
+
+```mermaid
+flowchart TB
+    Repo["Git Repository"]
+
+    Context["Engagement Context"]
+    Releases["Release State"]
+    Artifacts["Project Artifacts"]
+    Decisions["Decisions"]
+    Evidence["Validation Evidence"]
+    History["Git History"]
+
+    Repo --> Context
+    Repo --> Releases
+    Repo --> Artifacts
+    Repo --> Decisions
+    Repo --> Evidence
+    Repo --> History
+
+    Session1["AI Session 1"] --> Repo
+    Session2["AI Session 2"] --> Repo
+    Practitioner["Another Practitioner"] --> Repo
+```
+
+This means a practitioner can leave a project, return later or hand it to somebody else without reconstructing the engagement from chat history.
+
+It also means that the project develops an inspectable history alongside the implementation itself.
+
+At the end of a release, you do not just have generated SQL, models, dashboards and documentation.
+
+You have a version-controlled record of:
+
+- what was requested
+- what was designed
+- what was built
+- which requirements the implementation addresses
+- how it was validated
+- which decisions were made
+- what was approved
+- what was deployed
+- what was handed over
+
+That record becomes part of the deliverable.
+
+## The practitioner stays in control
+
+Wire is designed to increase the amount of project delivery that AI can perform, not to remove practitioners from the process.
+
+The valuable work of a data consultant or analytics engineer is not simply typing SQL.
+
+It includes understanding the client's problem, challenging assumptions, making architectural trade-offs, interpreting ambiguous requirements, deciding what *should* be built and working with stakeholders to make sure the result is useful.
+
+Wire takes on more of the repeatable mechanics around that work.
+
+It can read the project context every time. It can apply the same engineering conventions repeatedly. It can trace an implementation back to its requirements. It can run validation consistently. It can maintain project state and coordinate work between specialist agents.
+
+That gives the practitioner more time to concentrate on the decisions, relationships and problem-solving where human judgement has the greatest value.
+
+## What Wire provides
+
+The easiest way to think about the relationship between Wire and the underlying AI is:
+
+| AI coding runtime | Wire |
+| --- | --- |
+| Generates and edits code | Defines how the project is delivered |
+| Reasons about the immediate task | Maintains engagement and release context |
+| Uses tools | Coordinates specialist workflows and tools |
+| Responds to prompts | Determines applicable delivery steps |
+| Can inspect the repository | Maintains persistent project state |
+| Can test its work | Defines the required validation process |
+| Executes engineering tasks | Connects tasks to requirements and designs |
+| Works autonomously where appropriate | Introduces approvals and review gates where required |
+
+Claude Code or Gemini CLI provides the reasoning and execution capability.
+
+**Wire provides the delivery discipline around it.**
+
+:::info[About Wire and Rittman Analytics]
+
+Wire was created by Rittman Analytics from the methods we use to deliver data platform, analytics engineering and platform migration engagements.
+
+It is designed primarily for Rittman Analytics team members and our clients' data teams, providing an agentic way to develop and evolve modern data platforms while retaining the structure, quality controls and practitioner oversight expected of a professional consulting engagement.
+
+The integrations, processes and workflows embedded in Wire reflect current practices at Rittman Analytics and continue to evolve as we use the framework on real delivery projects.
+
+The plugin code and documentation are publicly available under the [Functional Source License 1.1](https://fsl.software). You're free to use them within those terms.
+
+For more information about Wire or Rittman Analytics' consulting services, contact [info@rittmananalytics.com](mailto:info@rittmananalytics.com).
+
 :::
-
-When the connections are set up, Wire can also read your recorded client meetings and bring the decisions made in them into its reviews, keep Jira or Linear in step with the work, publish its documents to Confluence or Notion for the client to comment on, and read from and write to the warehouse and the tools around it, such as BigQuery, Snowflake, Looker, Omni and Fivetran. [Part 2 lists the connections](../reference/mcp-servers.md) and how to set each one up.
-
-## Who Is Wire For?
-
-Wire is built for Rittman Analytics consultants and for the data teams of our clients, and the method it follows is the one Rittman Analytics uses on its own engagements. The plugin and this documentation are public under the [Functional Source License 1.1](https://fsl.software), and if you would like to know more about Wire or about our consulting, you can contact us at [info@rittmananalytics.com](mailto:info@rittmananalytics.com).
-
-## Getting Started
-
-Installing Wire into Claude Code takes three steps, each of which is a command you type into a Claude Code session. At a high level they are:
-
-1. Add Rittman Analytics' plugin catalogue.
-2. Install the Wire plugin.
-3. Load it into the current session.
-
-Let's take a look at each in turn.
-
-**Step 1: Adding the catalogue.** Claude Code installs plugins from catalogues (Anthropic calls them "marketplaces"), so your first step is to add ours:
-
-```
-/plugin marketplace add rittmananalytics/wire-plugin
-```
-
-**Step 2: Installing Wire.** With the catalogue added, install the plugin itself:
-
-```
-/plugin install wire@rittman-analytics
-```
-
-**Step 3: Loading it.** Finally, load the plugin into the session you are in, so that Wire is available without restarting Claude Code:
-
-```
-/reload-plugins
-```
-
-You should now be able to type `/wire:` and see Wire's commands offered for completion. If they do not appear, run the third step again; it activates whatever was installed since the session began. [Installation](../getting-started/installation.md) in Part 2 covers Gemini CLI and the connections, and [Upgrading from 3.x](../getting-started/upgrading-from-3x.md) is for anyone who has used an earlier Wire.
-
-With Wire installed, open Claude Code in the git repository for your engagement and say what you want. If this is your first time, follow Chapter 2, which starts from an empty repository and ends with approved dashboards.
-
-## What Is in This Guide?
-
-Part 1 of this guide is meant to be read in order. It shows how you work with Wire, in plain language, through three releases of increasing size and a ticket against one of them once it is live, and then explains what was happening underneath before showing the largest kind of release with commands typed at the points where that helps.
-
-| Chapter | What it covers |
-|---|---|
-| 1. What Wire Is | This page |
-| 2. Getting Started | A first release from an empty repository: dashboards designed and approved before any data work |
-| 3. Data Modelling and Transformation | A dbt build across three source systems, with the definitions agreed first |
-| 4. Working a Ticket | A change request against the live Northwind dashboards, worked inside the release that built them |
-| 5. Running Discovery | A discovery with seven stakeholders that ends in a roadmap the sponsor signs off |
-| 6. How Wire Works | The orchestration agent, the lane agents and the commands behind the steps you have seen |
-| 7. A Full Platform Build, with Commands | The largest kind of release, with commands typed directly where it helps |
-
-Part 2 is the reference: installation and upgrading, every kind of release, command-level walkthroughs, the integrations and the full command list. Let's begin, then, with a first release.
