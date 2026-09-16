@@ -95,6 +95,7 @@ const sidebars = {
             'tutorials/joining-mid-release',
             'tutorials/upgrading-your-release',
             'tutorials/data-model-registry',
+            'tutorials/dbt-charts',
           ],
         },
         {

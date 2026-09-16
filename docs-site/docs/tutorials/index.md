@@ -48,6 +48,7 @@ direction rather than by keystrokes.
 | [Joining Mid-Release](./joining-mid-release) | n/a | Aldgate Financial Services: consultant handover at Phase 3 | `/wire:start` state recovery; `decisions.md` history; Fathom transcript surfacing; first-session planning on an engagement you did not start |
 | [Upgrading Your Release](./upgrading-your-release) | n/a | Pennant Capital Management: dormant release resuming after a six-week pause | What `/wire:upgrade` changes and preserves; spec version delta; post-upgrade verification; re-entrancy with in-progress artifacts |
 | [Using the Data Model Registry](./data-model-registry) | n/a | Core Dynamics, Inc.: B2B SaaS MRR/NRR model inside a `full_platform` release | Registry check as an inline step of `data_model-generate`; confident vertical match with `adapt`; cross-vertical pattern matched on technique rather than stated origin; what gets recorded in `context.md` and carried into the generated model |
+| [dbt Charts Boards](./dbt-charts) | `dbt_development` (also `full_platform`, `dashboard_first`) | Norbury Coffee Roasters: three warehouse folders on BigQuery into one dashboard each, published to dbt Charts Cloud | `dbtcharts-generate --auto` with one lane per subject area; linked dimensions across folders; the design convention overridden per engagement (currency, theme, logo); the eleven validate checks; edits not regeneration after review; the `dct cloud` publish sequence and path-based access |
 
 :::note
 

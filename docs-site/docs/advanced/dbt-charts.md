@@ -82,6 +82,7 @@ Things found the hard way and recorded in the `dbtcharts` skill so nobody redisc
 
 ## See also
 
+- [Tutorial: dbt Charts Boards](../tutorials/dbt-charts): the three commands on a worked example, the convention override, and publishing to dbt Charts Cloud
 - [Wire Agents](./wire-agents) (the `semantic-layer-developer` agent runs the generate and validate commands)
 - [Full Platform Build](../release-types/full-platform), [dbt Development](../release-types/dbt-development), [Dashboard-First](../release-types/dashboard-first)
 - [Command Reference](../reference/commands)
