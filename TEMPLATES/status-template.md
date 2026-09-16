@@ -85,6 +85,11 @@ jira:
       generate_key: null
       validate_key: null
       review_key: null
+    dbtcharts:
+      task_key: null
+      generate_key: null
+      validate_key: null
+      review_key: null
     data_refactor:
       task_key: null
       generate_key: null
@@ -186,6 +191,10 @@ docstore:
         page_id: null
         page_url: null
         last_synced: null
+      dbtcharts:
+        page_id: null
+        page_url: null
+        last_synced: null
       data_refactor:
         page_id: null
         page_url: null
@@ -274,6 +283,10 @@ docstore:
         page_url: null
         last_synced: null
       dashboards:
+        page_id: null
+        page_url: null
+        last_synced: null
+      dbtcharts:
         page_id: null
         page_url: null
         last_synced: null
@@ -434,6 +447,15 @@ artifacts:
     validate: not_started
     review: not_started
     file: null
+    generated_date: null
+    generated_files: []
+    revision_history: []
+  dbtcharts:
+    generate: not_started
+    validate: not_started
+    review: not_started
+    charts_dir: null
+    boards: []
     generated_date: null
     generated_files: []
     revision_history: []

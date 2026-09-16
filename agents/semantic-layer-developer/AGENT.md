@@ -5,6 +5,8 @@ description: LookML views, explores, dashboards, and semantic layer definitions 
 specs:
   - dashboards-generate
   - dashboards-validate
+  - dbtcharts-generate
+  - dbtcharts-validate
   - ads/lookml_views-generate
   - ads/lookml_views-validate
   - ads/semantic_layer-generate
@@ -22,6 +24,7 @@ specs:
 skills:
   - lookml-content-authoring
   - omni
+  - dbtcharts
 mcp_requirements:
   - bigquery
   - github

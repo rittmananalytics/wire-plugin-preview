@@ -108,6 +108,7 @@ const sidebars = {
             'advanced/wire-agents',
             'advanced/autopilot',
             'advanced/model-routing',
+            'advanced/dbt-charts',
             'advanced/vscode-extension',
             'advanced/issue-tracking',
             'advanced/document-store',

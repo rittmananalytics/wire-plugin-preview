@@ -177,6 +177,10 @@ With the design approved, development is where the models get built. `/wire:dbt-
 
 **Ready criteria**: all five development artifacts are `review: approved` and the dbt tests are passing.
 
+### Optional: dbt Charts boards
+
+If the client wants dashboards that live with the dbt models rather than in a BI tool, ask for them and Wire adds the optional `dbtcharts` artifact after the dbt models pass validation: `/wire:dbtcharts-generate <release>` scaffolds one [dbt Charts](../advanced/dbt-charts) board per warehouse subject area from the dbt manifest and catalog, curates the charts against the requirements and the business rules register, and validates them with `dct`, including a warehouse dry-run. It can run alongside `dashboards`, or instead of it where no BI tool is in scope.
+
 ## Phase 4: Testing (Days 9–10)
 
 `/wire:data_quality-generate` generates additional data quality tests beyond the embedded dbt tests: freshness checks, row count reconciliation, cross-system validation and custom business rules.

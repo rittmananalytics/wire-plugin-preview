@@ -238,6 +238,9 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 | `/wire:dashboards-generate` | `<project-folder>` | Generate dashboards |
 | `/wire:dashboards-validate` | `<project-folder>` | Validate dashboards |
 | `/wire:dashboards-review` | `<project-folder>` | Review dashboards |
+| `/wire:dbtcharts-generate` | `<release-folder> [--subject-area <folder>[,<folder>]] [--no-warehouse] [--force]` | Generate dbt Charts boards, one per warehouse subject area, from the dbt manifest and catalog (deterministic scaffold, then curation) |
+| `/wire:dbtcharts-validate` | `<release-folder> [--no-warehouse]` | Validate dbt Charts boards — dct structure and warehouse dry-run, ref()-only queries, no inline data, metadata, coverage |
+| `/wire:dbtcharts-review` | `<release-folder>` | Review dbt Charts boards with stakeholders |
 | `/wire:orchestration-generate` | `<project-folder>` | Generate orchestration layer (Dagster or dbt Cloud) |
 | `/wire:orchestration-validate` | `<project-folder>` | Validate orchestration layer against pipeline design |
 | `/wire:orchestration-review` | `<project-folder>` | Review orchestration setup with stakeholders |

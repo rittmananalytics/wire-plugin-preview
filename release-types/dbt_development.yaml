@@ -89,6 +89,14 @@ phases:
           - artifact: dbt
             action: validate
             outcome: PASS
+      - id: dbtcharts
+        command: dbtcharts
+        required: false
+        sequence: 3
+        depends_on:
+          - artifact: dbt
+            action: validate
+            outcome: PASS
 
   - id: testing
     name: "Testing"

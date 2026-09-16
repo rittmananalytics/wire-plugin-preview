@@ -203,6 +203,10 @@ Two counts are recorded in `status.md` and printed in the summary:
 
 `dashboards-validate` runs nine checks against the approved mockup chain rather than the dashboard's own claims, and fails while either count is above zero, so the table fallback cannot quietly become the delivered dashboard.
 
+### Optional: dbt Charts boards
+
+Where the client's reporting tool is [dbt Charts](../advanced/dbt-charts), or where the approved mockup should also exist as code next to the models, the optional `dbtcharts` artifact runs after the dbt models pass validation. `/wire:dbtcharts-generate <release>` scaffolds a board per warehouse subject area and then maps every row of the visualization catalog to a dbt Charts chart type through a fixed table (KPI to `kpi`, line to `line`, donut to `pie`, table to `table`, and so on); a catalog row dbt Charts cannot draw is recorded as unmapped, never dropped. `/wire:dbtcharts-validate` fails if any catalog row is neither mapped nor listed.
+
 ## Phase 7: Data Refactor
 
 Once the client provides access to their actual data sources, the refactor:

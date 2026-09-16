@@ -18,6 +18,8 @@ matching skill file for those.
 Usage:
   python3 wire/scripts/lint_conventions.py --domain dbt \\
       --convention wire/conventions/dbt.yml --path models/ [--format json]
+  python3 wire/scripts/lint_conventions.py --domain dbtcharts \\
+      --convention wire/conventions/dbtcharts.yml --path charts/
 
 Exit code: 1 if any error-severity finding fires, 0 otherwise. Warnings never
 fail the run.
@@ -38,6 +40,7 @@ DOMAIN_EXTENSIONS = {
     "dbt": (".sql", ".yml", ".yaml"),
     "lookml": (".lkml",),
     "cube": (".yml", ".yaml"),
+    "dbtcharts": (".yml", ".yaml"),
 }
 
 
@@ -495,7 +498,120 @@ def check_cube(conv, filepath, text):
     return findings
 
 
-DISPATCH = {"dbt": check_dbt_file, "lookml": check_lookml, "cube": check_cube}
+def _rules(conv, section):
+    return [r for r in (conv.get(section) or []) if isinstance(r, dict) and r.get("id")]
+
+
+def check_dbtcharts(conv, filepath, text):
+    """dbt Charts boards under charts/ plus the project files (dbt_charts.yml, meta.yml).
+
+    Mechanical half of wire/conventions/dbtcharts.yml: KPI label length and prefix, title/label
+    and notes presence, KPI value formats, trend time_unit, hidden endpoint labels, section
+    heading rows, board-level theme, BigQuery SQL forms the dct static checker rejects, and the
+    anchor's allowed top-level keys. Presentation/window/shape settings are read by the generate
+    command, not checked here."""
+    findings = []
+    base = os.path.basename(filepath)
+    try:
+        doc = yaml.safe_load(text)
+    except Exception as e:
+        return [Finding("yaml_parse_error", "error", filepath, f"could not parse YAML: {e}")]
+    if not isinstance(doc, dict):
+        return findings
+
+    # --- project files -------------------------------------------------------------------
+    for rule in _rules(conv, "project_files"):
+        if rule.get("file") == base and rule.get("allowed_top_level_keys") is not None:
+            extra = sorted(k for k in doc if k not in rule["allowed_top_level_keys"])
+            if extra:
+                findings.append(Finding(rule["id"], _severity(rule, "error"), filepath,
+                                        f"{base} carries key(s) {extra}; allowed: {rule['allowed_top_level_keys']}"))
+        if rule.get("file") == base and rule["id"] == "meta_sets_theme" and "theme" not in doc:
+            findings.append(Finding(rule["id"], _severity(rule), filepath, "meta.yml does not set theme:"))
+    if base in ("dbt_charts.yml", "meta.yml"):
+        return findings
+    if "charts" not in doc and "rows" not in doc and "text" not in doc:
+        return findings  # not a board
+
+    def text_rule(section, rule_id):
+        r = get_rule(conv, section, rule_id)
+        if not r or not r.get("forbidden_pattern"):
+            return
+        for i, line in enumerate(text.splitlines(), 1):
+            if re.search(r["forbidden_pattern"], line):
+                findings.append(Finding(r["id"], _severity(r), filepath, r["description"], line=i))
+
+    if doc.get("charts"):  # a text-only board (the landing page) may use headings
+        text_rule("layout", "no_section_heading_rows")
+    text_rule("project_files", "board_no_own_theme")
+
+    # --- SQL forms ------------------------------------------------------------------------
+    for rule in _rules(conv, "sql"):
+        pat = rule.get("forbidden_pattern")
+        if not pat:
+            continue
+        for qname, q in (doc.get("queries") or {}).items():
+            sql = q.get("sql") if isinstance(q, dict) else q
+            if isinstance(sql, str) and re.search(pat, sql):
+                findings.append(Finding(rule["id"], _severity(rule, "error"), filepath,
+                                        f"query '{qname}': {rule['description']}"))
+
+    # --- charts and queries -----------------------------------------------------------------
+    notes_rule = get_rule(conv, "naming", "notes_required")
+    title_rule = get_rule(conv, "naming", "chart_title_required")
+    words_rule = get_rule(conv, "naming", "kpi_label_max_words")
+    prefix_rule = get_rule(conv, "naming", "kpi_label_no_table_prefix")
+    fmt_rule = get_rule(conv, "layout", "kpi_value_format_required")
+    tu_rule = get_rule(conv, "layout", "trend_time_unit_required")
+    ep_rule = get_rule(conv, "layout", "no_hidden_endpoint_labels")
+
+    if notes_rule:
+        for qname, q in (doc.get("queries") or {}).items():
+            if isinstance(q, dict) and not str(q.get("notes") or "").strip():
+                findings.append(Finding(notes_rule["id"], _severity(notes_rule, "error"), filepath,
+                                        f"query '{qname}' has no notes:"))
+
+    for cname, c in (doc.get("charts") or {}).items():
+        if not isinstance(c, dict):
+            continue
+        ctype = c.get("type")
+        style = c.get("style") if isinstance(c.get("style"), dict) else {}
+        if notes_rule and not str(c.get("notes") or "").strip():
+            findings.append(Finding(notes_rule["id"], _severity(notes_rule, "error"), filepath,
+                                    f"chart '{cname}' has no notes:"))
+        if ctype == "kpi":
+            label = str(c.get("label") or "")
+            if title_rule and not label.strip():
+                findings.append(Finding(title_rule["id"], _severity(title_rule, "error"), filepath,
+                                        f"KPI '{cname}' has no label:"))
+            if words_rule and label and len(label.split()) > int(words_rule.get("value", 4)):
+                findings.append(Finding(words_rule["id"], _severity(words_rule), filepath,
+                                        f"KPI '{cname}' label '{label}' has {len(label.split())} words (max {words_rule['value']})"))
+            if prefix_rule and label and re.search(prefix_rule["forbidden_pattern"], label):
+                findings.append(Finding(prefix_rule["id"], _severity(prefix_rule), filepath,
+                                        f"KPI '{cname}' label '{label}' starts with a table-name prefix"))
+            value_style = style.get("value") if isinstance(style.get("value"), dict) else {}
+            if fmt_rule and not value_style.get("format"):
+                findings.append(Finding(fmt_rule["id"], _severity(fmt_rule), filepath,
+                                        f"KPI '{cname}' has no style.value.format"))
+        else:
+            if title_rule and ctype and not str(c.get("title") or "").strip():
+                findings.append(Finding(title_rule["id"], _severity(title_rule, "error"), filepath,
+                                        f"chart '{cname}' ({ctype}) has no title:"))
+            if tu_rule and ctype in ("line", "bar", "area") and str(c.get("x") or "").lower() == "month":
+                axis_x = style.get("axis_x") if isinstance(style.get("axis_x"), dict) else {}
+                labels = axis_x.get("labels") if isinstance(axis_x.get("labels"), dict) else {}
+                if not (axis_x.get("time_unit") or labels.get("time_unit")):
+                    findings.append(Finding(tu_rule["id"], _severity(tu_rule), filepath,
+                                            f"chart '{cname}' plots month on x without style.axis_x.time_unit"))
+            ep = style.get("endpoint_labels") if isinstance(style.get("endpoint_labels"), dict) else {}
+            if ep_rule and ep.get("visible") is False:
+                findings.append(Finding(ep_rule["id"], _severity(ep_rule), filepath,
+                                        f"chart '{cname}' hides endpoint labels; alias the column instead"))
+    return findings
+
+
+DISPATCH = {"dbt": check_dbt_file, "lookml": check_lookml, "cube": check_cube, "dbtcharts": check_dbtcharts}
 
 
 def main():

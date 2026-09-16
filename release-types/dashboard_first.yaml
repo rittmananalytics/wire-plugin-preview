@@ -169,6 +169,14 @@ phases:
           - artifact: semantic_layer
             action: review
             outcome: approved
+      - id: dbtcharts
+        command: dbtcharts
+        required: false
+        sequence: 4
+        depends_on:
+          - artifact: dbt
+            action: validate
+            outcome: PASS
 
   - id: data_refactor
     name: "Data Refactor"

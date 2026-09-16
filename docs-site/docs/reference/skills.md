@@ -145,6 +145,12 @@ This skill connects via the Omni CLI and maps the connection → model (topics, 
 
 ---
 
+
+### `dbtcharts`
+
+**Activates when**: the user mentions dbt Charts, `dct`, or a board file under `charts/`, or asks for a dashboard over dbt models where the reporting tool is dbt Charts.
+
+Boards are YAML files in the dbt project (queries through `ref()`, charts, a layout) that the `dct` CLI validates and renders. The skill carries the Wire board rules (`ref()`-only queries, no inline data, `notes:` on every query and chart, `label:` on KPIs and `title:` elsewhere, one board per subject area), the deterministic scaffold `scripts/dbtcharts_scaffold.py`, and the validate-then-render loop. It is used by `/wire:dbtcharts-generate`, `-validate` and `-review`, and points to `dct docs` and `dct skills` as the field reference so no key is guessed. See [dbt Charts Boards](../advanced/dbt-charts).
 ### `smml-semantic-modeling`
 
 **Activates when**: hand-authoring, editing, reviewing or troubleshooting an Oracle Analytics Cloud (OAC) semantic model directly in SMML (Semantic Modeler Markup Language): physical/logical/presentation layers, role-playing dimensions, hierarchies, calculated measures or subject-area design.
