@@ -111,6 +111,11 @@ The scaffold's output is an inventory, not a dashboard: one KPI per numeric colu
 | `r'...'` raw-string regex literals | `ENDS_WITH`, `STARTS_WITH`, or a plain-string regex |
 | A query named like one of its own columns, reused as `{{ queries.name }}` | `{{ queries.x }}` expands to `(...) AS x`, so the alias shadows the column; name base queries differently (`time_off`, not `days_off`) |
 
+### Two rules for running lanes in parallel
+
+- **`dbt show` rewrites `target/manifest.json` on dbt Fusion**, and `dct validate` and `dct render` read that file. A lane profiling while another renders makes the render fail with `ERR-DBT-MANIFEST-UNREADABLE`. Every `dbt show` in a lane takes `--target-path <its own scratch dir>`; the orchestrator runs `dbt compile` once before the whole-set validate and render.
+- **A lane's work lives in its state file, not its conversation.** `--auto` lanes follow the lane contract in `specs/utils/director_operating_model.md`: `.wire/releases/<release>/lanes/dbtcharts-<area>.md`, rewritten after each completed item, ending with the report rows. The orchestrating session dispatches the lanes itself (the specialist-agent delegate wrapper does not apply to `--auto`), watches the state files, and re-dispatches a lane with no writes for 30 minutes. The first real run lost two of twelve boards' designs and every lane's report rows when the wrapping agent stalled; this is the rule that prevents that.
+
 ## The scaffold
 
 `scripts/dbtcharts_scaffold.py` (shipped with the plugin; source at `wire/scripts/dbtcharts_scaffold.py`) turns a dbt manifest and catalog into one board per subject area, deterministically:

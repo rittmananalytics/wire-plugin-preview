@@ -68,6 +68,8 @@ Things found the hard way and recorded in the `dbtcharts` skill so nobody redisc
 - The static column check misreads `DATE_TRUNC(d, MONTH)`, `WEEK(MONDAY)` and `r'...'` raw strings. The scaffold writes `DATE(EXTRACT(YEAR FROM d), EXTRACT(MONTH FROM d), 1)`; the skill lists the other substitutes.
 - `dct validate --warehouse` needs the warehouse adapter inside the tool environment (`uv tool install dbt-charts --with dbt-bigquery`), and on Apple silicon an arm64 Python named explicitly.
 - Currency presets print `$` and axis formats accept no other symbol; non-dollar money uses a KPI prefix and plain axes with the currency in the subtitle.
+- `dbt show` on dbt Fusion rewrites `target/manifest.json`, which `dct` reads. Design lanes profile with `--target-path <scratch>` so a concurrent render never reads a half-written manifest, and the orchestrator compiles once before the whole-set validate.
+- `--auto` lanes follow the director model's lane contract: the orchestrating session dispatches them, each writes a state file under `lanes/` after every completed item, and a lane silent for 30 minutes is re-dispatched. The generation report is assembled from those files.
 
 ## Where the rules live
 

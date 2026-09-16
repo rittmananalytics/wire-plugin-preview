@@ -242,7 +242,7 @@ Follow `specs/utils/precondition_gate.md` before proceeding.
 
 # dbtcharts Generate Command
 
-Follow `specs/utils/semantic_layer_developer_delegate.md` before executing the workflow below.
+Follow `specs/utils/semantic_layer_developer_delegate.md` before executing the workflow below, **unless `--auto` is given**. An auto run is a fan-out of one lane per subject area, and the orchestrating session dispatches those lanes itself under the lane contract in `specs/utils/director_operating_model.md` (Step 5); wrapping the whole run in one specialist agent that then spawns the lanes hides a stall from the orchestrator, because nothing records progress until that agent returns.
 
 ## Purpose
 
@@ -325,6 +325,8 @@ In the dbt project directory:
 
 Use the release's dbt profile and target as `dbt-validate` does. A manifest older than the newest model file is regenerated, never reused.
 
+3. **Keep `target/manifest.json` still while `dct` reads it.** On dbt Fusion every `dbt show` rewrites `target/manifest.json`, and `dct validate` and `dct render` read that file, so a lane profiling with `dbt show` while another lane or the orchestrator renders makes the render fail with `ERR-DBT-MANIFEST-UNREADABLE`. Every `dbt show` run during Step 5 therefore passes `--target-path <scratch dir>` (one directory per lane, outside the project's `target/`), and the orchestrator runs `dbt compile` once more before Step 6 so the shared manifest is current.
+
 ### Step 4: Run the scaffold
 
 ```bash
@@ -352,7 +354,24 @@ The scaffold never overwrites an existing board without `--force`. A board the c
 
 This is the judgement half. Work board by board to `skills/dbtcharts/board-design-brief.md`, and record every change in the generation report as a row: `board`, `chart`, `scaffold proposed`, `kept | changed | dropped | added`, `why`.
 
-**With `--auto`:** dispatch one lane per subject area (one subagent each, all at once), each given the brief, the reference board if one is curated already, the scaffold's board and summary for its area, and the release's flags. A lane profiles its models, rewrites `charts/<area>.yml` in place, validates with `--warehouse`, renders, inspects its PNG, fixes what it sees, and returns the report rows. Nothing pauses; a choice the brief does not settle is made and recorded. The director reviews the returned reports and the renders before Step 6.
+**With `--auto`:** the orchestrating session dispatches one lane per subject area (one subagent each, all at once, within `lanes_max`), each with the lane brief template from `specs/utils/director_operating_model.md` filled in:
+
+```
+Lane:          dbtcharts [<area>]
+Release:       <release folder>
+Task:          design charts/<area>.yml to skills/dbtcharts/board-design-brief.md, using <resolved convention>
+Owns:          <dbt_project_path>/charts/<area>.yml; .wire/releases/<release>/dev/dbtcharts/<area>.png; .wire/releases/<release>/lanes/dbtcharts-<area>.md
+State file:    .wire/releases/<release>/lanes/dbtcharts-<area>.md
+Resume:        Read the state file first; skip every completed item. Rewrite it after each completed item, not at the end.
+Budget:        <warehouse_spend setting>
+Flat:          Do not spawn sub-agents.
+Status:        Do not write status.md or execution_log.md.
+Report:        Report once, at completion, at a stall, or at a decision you cannot make.
+```
+
+Each lane receives the brief, the reference board if one is curated already, the scaffold's board and its rows in `scaffold_summary.json` and `needs_human.json`, and the tool notes (the `--target-path` rule from Step 3). Its items, in order, each written to the state file as it completes: profiled, designed (`charts/<area>.yml` rewritten in place), warehouse-validated, rendered and inspected, linted, and `complete` with the report rows (`board`, `chart`, `scaffold proposed`, `kept | reshaped | dropped | added`, `why`), the tables kept and dropped, the profiling findings and the `needs_human` decisions for its area. Nothing pauses; a choice the brief does not settle is made and recorded in the state file.
+
+The orchestrator watches the state files, not the lanes: a lane with no writes for 30 minutes is stalled and its remaining items are re-dispatched to a fresh lane with the same brief, which the resume contract makes safe. When every lane's state file says `complete`, the orchestrator reads them all, then does Step 6 over the whole set. The generation report (Step 7) is assembled from the state files, so no lane's work exists only in a conversation.
 
 **Without `--auto`:** the same work, board by board in the foreground, pausing where the brief does not settle a choice (which fact leads the board, which of two measures is the headline) and asking.
 
@@ -382,6 +401,7 @@ This is the judgement half. Work board by board to `skills/dbtcharts/board-desig
 
 ### Step 6: Validate and render
 
+0. `dbt compile` once more in the dbt project, so `target/manifest.json` is current and no lane is still writing it (Step 3, point 3). Nothing below runs while a lane's `dbt show` can touch that file.
 1. `dct validate <dbt_project_path>/charts/` (structure and, with the manifest present, `ref()` names and model columns). Fix every error and re-run until there are none. Record warnings by code in the report; `WARN-DBT-MODEL-COLUMNS-UNRESOLVED` on a model whose SQL `dct` cannot derive columns from is expected and is cleared by the warehouse run.
 2. Unless `--no-warehouse` or `warehouse_spend: none`: `dct validate charts/ --warehouse`. On BigQuery this is a dry run and is not billed; on Snowflake, Postgres and Redshift it is an `EXPLAIN`. Fix every error.
 3. Unless `--no-warehouse` or `warehouse_spend: none`: render each board for the reviewer, `dct render charts/<board>.yml --format png --output .wire/releases/<release>/dev/dbtcharts/<board>.png`, and render `charts/index.yml` the same way. Renders run the queries; under `warehouse_spend: estimate_required` or a cap, the cost governance rules of `specs/utils/director_operating_model.md` apply and the run is disclosed in the report.
@@ -395,7 +415,7 @@ This is the judgement half. Work board by board to `skills/dbtcharts/board-desig
 - dct version, dialect, source name, profile and target
 - the design convention that resolved (engagement override or framework default) and any flag that overrode a value
 - the subject-area table from Step 1 with boards written, skipped and empty
-- the curation table from Step 5
+- the curation table from Step 5, assembled from the lane state files under `lanes/` on an `--auto` run
 - the catalog mapping table where a viz catalog exists, with unmapped rows
 - every `needs_human` item and its decision
 - the profiling findings per board: columns and tables dropped, stopped feeds and the windows chosen

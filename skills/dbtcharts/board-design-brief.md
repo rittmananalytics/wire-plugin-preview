@@ -15,9 +15,12 @@ The brief `/wire:dbtcharts-generate` hands to whoever (or whichever lane) design
 Run `dbt show --inline` over each candidate model. Record, per column you intend to chart: null rate, distinct count, min and max date, whether the feed is still loading. Drop or replace anything that is mostly null, all zero, a single snapshot, or a technical id. Note stopped feeds: windows then anchor on the last loaded month, and the board `notes:` says so.
 
 ```bash
-dbt show --inline "select column_name, data_type from {{ ref('M').database }}.{{ ref('M').schema }}.INFORMATION_SCHEMA.COLUMNS where table_name = '{{ ref('M').identifier }}' order by ordinal_position" --limit 200
-dbt show --inline "select count(*) n, countif(x is null) x_nulls, min(d) first_d, max(d) last_d from {{ ref('M') }}"
+SCRATCH=$(mktemp -d)   # your own target dir: dbt show rewrites target/manifest.json, which dct reads while other lanes render
+dbt show --target-path "$SCRATCH" --inline "select column_name, data_type from {{ ref('M').database }}.{{ ref('M').schema }}.INFORMATION_SCHEMA.COLUMNS where table_name = '{{ ref('M').identifier }}' order by ordinal_position" --limit 200
+dbt show --target-path "$SCRATCH" --inline "select count(*) n, countif(x is null) x_nulls, min(d) first_d, max(d) last_d from {{ ref('M') }}"
 ```
+
+Never run `dbt show` without `--target-path` while boards are being validated or rendered: on dbt Fusion it rewrites the project's `target/manifest.json`, and a concurrent `dct render` then fails with `ERR-DBT-MANIFEST-UNREADABLE`.
 
 ## The shape
 
@@ -60,4 +63,6 @@ dct validate charts/<area>.yml --warehouse     # only WARN-DBT-MODEL-COLUMNS-UNR
 dct render charts/<area>.yml --output <release>/dev/dbtcharts/<area>.png
 ```
 
-Look at the PNG. Fix overlaps, empty charts, unreadable labels, KPIs without formats, an axis on the wrong side. Zero render warnings other than `WARN-DBT-MODEL-COLUMNS-UNRESOLVED`. Then report, in under 200 words: tables kept and dropped, the KPIs and charts built, the validate and render warning counts, the data problems found (null columns, empty tables, stopped feeds), and the PNG path.
+Look at the PNG. Fix overlaps, empty charts, unreadable labels, KPIs without formats, an axis on the wrong side. Zero render warnings other than `WARN-DBT-MODEL-COLUMNS-UNRESOLVED`.
+
+When you run as a lane of `--auto`, write your state file (`.wire/releases/<release>/lanes/dbtcharts-<area>.md`) after each of these items, not at the end: profiled, designed, warehouse-validated, rendered and inspected, linted, complete. The final write holds your report: one row per scaffold chart (`kept | reshaped | dropped | added`, with a one-clause reason), the tables kept and dropped, the KPIs and charts built, the profiling findings (null columns, empty tables, stopped feeds, windows chosen), every `needs_human` item for the area with your decision, the validate and render warning counts, and the PNG path. The orchestrator assembles the generation report from these files; a row that exists only in your conversation is lost if the session dies.
