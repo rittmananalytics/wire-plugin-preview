@@ -19,7 +19,15 @@ The command has two halves with a fixed line between them.
 
 **The design is judgement.** The scaffold's board is an inventory: one KPI per numeric column, one line per month, one bar per category, for every table. The agent rebuilds each into a dashboard to the brief shipped with the `dbtcharts` skill (`board-design-brief.md`): it profiles the models first so nothing charts a mostly-null column or a stopped feed, keeps the tables that matter, writes a KPI row with prior-period deltas from one query, one hero trend over the last 24 months, a few ranked breakdowns and a detail table, in the business language the release already uses (the business rules register, the requirements, the viz catalog), and decides every `needs_human` item. `--auto` runs this for every subject area at once, one lane each, without pausing; `--subject-area w_sales` designs one area, its facts and the dimensions they join. Each decision is a row in the generation report, so the reviewer sees what the scaffold proposed and what changed.
 
+![The Marketing board produced by dbtcharts-generate: a KPI row with prior-period deltas, a stacked 24-month conversions trend, attribution and email breakdowns, LinkedIn engagement, and a paid-campaigns table](/img/dbt-charts/dbt_charts_example_dashboard.png)
+
+*One board as the command leaves it: the Marketing subject area of a live BigQuery warehouse. Six KPIs with deltas against the prior period, a hero trend over the last 24 months, four breakdowns, one detail table, GBP shown as a prefix and named in the subtitles.*
+
 The scaffold also writes two project files once: `charts/meta.yml`, which sets the theme every board inherits (`vivid` by default; `--theme` changes it), and `charts/index.yml`, the landing page `dct serve` shows at `/` in place of a file listing, one card per board with an optional logo (`--logo`, embedded as a data URI because dct serves no static files). `--currency '£'` switches money formats to a prefix for a non-dollar client, since dbt Charts' currency presets print `$` and its axis formats take no other symbol.
+
+![The landing page dct serve shows at /: a heading with the engagement's logo top-right and twelve bordered cards, one per board, grouped into Commercial, Delivery and finance, People and Technology](/img/dbt-charts/dbt_charts_homepage.png)
+
+*The generated landing page for the same warehouse, with the engagement's logo embedded and one card per subject-area board.*
 
 ## Validation
 
