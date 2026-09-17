@@ -27,7 +27,13 @@ warehouse connection:
     completes;
   * `plan.json` (what will be published, with the counts validate compares
     against the warehouse), `run.sh` (the same publication from a laptop) and
-    `checks.sql` (the validate queries in the destination's dialect).
+    `checks.sql` (the validate queries in the destination's dialect);
+  * when the LookML lives in another repository (`--lookml-repo`), a second
+    workflow file, `lookml_repo/agents-schema-lookml.yml` under --out, to commit
+    in that repository as `.github/workflows/agents-schema-lookml.yml`. The
+    upstream Looker workflow checks out the repository that calls it, so the
+    LookML repository has to publish itself; each provider replaces only its own
+    tables, so two repositories writing into one AGENTS schema is by design.
 
 The same inputs always produce the same files; wire/tests/development/
 validate_agents_schema_plan.py holds that to be true byte for byte. Anything
@@ -40,7 +46,8 @@ Usage:
     python3 agents_schema_plan.py --repo-root . --out .wire/releases/<r>/dev/agents_schema \
         --destination bigquery --project-id my-project --location EU \
         --dbt-project-dir dbt --dbt-profile my_profile --dbt-target prod \
-        [--lookml-dir looker] [--omni-dir "omni/My Connection"] [--osi-dir osi] [--sigma-dir sigma] \
+        [--lookml-dir looker | --lookml-repo owner/repo[@ref] [--lookml-repo-dir .] [--lookml-repo-local ~/GitHub/looker]] \
+        [--omni-dir "omni/My Connection"] [--osi-dir osi] [--sigma-dir sigma] \
         [--skills-source dbt/models/marts]... [--provider acme] \
         [--skills-out agents_schema/skills] [--workflow-path .github/workflows/agents-schema.yml] \
         [--branch main] [--agents-schema-version v0.0.11] [--layer-path models/warehouse] [--force]
@@ -53,7 +60,7 @@ import re
 import sys
 from pathlib import Path, PurePosixPath
 
-SCRIPT_VERSION = "1.0.0"
+SCRIPT_VERSION = "1.2.0"
 DEFAULT_AGENTS_SCHEMA_VERSION = "v0.0.11"
 AGENTS_SCHEMA_REPO = "dbt-labs/agents_schema"
 
@@ -166,6 +173,78 @@ def relation(node: dict) -> str | None:
 def model_dir(node: dict) -> str | None:
     p = node.get("original_file_path")
     return posix(Path(p).parent) if p else None
+
+
+# ---------------------------------------------------------------------------
+# LookML pre-check (mirrors agents_schema/lookml.py's parser, so a file the
+# upstream CLI would refuse is named here instead of failing the publish)
+# ---------------------------------------------------------------------------
+
+LKML_BLOCK_RE = re.compile(r"\b(view|explore|dimension|dimension_group|measure)\s*:\s*([A-Za-z_][\w.]*)\s*\{")
+
+
+def lkml_strip_comments(text: str) -> str:
+    out, quote, i = [], None, 0
+    while i < len(text):
+        ch = text[i]
+        if quote:
+            out.append(ch)
+            if ch == "\\" and i + 1 < len(text):
+                i += 1; out.append(text[i])
+            elif ch == quote:
+                quote = None
+        elif ch in ("'", '"'):
+            quote = ch; out.append(ch)
+        elif ch == "#":
+            while i < len(text) and text[i] != "\n":
+                i += 1
+            if i < len(text):
+                out.append("\n")
+        else:
+            out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def lkml_unterminated(text: str) -> int | None:
+    """The 1-based line of the first block the upstream parser cannot close, else None.
+    The upstream matcher honours ' and " quotes but knows nothing of SQL -- comments,
+    so an apostrophe in a comment inside a sql: block opens a quote that never closes."""
+    text = lkml_strip_comments(text)
+    pos = 0
+    while (m := LKML_BLOCK_RE.search(text, pos)):
+        depth, quote, i = 0, None, m.end() - 1
+        while i < len(text):
+            ch = text[i]
+            if quote:
+                if ch == "\\":
+                    i += 1
+                elif ch == quote:
+                    quote = None
+            elif ch in ("'", '"'):
+                quote = ch
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            i += 1
+        else:
+            return text.count("\n", 0, m.start()) + 1
+        pos = i + 1
+    return None
+
+
+def lkml_precheck(ldir: Path, files: list[str], label: str, needs_human: list[dict]) -> None:
+    bad = []
+    for rel in files:
+        line = lkml_unterminated((ldir / rel).read_text(encoding="utf-8", errors="replace"))
+        if line is not None:
+            bad.append(f"{rel} (block opened at line {line})")
+    if bad:
+        needs_human.append({"item": "looker", "reason": "lookml_unparseable",
+                            "detail": f"{len(bad)} file(s) in {label} the agents-schema LookML parser cannot close, so the looker publish would fail with 'unterminated LookML block': {'; '.join(bad)}. The usual cause is an apostrophe or quote inside a SQL -- comment in a sql: block; reword the comment."})
 
 
 # ---------------------------------------------------------------------------
@@ -375,6 +454,8 @@ def workflow_yaml(plan: dict, branch: str) -> str:
     ]
     previous = None
     for p in plan["providers"]:
+        if p.get("source_repo"):
+            continue  # published by that repository's own workflow (see lookml_repo_workflow_yaml)
         src = p["source_type"]
         job = p["job"]
         lines.append(f"  {job}:")
@@ -399,6 +480,37 @@ def workflow_yaml(plan: dict, branch: str) -> str:
     return "\n".join(lines)
 
 
+def lookml_repo_workflow_yaml(plan: dict, p: dict) -> str:
+    tag = plan["agents_schema_version"]
+    lines = [
+        f"# Written by Wire (/wire:agents_schema-generate) for the LookML repository {p['source_repo']}.",
+        f"# Commit this file there as {p['workflow_destination']}. It publishes that repository's",
+        f"# LookML into the warehouse AGENTS schema (AGENTS.LOOKML_*) on every push to {p['publish_branch']},",
+        "# alongside the dbt repository's own publication; each provider replaces only its own tables.",
+        f"# Reusable workflow: https://github.com/{AGENTS_SCHEMA_REPO}, pinned at {tag}.",
+        "# Secret: WAREHOUSE_CREDENTIALS, the same destination credentials YAML as the dbt repository's.",
+        "name: Agents Schema (LookML)",
+        "",
+        "on:",
+        "  workflow_dispatch:",
+        "  push:",
+        f"    branches: [{p['publish_branch']}]",
+        "",
+        "permissions:",
+        "  contents: read",
+        "",
+        "jobs:",
+        "  agents-schema-looker:",
+        f"    uses: {AGENTS_SCHEMA_REPO}/.github/workflows/agents-schema-looker.yml@{tag}",
+        "    with:",
+        f"      lookml-dir: {yaml_str(p['source_dir'])}",
+        "    secrets:",
+        "      WAREHOUSE_CREDENTIALS: ${{ secrets.WAREHOUSE_CREDENTIALS }}",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def run_sh(plan: dict) -> str:
     req = plan["pypi_requirement"]
     lines = [
@@ -415,7 +527,12 @@ def run_sh(plan: dict) -> str:
     ]
     for p in plan["providers"]:
         lines.append(f"# {p['source_type']}: {', '.join('AGENTS.' + t for t in p['tables'])}")
-        lines.append("$AGENTS_SCHEMA " + p["cli_args"])
+        if p.get("cli_args"):
+            if p.get("source_repo"):
+                lines.append(f"# from the local clone of {p['source_repo']}; CI publishes it from that repository's own workflow")
+            lines.append("$AGENTS_SCHEMA " + p["cli_args"])
+        else:
+            lines.append(f"# published from {p['source_repo']} by its own workflow ({p['workflow_destination']}); no local clone was given")
     lines.append("")
     return "\n".join(lines)
 
@@ -522,7 +639,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     ap.add_argument("--dbt-profile", help="profile for the workflow's managed dbt parse (needs the DBT_PROFILES_YML secret)")
     ap.add_argument("--dbt-target")
     ap.add_argument("--layer-path", default="models/warehouse", help="warehouse layer folder inside the dbt project, for the guide")
-    ap.add_argument("--lookml-dir")
+    ap.add_argument("--lookml-dir", help="LookML inside this repository")
+    ap.add_argument("--lookml-repo", help="owner/repo[@ref] of a separate LookML repository; writes a workflow for that repository instead of a job here")
+    ap.add_argument("--lookml-repo-dir", default=".", help="directory holding the *.lkml files inside --lookml-repo (default: its root)")
+    ap.add_argument("--lookml-repo-local", help="a local clone of --lookml-repo, used to count the files and for run.sh")
+    ap.add_argument("--lookml-repo-branch", help="the branch of --lookml-repo whose pushes publish (default: the @ref, else main)")
     ap.add_argument("--omni-dir")
     ap.add_argument("--osi-dir")
     ap.add_argument("--sigma-dir")
@@ -535,6 +656,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     ap.add_argument("--branch", default="main", help="the branch whose pushes publish")
     ap.add_argument("--agents-schema-version", default=DEFAULT_AGENTS_SCHEMA_VERSION, help="release tag of dbt-labs/agents_schema to pin")
     ap.add_argument("--force", action="store_true", help="overwrite the workflow, agents.yml and the guide draft if they exist")
+    ap.add_argument("--force-workflow", action="store_true", help="overwrite only the workflow (a provider was added or removed); the guide and agents.yml are left alone")
     return ap.parse_args(argv)
 
 
@@ -549,6 +671,12 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if not re.match(r"^v\d+\.\d+\.\d+$", a.agents_schema_version):
         print(f"error: --agents-schema-version {a.agents_schema_version!r} must look like v0.0.11", file=sys.stderr)
+        return 1
+    if a.lookml_dir and a.lookml_repo:
+        print("error: give --lookml-dir (LookML in this repository) or --lookml-repo (a separate repository), not both", file=sys.stderr)
+        return 1
+    if a.lookml_repo and not re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(@[A-Za-z0-9_./-]+)?$", a.lookml_repo):
+        print(f"error: --lookml-repo {a.lookml_repo!r} must look like owner/repo or owner/repo@ref", file=sys.stderr)
         return 1
     out_dir = resolve(root, a.out)
     skills_out = resolve(root, a.skills_out)
@@ -609,12 +737,44 @@ def main(argv: list[str] | None = None) -> int:
         if not files:
             needs_human.append({"item": src, "reason": "empty_source", "detail": f"{rel_to(d, root)} holds no {', '.join(SOURCE_GLOBS[src])} files; provider not planned"})
             continue
+        if src == "looker":
+            lkml_precheck(d, files, rel_to(d, root), needs_human)
         providers.append({
             "source_type": src, "root_provider": ROOT_PROVIDER[src], "job": f"agents-schema-{src}",
             "source_dir": rel_to(d, root), "counts": {"files": len(files)}, "files": files,
             "tables": list(TABLES[src]), "expected_rows": {t: ">0" for t in TABLES[src]},
             "cli_args": f"{src} {CLI_FLAG[src]} {json.dumps(rel_to(d, root)) if ' ' in rel_to(d, root) else rel_to(d, root)}",
         })
+
+    # -- LookML in a separate repository ----------------------------------------
+    if a.lookml_repo:
+        repo, _, ref = a.lookml_repo.partition("@")
+        branch = a.lookml_repo_branch or ref or "main"
+        local = resolve(root, a.lookml_repo_local) if a.lookml_repo_local else None
+        files = None
+        if local is not None:
+            ldir = local / a.lookml_repo_dir if a.lookml_repo_dir not in (".", "") else local
+            if not ldir.is_dir():
+                needs_human.append({"item": "looker", "reason": "missing_source", "detail": f"--lookml-repo-local {a.lookml_repo_local}/{a.lookml_repo_dir} is not a directory"})
+            else:
+                files = sorted({posix(f.relative_to(ldir)) for pat in SOURCE_GLOBS["looker"] for f in ldir.glob(pat) if f.is_file()})
+                if not files:
+                    needs_human.append({"item": "looker", "reason": "empty_source", "detail": f"{a.lookml_repo_local}/{a.lookml_repo_dir} holds no *.lkml files; the repository workflow is still written"})
+                else:
+                    lkml_precheck(ldir, files, f"{repo} ({a.lookml_repo_local})", needs_human)
+        else:
+            needs_human.append({"item": "looker", "reason": "lookml_repo_not_cloned", "detail": f"no --lookml-repo-local clone of {repo}; the file count is unknown until the LookML repository's workflow runs, and run.sh cannot publish LookML from this machine"})
+        p = {
+            "source_type": "looker", "root_provider": "lookml", "job": "agents-schema-looker",
+            "source_repo": repo, "source_ref": ref or None, "publish_branch": branch,
+            "source_dir": a.lookml_repo_dir or ".", "local_clone": rel_to(local, root) if local else None,
+            "counts": {"files": len(files) if files is not None else "unknown"}, "files": files,
+            "tables": list(TABLES["looker"]), "expected_rows": {t: ">0" for t in TABLES["looker"]},
+            "workflow_file": rel_to(out_dir / "lookml_repo" / "agents-schema-lookml.yml", root),
+            "workflow_destination": ".github/workflows/agents-schema-lookml.yml",
+            "cli_args": (f"looker --lookml-dir {rel_to(ldir, root)}" if files is not None else None),
+        }
+        providers.append(p)
 
     # -- skills ----------------------------------------------------------------
     skills: list[dict] = []
@@ -718,11 +878,16 @@ def main(argv: list[str] | None = None) -> int:
         "skipped_existing": skipped_existing,
     }
 
-    for path, text in ((workflow_path, workflow_yaml(plan, a.branch)), (agents_yml_path, agents_yml(dest))):
-        if path.exists() and not a.force:
+    for path, text, force in ((workflow_path, workflow_yaml(plan, a.branch), a.force or a.force_workflow),
+                              (agents_yml_path, agents_yml(dest), a.force)):
+        if path.exists() and not force:
             skipped_existing.append(rel_to(path, root))
         else:
             write_text(path, text, written, root)
+    for p in providers:
+        if p.get("source_repo"):
+            write_text(out_dir / "lookml_repo" / "agents-schema-lookml.yml", lookml_repo_workflow_yaml(plan, p), written, root)
+            plan["files"]["lookml_repo_workflow"] = p["workflow_file"]
     write_text(out_dir / "run.sh", run_sh(plan), written, root)
     (out_dir / "run.sh").chmod(0o755)
     write_text(out_dir / "checks.sql", checks_sql(plan), written, root)
@@ -733,7 +898,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"agents_schema_plan {SCRIPT_VERSION}: agents-schema {a.agents_schema_version} -> {a.destination}")
     for p in providers:
         c = ", ".join(f"{k} {v}" for k, v in p["counts"].items())
-        print(f"  {p['source_type']:7s} {p['source_dir']}  ({c})  -> {', '.join('AGENTS.' + t for t in p['tables'])}")
+        where = f"{p['source_repo']}:{p['source_dir']} (own workflow)" if p.get("source_repo") else p["source_dir"]
+        print(f"  {p['source_type']:7s} {where}  ({c})  -> {', '.join('AGENTS.' + t for t in p['tables'])}")
     print(f"  skills: {len(skills)}  skipped sources: {len(skipped)}  needs_human: {len(needs_human)}")
     print(f"  written: {len(written)}  skipped existing: {len(skipped_existing)}" + (f" ({', '.join(plan['skipped_existing'])})" if skipped_existing else ""))
     print(f"  plan: {rel_to(out_dir / 'plan.json', root)}")

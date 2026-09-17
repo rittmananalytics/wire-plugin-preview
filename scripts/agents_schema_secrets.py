@@ -37,7 +37,7 @@ or with any interpreter that has it.
 
 Usage:
     python3 agents_schema_secrets.py --profiles-yml ~/.dbt/profiles.yml --profile acme --target prod --check
-    python3 agents_schema_secrets.py ... --repo owner/repo --set-secrets [--dry-run]
+    python3 agents_schema_secrets.py ... --repo owner/repo --set-secrets [--warehouse-only] [--dry-run]
     python3 agents_schema_secrets.py ... --publish .wire/releases/<r>/dev/agents_schema/run.sh [--dry-run]
 
 Exit codes: 0 ok; 1 usage or profile error; 3 the target's credential shape is not
@@ -144,6 +144,7 @@ def main(argv=None) -> int:
     ap.add_argument("--repo", help="owner/repo for gh secret set (default: the current repository)")
     ap.add_argument("--check", action="store_true", help="report what can be derived; sets nothing")
     ap.add_argument("--set-secrets", action="store_true", help="set WAREHOUSE_CREDENTIALS and DBT_PROFILES_YML on the repository")
+    ap.add_argument("--warehouse-only", action="store_true", help="with --set-secrets: set WAREHOUSE_CREDENTIALS only (a LookML repository needs no dbt profile)")
     ap.add_argument("--publish", metavar="RUN_SH", help="run this run.sh with WAREHOUSE_CREDENTIALS in its environment")
     ap.add_argument("--dry-run", action="store_true", help="with --set-secrets or --publish: print what would happen, do nothing")
     ap.add_argument("--json", action="store_true", help="machine-readable output for --check")
@@ -171,7 +172,8 @@ def main(argv=None) -> int:
 
     if a.set_secrets:
         repo_args = ["-R", a.repo] if a.repo else []
-        for name, value in (("WAREHOUSE_CREDENTIALS", wh_yaml), ("DBT_PROFILES_YML", prof_yaml)):
+        pairs = [("WAREHOUSE_CREDENTIALS", wh_yaml)] + ([] if a.warehouse_only else [("DBT_PROFILES_YML", prof_yaml)])
+        for name, value in pairs:
             if a.dry_run:
                 print(f"would run: gh secret set {name} {' '.join(repo_args)}  <- stdin ({describe(name, value)})")
                 continue

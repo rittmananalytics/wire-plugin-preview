@@ -1,9 +1,9 @@
 ---
-description: Publish the release's metadata into the warehouse AGENTS schema for AI agents: plan the providers (dbt manifest, LookML, Omni, OSI, Sigma, skills), write the pinned GitHub workflow, agents.yml and the skills, complete the warehouse guide, offer to set the repository secrets from the dbt profile, publish from CI or with --publish
-argument-hint: <release-folder> [--providers <list>] [--skills-source <path>]... [--provider <name>] [--no-guide] [--set-secrets] [--publish] [--no-warehouse] [--force]
+description: Publish the release's metadata into the warehouse AGENTS schema for AI agents: plan the providers (dbt manifest, LookML, Omni, OSI, Sigma, skills), write the pinned GitHub workflow, agents.yml and the skills, complete the warehouse guide, offer to set the repository secrets from the dbt profile, publish from CI or with --publish; --lookml-repo publishes LookML from its own repository
+argument-hint: <release-folder> [--providers <list>] [--skills-source <path>]... [--lookml-repo <owner/repo[@ref]>] [--provider <name>] [--no-guide] [--set-secrets] [--publish] [--no-warehouse] [--force]
 ---
 
-# Publish the release's metadata into the warehouse AGENTS schema for AI agents: plan the providers (dbt manifest, LookML, Omni, OSI, Sigma, skills), write the pinned GitHub workflow, agents.yml and the skills, complete the warehouse guide, offer to set the repository secrets from the dbt profile, publish from CI or with --publish
+# Publish the release's metadata into the warehouse AGENTS schema for AI agents: plan the providers (dbt manifest, LookML, Omni, OSI, Sigma, skills), write the pinned GitHub workflow, agents.yml and the skills, complete the warehouse guide, offer to set the repository secrets from the dbt profile, publish from CI or with --publish; --lookml-repo publishes LookML from its own repository
 
 ## User Input
 
@@ -203,7 +203,7 @@ inputs:
       description: "Path to the release folder"
   optional:
     - name: flags
-      description: "--providers dbt,looker,omni,osi,sigma,skills limits the plan to the named sources (default: every source the release has); --skills-source <path> adds a markdown file or folder to publish as skills (repeatable); --provider <name> sets the publisher of the skill rows (default: the engagement slug); --no-guide skips the warehouse guide draft; --set-secrets derives WAREHOUSE_CREDENTIALS and DBT_PROFILES_YML from the release's dbt profile and sets them on the repository with gh, without asking; --publish runs the publication from this machine after the plan is written (WAREHOUSE_CREDENTIALS from the environment, or derived from the dbt profile when --set-secrets is given or the offer in Step 5.5 is accepted); --no-warehouse writes the plan only and never touches the warehouse; --force rewrites the workflow, agents.yml and the guide draft where they exist"
+      description: "--providers dbt,looker,omni,osi,sigma,skills limits the plan to the named sources (default: every source the release has); --skills-source <path> adds a markdown file or folder to publish as skills (repeatable); --provider <name> sets the publisher of the skill rows (default: the engagement slug); --lookml-repo <owner/repo[@ref]> names a separate LookML repository (with --lookml-repo-dir <path> for the folder inside it and --lookml-repo-local <clone> for a local clone), so the plan writes a workflow for that repository instead of a job here; --no-guide skips the warehouse guide draft; --set-secrets derives WAREHOUSE_CREDENTIALS and DBT_PROFILES_YML from the release's dbt profile and sets them on the repository with gh, without asking; --publish runs the publication from this machine after the plan is written (WAREHOUSE_CREDENTIALS from the environment, or derived from the dbt profile when --set-secrets is given or the offer in Step 5.5 is accepted); --no-warehouse writes the plan only and never touches the warehouse; --force rewrites the workflow, agents.yml and the guide draft where they exist; --force-workflow rewrites only the workflow, for a provider added or removed after the guide was completed"
 preconditions: dynamic
 auto_validate: false
 produces:
@@ -216,6 +216,9 @@ produces:
   - type: document
     path: "<repo_root>/agents_schema/skills/<skill>.md"
     description: "The skills the skills provider publishes as AGENTS.ROOT rows: the release's knowledge files with a derived uses: declaration, plus the warehouse guide"
+  - type: document
+    path: "dev/agents_schema/lookml_repo/agents-schema-lookml.yml"
+    description: "When the LookML lives in a separate repository: the workflow to commit there as .github/workflows/agents-schema-lookml.yml, publishing that repository's LookML into the same AGENTS schema"
   - type: report
     path: "dev/agents_schema/plan.json"
     description: "What will be published: providers, source paths, the row counts validate compares against the warehouse, the skills and their uses, every needs_human item"
@@ -229,7 +232,7 @@ delegates_to:
   - utils/jira_sync
   - utils/docstore_sync
 description: Publish the release's metadata into the warehouse AGENTS schema (dbt Labs' Agents Schema) — a deterministic plan detects the providers the release has (dbt manifest, LookML, Omni, OSI, Sigma, knowledge skills), writes the pinned GitHub workflow, agents.yml and the skills directory, the consultant completes the warehouse guide, and the publication runs from CI or, with --publish, from this machine
-argument-hint: <release-folder> [--providers <list>] [--skills-source <path>]... [--provider <name>] [--no-guide] [--set-secrets] [--publish] [--no-warehouse] [--force]
+argument-hint: <release-folder> [--providers <list>] [--skills-source <path>]... [--lookml-repo <owner/repo[@ref]> [--lookml-repo-dir <path>] [--lookml-repo-local <clone>]] [--provider <name>] [--no-guide] [--set-secrets] [--publish] [--no-warehouse] [--force | --force-workflow]
 workload: judgment
 ---
 
@@ -262,6 +265,7 @@ The command is in two halves, and the line between them is fixed:
 /wire:agents_schema-generate 01-dbt-foundation                          # plan and write the files; publication runs from CI
 /wire:agents_schema-generate 01-dbt-foundation --publish                # also run the publication from this machine
 /wire:agents_schema-generate 01-dbt-foundation --set-secrets --publish  # set both repository secrets from the dbt profile, then publish
+/wire:agents_schema-generate 01-dbt-foundation --lookml-repo acme/looker@production --lookml-repo-local ~/GitHub/acme-looker
 /wire:agents_schema-generate 01-dbt-foundation --providers dbt,skills   # dbt and skills only, even if LookML exists
 /wire:agents_schema-generate 01-dbt-foundation --skills-source docs/analyst_notes --provider acme
 /wire:agents_schema-generate 01-dbt-foundation --no-warehouse           # under warehouse_spend: none
@@ -288,7 +292,7 @@ Also needed:
 |---|---|---|
 | The dbt project | `status.md` `dbt_project_path` (or `migration.dbt_project_path`), else `dbt/`, `dbt_project/` or the repository root, whichever holds `dbt_project.yml` | when the dbt provider applies |
 | `target/manifest.json` | `dbt compile` in that project (Step 3) | dbt provider |
-| The LookML project | `semantic_layer.generated_files` in `status.md`, else `lookml/` or `looker/` at the repository root holding `*.lkml` | looker provider |
+| The LookML project | `--lookml-repo` or `agents_schema.lookml_repo` in `.wire/engagement/context.md` when the Looker project is its own repository (the usual case: Looker's Git integration owns it); else `semantic_layer.generated_files` in `status.md`, else `lookml/` or `looker/` at the repository root holding `*.lkml` | looker provider |
 | The Omni connection directory | `omni_model` batches on a `bi_migration` release (`migration_sources.omni_model.path`), else a folder holding `*.view.yaml` and `*.topic.yaml` | omni provider |
 | `*.osi.yaml`, `*.sigma.yaml` directories | named by `--providers` and `.wire/engagement/context.md` `agents_schema.osi_dir` / `sigma_dir`; never guessed | osi, sigma providers |
 | Knowledge skills | `models/marts/<domain>/DOMAIN_REFERENCE.md` from `ads_knowledge-skill-generate` (`agentic_data_stack`); any `--skills-source` | skills provider |
@@ -301,6 +305,7 @@ Also needed:
 ### Step 1: Resolve the sources and the destination
 
 1. Read `status.md` and `.wire/engagement/context.md`. Resolve the dbt project as in Inputs. Resolve each other source directory the same way; a source named by `--providers` whose directory cannot be found stops the command and names the paths checked.
+1a. **LookML in its own repository.** Looker's Git integration usually owns the LookML, so a `lookml/` folder in the dbt repository is often a copy or a subset and not what Looker serves. When `--lookml-repo` or the engagement context names a repository, plan the looker provider from that repository: the upstream Looker workflow checks out the repository that calls it, so that repository publishes itself through a workflow the plan writes for it (Step 4), and the dbt repository's workflow carries no looker job. Give `--lookml-repo-local` when a clone is on this machine, so the plan can count the files and `run.sh` can publish LookML from here; without one the file count is unknown until that workflow runs. A `lookml/` folder in the dbt repository is ignored when `--lookml-repo` is given, and the report says so. Both providers replacing only their own tables is what makes two repositories writing into one `AGENTS` schema safe.
 2. Resolve the destination type. Agents Schema writes to Snowflake, Databricks and BigQuery only; any other warehouse stops the command:
 
    ```
@@ -338,7 +343,8 @@ python3 <plugin>/scripts/agents_schema_plan.py \
   [--project-id <gcp project> --location <location>] [--snow-connection <name>] \
   [--databricks-host <host> --databricks-http-path <path> --databricks-catalog <catalog>] \
   [--dbt-project-dir <path> --dbt-profile <profile> --dbt-target <target>] \
-  [--lookml-dir <path>] [--omni-dir <path>] [--osi-dir <path>] [--sigma-dir <path>] \
+  [--lookml-dir <path> | --lookml-repo <owner/repo[@ref]> [--lookml-repo-dir <path>] [--lookml-repo-local <clone>]] \
+  [--omni-dir <path>] [--osi-dir <path>] [--sigma-dir <path>] \
   [--skills-source <path>]... --provider <publisher> \
   [--no-guide] [--force]
 ```
@@ -347,13 +353,14 @@ Pass only the sources Step 1 resolved (and `--providers` kept). The script write
 
 | File | Written | Rewritten on a re-run |
 |---|---|---|
-| `.github/workflows/agents-schema.yml` | one job per planned provider, chained in the order dbt, looker, omni, osi, sigma, skills, every `uses:` pinned to the tag | only with `--force` |
+| `.github/workflows/agents-schema.yml` | one job per planned provider, chained in the order dbt, looker, omni, osi, sigma, skills, every `uses:` pinned to the tag | with `--force`, or `--force-workflow` (a provider added or removed; the guide is left alone) |
 | `agents.yml` | the destination's connection settings for the consumer skills (project and location; the Snowflake connection name; the Databricks host, path and catalog). Never a credential | only with `--force` |
+| `dev/agents_schema/lookml_repo/agents-schema-lookml.yml` | with `--lookml-repo`: the one-job workflow for that repository, pinned to the same tag, publishing on the given ref (default `main`) from `--lookml-repo-dir`; to be committed there as `.github/workflows/agents-schema-lookml.yml` with the same `WAREHOUSE_CREDENTIALS` secret | always |
 | `agents_schema/skills/<skill>.md` | every skill source copied. A colocated `DOMAIN_REFERENCE.md` becomes `skill/<domain>` with `uses.tables` derived from the models in its folder; a source with its own `uses:` is copied unchanged; a dbt `{% docs %}` block is skipped | always (they are derived) |
 | `agents_schema/skills/warehouse_guide.md` | the draft guide: one section per subject area of the warehouse layer, one row per model with its table, keys and dates, and the two `wire: complete` markers | only with `--force` |
 | `dev/agents_schema/plan.json`, `run.sh`, `checks.sql` | the plan, the local publication, the validate queries | always |
 
-Read `plan.json`: `providers[]` (source, path, counts, the `AGENTS.*` tables each replaces, the workflow job), `skills[]` (key, path, source, how the `uses:` came to be: `derived`, `kept` or `none`), `skipped[]`, `needs_human[]` (`no_manifest`, `no_dbt_profile`, `disabled_models_in_manifest`, `models_without_schema`, `empty_source`, `missing_source`, `uses_not_derived`, `duplicate_skill_key`, `draft_to_complete`, `bigquery_project_id_missing`) and `skipped_existing[]`.
+Read `plan.json`: `providers[]` (source, path, counts, the `AGENTS.*` tables each replaces, the workflow job; for a separate LookML repository also `source_repo`, `source_ref`, `publish_branch`, `local_clone` and `workflow_file`), `skills[]` (key, path, source, how the `uses:` came to be: `derived`, `kept` or `none`), `skipped[]`, `needs_human[]` (`no_manifest`, `no_dbt_profile`, `disabled_models_in_manifest`, `models_without_schema`, `empty_source`, `missing_source`, `lookml_repo_not_cloned`, `lookml_unparseable`, `uses_not_derived`, `duplicate_skill_key`, `draft_to_complete`, `bigquery_project_id_missing`) and `skipped_existing[]`.
 
 A `--providers` list drops any planned provider not named; a provider named but not found is a stop, not a silent skip.
 
@@ -397,7 +404,7 @@ The two secrets the workflow needs usually already exist, in a different shape, 
    }
    ```
 
-4. Act on the answer with the same script. Option A: `--repo <owner/repo> --set-secrets --publish .wire/releases/<release>/dev/agents_schema/run.sh`. Option B: `--repo <owner/repo> --set-secrets`. Option C: nothing; record the choice. The script reads the one profile and target, builds `WAREHOUSE_CREDENTIALS` in the destination's shape and `DBT_PROFILES_YML` as that one profile and target (never the whole `profiles.yml`, which commonly holds other clients' credentials), passes both to `gh secret set` on stdin, and for option A runs `run.sh` with the credential in the child process's environment. It prints names, shapes and lengths only. Record `secrets_set: [WAREHOUSE_CREDENTIALS, DBT_PROFILES_YML]` in `status.md` and the option taken in the generation report.
+4. Act on the answer with the same script. With `--lookml-repo`, the same `WAREHOUSE_CREDENTIALS` is set on that repository too (`--repo <lookml owner/repo> --set-secrets --warehouse-only`; it needs no `DBT_PROFILES_YML`), so its workflow can run; without `gh` rights on it, record that the LookML repository's owner adds the secret. Option A: `--repo <owner/repo> --set-secrets --publish .wire/releases/<release>/dev/agents_schema/run.sh`. Option B: `--repo <owner/repo> --set-secrets`. Option C: nothing; record the choice. The script reads the one profile and target, builds `WAREHOUSE_CREDENTIALS` in the destination's shape and `DBT_PROFILES_YML` as that one profile and target (never the whole `profiles.yml`, which commonly holds other clients' credentials), passes both to `gh secret set` on stdin, and for option A runs `run.sh` with the credential in the child process's environment. It prints names, shapes and lengths only. Record `secrets_set: [WAREHOUSE_CREDENTIALS, DBT_PROFILES_YML]` in `status.md` and the option taken in the generation report.
 
 On a client-owned repository, option C is the usual answer unless the engagement brief says the consultant holds the client's CI secrets; say so when asking.
 
@@ -419,7 +426,7 @@ Never paste a credential into a file, a spec output or a chat; `run.sh` refuses 
 - the skills table: key, source, `uses:` origin, and the decisions from Step 5
 - every `needs_human` and `skipped` item with its decision
 - the secrets: derived and set from the dbt profile (which profile and target, which shape), or left to the repository owner, or not derivable and why
-- the publication: `ran from this machine` with the CLI output, or `pending CI` with the secrets the client has to add
+- the publication: `ran from this machine` with the CLI output, or `pending CI` with the secrets the client has to add; with `--lookml-repo`, whether the LookML was published from the local clone and that the repository workflow still has to be committed there
 - the files written and the files left alone (`skipped_existing`)
 
 ### Step 8: Update Status
@@ -440,6 +447,8 @@ agents_schema:
   published: ran | pending_ci | not_run
   published_date: null
   secrets_set: []                    # [WAREHOUSE_CREDENTIALS, DBT_PROFILES_YML] when Step 5.5 set them
+  lookml_repo: null                  # owner/repo@ref when the LookML publishes from its own repository
+  lookml_repo_workflow: null         # dev/agents_schema/lookml_repo/agents-schema-lookml.yml, to commit there
   needs_human: N
   needs_human_resolved: N            # must equal needs_human before validate can pass
   guide_complete: true | false       # no wire: complete marker remains
@@ -471,7 +480,8 @@ Ran from this machine: <CLI output> | Pending CI: [add WAREHOUSE_CREDENTIALS and
 
 ### Next steps
 1. /wire:agents_schema-validate <release>
-2. /wire:agents_schema-review <release>
+2. [with --lookml-repo] commit dev/agents_schema/lookml_repo/agents-schema-lookml.yml to <owner/repo> as .github/workflows/agents-schema-lookml.yml
+3. /wire:agents_schema-review <release>
 ```
 
 End with the commands that ran and the one that follows, in full (`specs/utils/director_operating_model.md` rule 7):
@@ -494,6 +504,14 @@ Neither is overwritten. Read the existing workflow before deciding: if it publis
 ### Another team already publishes into `AGENTS`
 
 `AGENTS.ROOT` is shared. Each provider's run replaces only its own table family and its own `ROOT` rows, so a second publisher of the same provider (two dbt projects, say) would overwrite the first. If validate's Check 9 later lists a provider the plan does not own, that is information, not a failure; two publishers of one provider is a decision for the release director and is recorded as such.
+
+### A LookML file the upstream parser cannot read
+
+The agents-schema LookML parser matches braces while honouring `'` and `"` quotes, and knows nothing of SQL `--` comments. An apostrophe inside such a comment in a `sql:` block (`-- clients who haven't renewed`) opens a quote that never closes, and the whole looker publish fails with `unterminated LookML block` and no file name. The plan runs the same check over every `*.lkml` it can see and names the files in a `lookml_unparseable` item with the line where the block opens. Reword the comment in the LookML (a comment-only change, in the LookML repository's own pull request when `--lookml-repo` is used); nothing else works around it, since the CLI reads the files as they are.
+
+### The LookML is in its own repository and the dbt repository also has a `lookml/` folder
+
+The folder in the dbt repository is usually generated output or a stale copy. `--lookml-repo` wins: the looker provider is planned from the named repository, the folder is ignored, and the report names it so nobody wonders why its files were not published. If the folder is in fact the served project, do not pass `--lookml-repo`.
 
 ### The consultant's `profiles.yml` holds many clients
 

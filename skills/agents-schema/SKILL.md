@@ -89,6 +89,10 @@ uv run --with pyyaml python3 <plugin>/scripts/agents_schema_secrets.py --profile
 
 `/wire:agents_schema-generate` offers this in its Step 5.5 (set and publish, set only, or leave to the repository owner) and `--set-secrets` answers without asking. Exit 3 means the profile's credential shape is not one the CLI accepts (BigQuery OAuth, Snowflake SSO, Databricks OAuth): the secrets are then the owner's to add by hand. On a client-owned repository, leaving them to the client is the usual answer unless the engagement says otherwise.
 
+### LookML in its own repository
+
+Looker's Git integration usually owns the LookML, in a repository of its own. The upstream Looker workflow checks out the repository that calls it, so that repository publishes itself: `--lookml-repo owner/repo[@ref]` (with `--lookml-repo-dir` for the folder inside it and `--lookml-repo-local` for a clone on this machine) makes the plan write `dev/agents_schema/lookml_repo/agents-schema-lookml.yml`, a one-job workflow pinned to the same tag that publishes `AGENTS.LOOKML_*` on every push to the ref, to commit there as `.github/workflows/agents-schema-lookml.yml` with the same `WAREHOUSE_CREDENTIALS` secret. The dbt repository's workflow then carries no looker job. Two repositories writing into one `AGENTS` schema is by design: each provider replaces only its own tables and `ROOT` rows. With a local clone, `run.sh` also publishes the LookML from this machine.
+
 ### From a laptop
 
 ```bash
@@ -149,13 +153,14 @@ Then follow the provider guidance in `content`. The lineage walk the spec gives 
 - **The `omni` source wants the connection-level folder** of an Omni Git sync (`omni/<connection name>/`), not the repository root; `--omni-dir` with a space in it is fine, the plan quotes it.
 - **OSI files fail loudly.** An `*.osi.yaml` that does not match the OSI JSON schema fails the whole OSI run with the file and JSON path; nothing partial is written. Fix the file, not the run.
 - **`snowflake-semantic`** (pointer rows for native Snowflake semantic views) is an experimental CLI source Wire does not plan; run it by hand if a client wants it, `agents-schema snowflake-semantic --semantic-view DB.SCHEMA.VIEW`.
+- **The LookML parser knows no SQL comments.** It matches braces while honouring quotes, so an apostrophe inside a `--` comment in a `sql:` block (`-- clients who haven't renewed`) opens a quote that never closes, and the whole looker publish fails with `unterminated LookML block` and no file name. The plan runs the same check first and names the files (`lookml_unparseable`); reword the comment.
 - **Row counts are the contract.** `plan.json` records the model, column and dependency counts the manifest predicts; validate compares them to `AGENTS.DBT_MODEL`, `DBT_COLUMN` and `DBT_DEPENDENCY`. A difference means the publication ran from a different manifest than the plan.
 
 ## Relationship to the Wire commands
 
 | Command | What it does with this skill |
 |---|---|
-| `/wire:agents_schema-generate <release> [--set-secrets] [--publish]` | Runs the plan over the release's sources, has the consultant complete the guide and the skill decisions, offers to set the repository secrets from the dbt profile, publishes from this machine with `--publish` or leaves it to the workflow |
+| `/wire:agents_schema-generate <release> [--lookml-repo <owner/repo>] [--set-secrets] [--publish]` | Runs the plan over the release's sources, has the consultant complete the guide and the skill decisions, offers to set the repository secrets from the dbt profile, publishes from this machine with `--publish` or leaves it to the workflow |
 | `/wire:agents_schema-validate <release>` | Ten checks: pinned workflow and files, sources unchanged, skills well formed and finished, no credentials, `ROOT` overview rows, row counts, skill rows, no stale models, other publishers listed, `agents.yml` settings |
 | `/wire:agents_schema-review <release>` | Presents what an agent will now be told about the warehouse for sign-off |
 | `/wire:ads_knowledge-skill-generate <release>` | Writes the `DOMAIN_REFERENCE.md` files the skills provider publishes on an `agentic_data_stack` release |

@@ -237,7 +237,7 @@ agents_schema:
 **Reviewed by:** [Reviewer]
 
 ### Next Steps
-1. Commit the workflow, agents.yml and agents_schema/skills/ on the release branch and open the PR (/wire:utils-pr-create <release>)
+1. Commit the workflow, agents.yml and agents_schema/skills/ on the release branch and open the PR (/wire:utils-pr-create <release>); with lookml_repo set, also commit dev/agents_schema/lookml_repo/agents-schema-lookml.yml to that repository as .github/workflows/agents-schema-lookml.yml and make sure it has the WAREHOUSE_CREDENTIALS secret
 2. If status.md has no secrets_set: the repository owner adds WAREHOUSE_CREDENTIALS [and DBT_PROFILES_YML] to the Actions secrets (or re-run generate and accept the Step 5.5 offer); the workflow runs on the next push to <branch>, or by hand from the Actions tab
 3. After the first run: /wire:agents_schema-validate <release> to confirm the warehouse, then record published_date in status.md
 4. Consumers install the agents-schema plugin (claude plugin marketplace add dbt-labs/agents_schema; claude plugin install agents-schema@agents-schema) and start from AGENTS.ROOT
@@ -263,7 +263,7 @@ agents_schema:
 1. [skill / provider / file]: [change] (asked by [who])
 
 ### Next Steps
-1. Apply the changes: a skill edit goes straight into agents_schema/skills/; a change to what a model exposes goes back to /wire:dbt-generate <release>; a provider added or removed re-runs /wire:agents_schema-generate <release> --force
+1. Apply the changes: a skill edit goes straight into agents_schema/skills/; a change to what a model exposes goes back to /wire:dbt-generate <release>; a provider added or removed re-runs /wire:agents_schema-generate <release> --force-workflow (never --force, which rewrites the completed guide)
 2. /wire:agents_schema-validate <release>
 3. /wire:agents_schema-review <release>
 ```

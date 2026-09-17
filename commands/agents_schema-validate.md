@@ -177,10 +177,10 @@ From `status.md`: `version`, `destination`, `providers`, `skill_provider`, `skil
 
 ### Step 2: Run the checks
 
-**Check 1 — The plan and its files exist, and the workflow is pinned.** `plan.json` parses; every path in `plan.files` and `plan.skills[].path` exists; the workflow parses as YAML; every `uses:` line names `dbt-labs/agents_schema/.github/workflows/agents-schema-<source>.yml@<tag>` with `<tag>` equal to `plan.agents_schema_version` and to `status.md` `version`; the jobs are exactly `plan.providers[].job`, in order, each `needs:` the one before.
+**Check 1 — The plan and its files exist, and the workflow is pinned.** `plan.json` parses; every path in `plan.files` and `plan.skills[].path` exists; the workflow parses as YAML; every `uses:` line names `dbt-labs/agents_schema/.github/workflows/agents-schema-<source>.yml@<tag>` with `<tag>` equal to `plan.agents_schema_version` and to `status.md` `version`; the jobs are exactly `plan.providers[].job` for the providers this repository publishes, in order, each `needs:` the one before; a provider with `source_repo` (LookML in its own repository) has no job here, and its `workflow_file` exists, parses, is pinned to the same tag and names `publish_branch` and `source_dir`.
 Severity: **Critical**. A floating or mismatched tag publishes whatever the upstream repository holds on the day.
 
-**Check 2 — The sources are still where the plan says.** For the dbt provider, the manifest exists and its `resource_type: model` node set equals `plan.providers[dbt].model_ids`; a manifest older than the newest `.sql` or `.yml` under `models/` is reported. For each file provider, the files matching its glob under `source_dir` equal `plan.providers[].files`.
+**Check 2 — The sources are still where the plan says.** For the dbt provider, the manifest exists and its `resource_type: model` node set equals `plan.providers[dbt].model_ids`; a manifest older than the newest `.sql` or `.yml` under `models/` is reported. For each file provider, the files matching its glob under `source_dir` equal `plan.providers[].files`; for a provider with `source_repo`, the check runs in `local_clone` when the plan records one and is otherwise `unverified` with the repository named (the count comes from the warehouse in Check 6). Any `lookml_unparseable` item in the plan must have a decision in the generation report (the file reworded, or the publish accepted as blocked until it is).
 Severity: **Major**. A source that moved after the plan publishes something else, or nothing.
 
 **Check 3 — Skills are well formed and finished.** Every skill file under `skills_dir`: front-matter, when present, parses as YAML and `uses` holds only `schemas` and `tables` lists of strings, every `tables` entry schema-qualified (`schema.table`), and every entry resolves to a relation in the manifest (`schema.alias_or_name`) or a schema the manifest uses; no file holds a dbt `{% docs %}` block; no `<!-- wire: complete` marker remains; the skill set equals `plan.skills[].key`, so nothing was added to the directory without a plan entry; `needs_human_resolved` equals `needs_human` and every item has a decision in the generation report.
@@ -219,7 +219,7 @@ Severity: **Major**. The consumer skills stop at the first query without it.
 ### Results
 | # | Check | Severity | Result | Detail |
 |---|---|---|---|---|
-| 1 | Plan, files and pinned workflow | Critical | PASS / FAIL | tag; jobs |
+| 1 | Plan, files and pinned workflow | Critical | PASS / FAIL | tag; jobs; the LookML repository workflow where one is planned |
 | 2 | Sources match the plan | Major | ... | model set diff; file diff; manifest age |
 | 3 | Skills well formed and finished | Major | ... | files; uses errors; markers; needs_human |
 | 4 | No credentials | Critical | ... | |
