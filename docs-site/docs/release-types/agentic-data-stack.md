@@ -138,6 +138,10 @@ models/marts/
 
 A CI check template is included that flags when a model PR does not update the collocated reference file.
 
+## Optional: Agents Schema
+
+The knowledge skills, the canonical models and the LookML views can also be published into the warehouse itself, through dbt Labs' [Agents Schema](../advanced/agents-schema). The optional `agents_schema` artifact runs in the implementation phase once `canonical_models` passes validation (the `knowledge_skill` and `lookml_views` gates are advisory). `/wire:agents_schema-generate <release>` turns each `DOMAIN_REFERENCE.md` into a `skill/<domain>` row in `AGENTS.ROOT` with a `uses:` declaration derived from the models in its folder, publishes the manifest and the LookML alongside, and writes the pinned GitHub workflow that keeps the schema current. An agent that queries the warehouse then finds the same context the `agent_config` routes to, without leaving SQL.
+
 ## What the release delivers
 
 At the end of the engagement, the client has:

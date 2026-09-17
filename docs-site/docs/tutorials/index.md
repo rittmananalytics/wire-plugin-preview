@@ -30,7 +30,7 @@ direction rather than by keystrokes.
 
 | Tutorial | Release Type | Scenario | Key Features Shown |
 |---|---|---|---|
-| [Full Platform](./full-platform) | `full_platform` | Eversholt Brewing Co: Shopify, BrewMan ERP and HubSpot into BigQuery + Looker | All six phases end-to-end; parallel dbt agent fan-out; Jira hierarchy creation; `decisions.md` accumulation across agents |
+| [Full Platform](./full-platform) | `full_platform` | Eversholt Brewing Co: Shopify, BrewMan ERP and HubSpot into BigQuery + Looker | All six phases end-to-end; parallel dbt agent fan-out; Jira hierarchy creation; `decisions.md` accumulation across agents; the optional Agents Schema publication after the dbt models |
 | [dbt Development](./dbt-development) | `dbt_development` | Vantage Financial Reporting: Stripe, Salesforce and PostgreSQL into Snowflake | Transformation-only scope; cross-system customer identity resolution; 38 schema tests; skipping pipeline and BI phases |
 | [Pipeline and dbt](./pipeline-dbt) | `pipeline_only` | Meridian Logistics Group: complex multi-source ingestion with a bespoke SFTP connector | Connector configuration and activation; custom Cloud Function pipeline; staging-layer focus before warehouse design is committed |
 | [Discovery (Shape Up)](./discovery-shape-up) | `discovery_shape_up` | Hallmark Property Partners: real estate investment go/no-go scoping | Appetite document; scope story map; risk catalogue; Fathom transcript integration; SOW-ready output in two days |

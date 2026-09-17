@@ -97,6 +97,20 @@ phases:
           - artifact: dbt
             action: validate
             outcome: PASS
+      # Optional. Publishes the release's metadata into the warehouse AGENTS
+      # schema for AI agents; the semantic layer gate is advisory.
+      - id: agents_schema
+        command: agents_schema
+        required: false
+        sequence: 4
+        depends_on:
+          - artifact: dbt
+            action: validate
+            outcome: PASS
+          - artifact: semantic_layer
+            action: validate
+            outcome: PASS
+            enforcement: advisory
 
   - id: testing
     name: "Testing"

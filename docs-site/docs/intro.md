@@ -15,7 +15,7 @@ In practical terms, instead of a practitioner writing dbt models, LookML, pipeli
 
 ## New in 4.0
 
-Wire 4.0 changes two things. The rules for how a delivery engagement runs stopped being prose inside Wire's own source and became data the framework reads and enforces, and because those rules are now data, you no longer have to know which of 338 commands comes next.
+Wire 4.0 changes two things. The rules for how a delivery engagement runs stopped being prose inside Wire's own source and became data the framework reads and enforces, and because those rules are now data, you no longer have to know which of 341 commands comes next.
 
 **You direct; Wire runs the commands.** Say what you want done and Wire works out which command that is from the release-type definition, runs it, tells you what it did in plain words and stops where a decision is yours, naming the commands that ran in the closing line of each report so that you learn them as you go. Two usage reviews found that the command surface, not the method, was what stopped people using Wire: on one engagement, orientation commands were a third of all runs, and on another, two client-side developers made 34 commits touching Wire artifacts and ran zero Wire commands. Every step still runs the real command, so the record on disk is identical to typing it yourself. Typing commands still works, always, and one setting restores the old behaviour for a whole engagement. [Part 1 of this guide](./using-wire/what-is-wire) shows the new way of working through four releases, and [The release director model](./advanced/release-director) has the rules.
 

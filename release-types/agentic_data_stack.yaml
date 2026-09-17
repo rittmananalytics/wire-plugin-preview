@@ -97,6 +97,27 @@ phases:
           - artifact: canonical_models
             action: review
             outcome: approved
+      # Optional. Publishes the canonical models, the LookML views and the
+      # knowledge skills into the warehouse AGENTS schema, so an agent that
+      # queries the warehouse finds the same context the agent_config routes
+      # to. The knowledge skill and LookML gates are advisory: a dbt-only
+      # publication is a legitimate first step.
+      - id: agents_schema
+        command: agents_schema
+        required: false
+        sequence: 5
+        depends_on:
+          - artifact: canonical_models
+            action: validate
+            outcome: PASS
+          - artifact: knowledge_skill
+            action: validate
+            outcome: PASS
+            enforcement: advisory
+          - artifact: lookml_views
+            action: validate
+            outcome: PASS
+            enforcement: advisory
 
   - id: agent
     name: "Agent"

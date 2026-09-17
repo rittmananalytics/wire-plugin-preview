@@ -85,6 +85,10 @@ Each phase produces one artifact with its own commands, and the table below give
 | Cutover | `cutover` | `/wire:cutover-*` | Parallel-run window, group-by-group access switch, schedules and alerts recreated, Looker read-only then decommissioned, rollback by re-enabling Looker. |
 | Enablement (optional) | `training`, `documentation` | `/wire:training-*`, `/wire:documentation-*` | |
 
+## Optional: Agents Schema
+
+Once a model batch passes validation, the optional `agents_schema` artifact can publish the migrated Omni model (views, dimensions, measures, topics and joins) into the warehouse's `AGENTS` schema through dbt Labs' [Agents Schema](../advanced/agents-schema), so agents that query the warehouse read the new semantic surface as it lands. `/wire:agents_schema-generate <release>` points the `omni` provider at the connection-level folder of the Omni Git sync and writes the pinned GitHub workflow; the LookML side is not published, since it is the surface being retired.
+
 ## The converter
 
 Why is the model phase split between a script and an agent? `scripts/lookml_to_omni.py` is the deterministic core of the model phase. It reads the LookML project and writes an Omni model directory: `<SCHEMA>/<view>.view`, `<explore>.topic`, `relationships.yaml`, plus `needs_human.json` and a conversion summary. Same input, identical output, no AI call. The agent's job is what the script cannot decide: topic design, naming and each `needs_human` item.

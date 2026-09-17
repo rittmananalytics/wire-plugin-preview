@@ -110,6 +110,7 @@ const sidebars = {
             'advanced/autopilot',
             'advanced/model-routing',
             'advanced/dbt-charts',
+            'advanced/agents-schema',
             'advanced/vscode-extension',
             'advanced/issue-tracking',
             'advanced/document-store',

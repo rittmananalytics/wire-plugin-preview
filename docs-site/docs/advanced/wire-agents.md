@@ -68,7 +68,7 @@ Here are the thirteen, together with the domain each one owns:
 | `data-quality-engineer` | Schema tests, Droughty QA, field docs, UAT |
 | `migration-specialist` | Full migration lifecycle: audits, inventory, strategy, cutover |
 | `delivery-lead` | Deployment guides, training, kickoff, enablement |
-| `agentic-data-stack-developer` | Canonical models, knowledge skills, agent configs, eval suites |
+| `agentic-data-stack-developer` | Canonical models, knowledge skills, agent configs, eval suites, the Agents Schema publication (`agents_schema`) on any release type that carries it |
 | `qa-agent` | Pure validator across all release types, no generation |
 
 The `qa-agent` has no generation responsibility. It validates the outputs from the other agents and reports pass or fail with specific remediation actions.

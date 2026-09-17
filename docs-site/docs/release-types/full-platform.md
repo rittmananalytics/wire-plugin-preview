@@ -181,6 +181,10 @@ With the design approved, development is where the models get built. `/wire:dbt-
 
 If the client wants dashboards that live with the dbt models rather than in a BI tool, ask for them and Wire adds the optional `dbtcharts` artifact after the dbt models pass validation: `/wire:dbtcharts-generate <release>` scaffolds one [dbt Charts](../advanced/dbt-charts) board per warehouse subject area from the dbt manifest and catalog, curates the charts against the requirements and the business rules register, and validates them with `dct`, including a warehouse dry-run. It can run alongside `dashboards`, or instead of it where no BI tool is in scope.
 
+### Optional: Agents Schema
+
+If AI agents will query the warehouse, ask for the optional `agents_schema` artifact once the dbt models pass validation (the semantic layer gate is advisory). `/wire:agents_schema-generate <release>` publishes the release's metadata into the warehouse's own `AGENTS` schema through dbt Labs' [Agents Schema](../advanced/agents-schema): the dbt manifest, the LookML, and skills assembled from the release's knowledge, including a warehouse guide the consultant completes from the business rules register. It writes the pinned GitHub workflow that keeps the schema current on every merge, and `/wire:agents_schema-validate` checks the warehouse holds exactly what the plan said.
+
 ## Phase 4: Testing (Days 9–10)
 
 `/wire:data_quality-generate` generates additional data quality tests beyond the embedded dbt tests: freshness checks, row count reconciliation, cross-system validation and custom business rules.

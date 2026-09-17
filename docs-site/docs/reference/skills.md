@@ -151,6 +151,14 @@ This skill connects via the Omni CLI and maps the connection → model (topics, 
 **Activates when**: the user mentions dbt Charts, `dct`, or a board file under `charts/`, or asks for a dashboard over dbt models where the reporting tool is dbt Charts.
 
 Boards are YAML files in the dbt project (queries through `ref()`, charts, a layout) that the `dct` CLI validates and renders. The skill carries the Wire board rules (`ref()`-only queries, no inline data, `notes:` on every query and chart, `label:` on KPIs and `title:` elsewhere, one board per subject area), the deterministic scaffold `scripts/dbtcharts_scaffold.py`, and the validate-then-render loop. It is used by `/wire:dbtcharts-generate`, `-validate` and `-review`, and points to `dct docs` and `dct skills` as the field reference so no key is guessed. See [dbt Charts Boards](../advanced/dbt-charts).
+### `agents-schema`
+
+**Activates when**: the user mentions Agents Schema, `AGENTS.ROOT`, the `agents-schema` CLI or its GitHub workflows, warehouse-delivered skills, or asks how an AI agent should find governed context for a warehouse.
+
+Agents Schema is dbt Labs' standard `AGENTS` schema inside Snowflake, Databricks or BigQuery, holding what the dbt manifest, the semantic layer and a set of markdown skills say about the warehouse. The skill carries the table contract, the two publication routes (the pinned reusable GitHub workflows, or `uvx --from agents-schema==<version>` from a laptop with the credentials in an environment variable), the skill front-matter rules the CLI enforces, the consumer side (`ROOT` first, lowercase on BigQuery, uppercase on Snowflake, the dbt Labs plugin marketplace) and the things found the hard way: every manifest model node is published, `ROOT` is shared across publishers, a malformed `uses:` is skipped silently. It is used by `/wire:agents_schema-generate`, `-validate` and `-review`. See [Agents Schema](../advanced/agents-schema).
+
+---
+
 ### `smml-semantic-modeling`
 
 **Activates when**: hand-authoring, editing, reviewing or troubleshooting an Oracle Analytics Cloud (OAC) semantic model directly in SMML (Semantic Modeler Markup Language): physical/logical/presentation layers, role-playing dimensions, hierarchies, calculated measures or subject-area design.

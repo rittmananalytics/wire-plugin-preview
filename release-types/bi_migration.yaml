@@ -99,6 +99,17 @@ phases:
           - artifact: omni_target_setup
             action: review
             outcome: approved
+      # Optional. Publishes the migrated Omni model (views, topics, joins)
+      # into the warehouse AGENTS schema, so agents read the new semantic
+      # surface as soon as it validates.
+      - id: agents_schema
+        command: agents_schema
+        required: false
+        sequence: 2
+        depends_on:
+          - artifact: omni_model
+            action: validate
+            outcome: PASS
 
   - id: content
     name: "Content Migration"

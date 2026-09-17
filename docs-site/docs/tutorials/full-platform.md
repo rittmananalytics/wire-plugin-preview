@@ -587,6 +587,45 @@ With the semantic layer approved, the dashboards can follow, so generate and rev
 /wire:dashboards-review 01-eversholt-brewing-platform → Approved 2026-06-10
 ```
 
+#### Optional: publish the metadata for AI agents (Agents Schema)
+
+Eversholt's finance director has started asking questions of the warehouse through Claude Code, and the data team wants those answers grounded in the model definitions rather than in guesses about table names. The `full_platform` graph carries an optional `agents_schema` artifact for this, after `dbt` passes validation; it is not part of the twelve-day plan above, and this section shows what it adds if the release director asks for it ("and publish the warehouse metadata for agents").
+
+[Agents Schema](../advanced/agents-schema) is dbt Labs' standard `AGENTS` schema inside the warehouse. Wire plans the publication; dbt Labs' `agents-schema` tool, run from the repository's GitHub Actions, writes the tables.
+
+```
+/wire:agents_schema-generate 01-eversholt-brewing-platform --provider eversholt
+→ [auto-delegated to agentic-data-stack-developer agent]
+
+Agents Schema publication: agents_schema v0.0.11 → bigquery (eversholt-data), schema agents
+| Provider | Source                | Counts                              | Job                  |
+| dbt      | dbt/                  | 13 models, 61 columns, 19 deps      | agents-schema-dbt    |
+| looker   | looker/               | 9 .lkml files                       | agents-schema-looker |
+| skills   | agents_schema/skills/ | 1 skill (warehouse_guide), 5 uses   | agents-schema-skills |
+Written: .github/workflows/agents-schema.yml, agents.yml, agents_schema/skills/warehouse_guide.md,
+         dev/agents_schema/{plan.json, run.sh, checks.sql}
+needs_human: 1 (skill/warehouse_guide: draft_to_complete)
+```
+
+The plan is a script, so the agent's work is the guide. It fills the two `wire: complete` sections of `agents_schema/skills/warehouse_guide.md` from the release: **Business definitions** takes `gross_margin_pct` as the semantic layer review confirmed it (net revenue less production cost, duty included and treated as additive, approved by Laura Hennessy on 2026-06-10) and the channel definitions from the requirements; **Known caveats** records that BrewMan production cost lands one day after the batch closes, so yesterday's margin is provisional until the 06:00 run. Both decisions go into `dev/agents_schema_generation_report.md`.
+
+Nothing has touched the warehouse yet. The workflow publishes on the next push to `main` once Tom adds the `WAREHOUSE_CREDENTIALS` secret (the BigQuery service-account YAML from the setup guide) and, because the repository does not commit `target/manifest.json`, `DBT_PROFILES_YML` for the managed `dbt parse`. `status.md` records `published: pending_ci`.
+
+```
+/wire:agents_schema-validate 01-eversholt-brewing-platform
+→ Checks 1–4 (pinned workflow, sources, skills, no credentials): PASS
+→ Checks 5–9 (warehouse): unverified — published: pending_ci
+→ Check 10 (agents.yml: project_id eversholt-data, location EU): PASS
+→ Verdict: PASS WITH WARNINGS
+
+/wire:agents_schema-review 01-eversholt-brewing-platform
+→ Laura Hennessy + Tom Barnard
+→ Guide definitions read as approved; provider name `eversholt` confirmed; no other publisher in AGENTS
+→ Approved 2026-06-10, on condition the first workflow run is confirmed
+```
+
+After the PR merges and the workflow's first run completes, `/wire:agents_schema-validate` runs again and the warehouse checks confirm what the plan said: three `overview` rows in `AGENTS.ROOT` (`dbt`, `lookml`, `skills`), 13 rows in `AGENTS.DBT_MODEL`, the built-in analyst skill and `skill/warehouse_guide` under provider `eversholt`. From then on an agent with BigQuery access starts at `SELECT provider, key, content FROM \`eversholt-data.agents.root\`` and finds the margin definition before it writes a query.
+
 ### Phase 4 — Testing (Days 8–9)
 
 ```

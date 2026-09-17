@@ -90,6 +90,11 @@ jira:
       generate_key: null
       validate_key: null
       review_key: null
+    agents_schema:
+      task_key: null
+      generate_key: null
+      validate_key: null
+      review_key: null
     data_refactor:
       task_key: null
       generate_key: null
@@ -195,6 +200,10 @@ docstore:
         page_id: null
         page_url: null
         last_synced: null
+      agents_schema:
+        page_id: null
+        page_url: null
+        last_synced: null
       data_refactor:
         page_id: null
         page_url: null
@@ -287,6 +296,10 @@ docstore:
         page_url: null
         last_synced: null
       dbtcharts:
+        page_id: null
+        page_url: null
+        last_synced: null
+      agents_schema:
         page_id: null
         page_url: null
         last_synced: null
@@ -456,6 +469,19 @@ artifacts:
     review: not_started
     charts_dir: null
     boards: []
+    generated_date: null
+    generated_files: []
+    revision_history: []
+  agents_schema:
+    generate: not_started
+    validate: not_started
+    review: not_started
+    version: null
+    destination: null
+    providers: []
+    skills: []
+    workflow: null
+    published: null
     generated_date: null
     generated_files: []
     revision_history: []

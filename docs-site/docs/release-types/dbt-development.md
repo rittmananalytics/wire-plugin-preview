@@ -73,6 +73,10 @@ A worked example of a dbt Development engagement, using a fictional client scena
 
 A dbt development release often has no BI tool in scope, and yet the client wants to see the numbers. The optional `dbtcharts` artifact answers that: once `dbt` passes validation, `/wire:dbtcharts-generate <release>` writes one [dbt Charts](../advanced/dbt-charts) board per warehouse subject area, as YAML in the dbt project reading the models through `ref()`, validated and rendered by the `dct` CLI. The scaffold is deterministic and the curation is recorded, so the reviewer sees what was proposed and what changed. `/wire:dbtcharts-validate` runs the `dct` checks and Wire's own, and `/wire:dbtcharts-review` presents the renders for sign-off.
 
+## Optional: Agents Schema
+
+Where AI agents will query the warehouse, the optional `agents_schema` artifact publishes the dbt project's metadata into the warehouse's own `AGENTS` schema through dbt Labs' [Agents Schema](../advanced/agents-schema): one row per model, column and dependency, plus skills assembled from the release's knowledge and a warehouse guide the consultant completes. `/wire:agents_schema-generate <release>` writes the pinned GitHub workflow, `agents.yml` and the skills; `/wire:agents_schema-validate` compares the warehouse against the plan; `/wire:agents_schema-review` presents what an agent will be told for sign-off. It runs after `dbt` passes validation; the `semantic_layer` gate is advisory because a dbt-only publication is a legitimate choice.
+
 ## Business rules discovery (optional first phase)
 
 Before the design work begins, there is a question that is easy to skip and expensive to leave open: what do the numbers actually mean? New in 4.0, `/wire:business-rules-generate` runs before design and establishes this, one business domain at a time.
