@@ -60,7 +60,7 @@ import re
 import sys
 from pathlib import Path, PurePosixPath
 
-SCRIPT_VERSION = "1.2.0"
+SCRIPT_VERSION = "1.3.0"
 DEFAULT_AGENTS_SCHEMA_VERSION = "v0.0.11"
 AGENTS_SCHEMA_REPO = "dbt-labs/agents_schema"
 
@@ -85,6 +85,23 @@ TABLES = {
 # The reusable workflow input that names the source directory, per source.
 WORKFLOW_INPUT = {"dbt": "dbt-project-dir", "looker": "lookml-dir", "omni": "omni-dir",
                   "osi": "osi-dir", "sigma": "sigma-dir", "skills": "skills-dir"}
+
+# dbt adapter package per destination, for the workflow's managed parse.
+ADAPTER_PACKAGE = {"bigquery": "dbt-bigquery", "snowflake": "dbt-snowflake", "databricks": "dbt-databricks"}
+
+
+def dbt_parse_command(project_dir: str, profile: str, target: str | None, destination: str) -> str:
+    """The managed-parse command the workflow runs when target/manifest.json is not
+    committed. The upstream action's default is `uvx --with <adapter> dbt parse`,
+    in which `dbt` resolves to an unrelated PyPI package of that name and dbt-core
+    then mismatches the adapter (ImportError: ArtifactMixin, seen on v0.0.11).
+    Pinning `--from dbt-core` makes `dbt` the real dbt-core entry point. $profiles_dir
+    is the action's own variable, expanded when it evals the command."""
+    adapter = ADAPTER_PACKAGE[destination]
+    common = f'--project-dir {project_dir} --profiles-dir "$profiles_dir" --profile {profile}' + (f" --target {target}" if target else "")
+    return (f"uvx --from dbt-core --with {adapter} dbt deps {common} && "
+            f"uvx --from dbt-core --with {adapter} dbt parse {common} --no-partial-parse")
+
 
 # The CLI flag that names the source directory, per source.
 CLI_FLAG = {"dbt": "--project-dir", "looker": "--lookml-dir", "omni": "--omni-dir",
@@ -469,6 +486,9 @@ def workflow_yaml(plan: dict, branch: str) -> str:
                 lines.append(f"      dbt-profile-name: {yaml_str(p['dbt_profile'])}")
             if p.get("dbt_target"):
                 lines.append(f"      dbt-target: {yaml_str(p['dbt_target'])}")
+            if p.get("dbt_parse_command"):
+                lines.append("      # pinned --from dbt-core: the action's default parse resolves `dbt` to an unrelated PyPI package")
+                lines.append(f"      dbt-parse-command: {yaml_str(p['dbt_parse_command'])}")
         if src == "skills":
             lines.append(f"      provider: {yaml_str(p['skill_provider'])}")
         lines.append("    secrets:")
@@ -707,6 +727,7 @@ def main(argv: list[str] | None = None) -> int:
                 "source_type": "dbt", "root_provider": "dbt", "job": "agents-schema-dbt",
                 "source_dir": rel_to(dbt_project, root), "manifest": rel_to(manifest_path, root),
                 "dbt_profile": a.dbt_profile, "dbt_target": a.dbt_target,
+                "dbt_parse_command": dbt_parse_command(rel_to(dbt_project, root), a.dbt_profile, a.dbt_target, a.destination) if a.dbt_profile else None,
                 "counts": counts, "model_ids": sorted(models),
                 "disabled_models_included": disabled,
                 "tables": list(TABLES["dbt"]),
