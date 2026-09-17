@@ -238,7 +238,7 @@ agents_schema:
 
 ### Next Steps
 1. Commit the workflow, agents.yml and agents_schema/skills/ on the release branch and open the PR (/wire:utils-pr-create <release>)
-2. Client: add WAREHOUSE_CREDENTIALS [and DBT_PROFILES_YML] to the repository's Actions secrets; the workflow runs on the next push to <branch>, or by hand from the Actions tab
+2. If status.md has no secrets_set: the repository owner adds WAREHOUSE_CREDENTIALS [and DBT_PROFILES_YML] to the Actions secrets (or re-run generate and accept the Step 5.5 offer); the workflow runs on the next push to <branch>, or by hand from the Actions tab
 3. After the first run: /wire:agents_schema-validate <release> to confirm the warehouse, then record published_date in status.md
 4. Consumers install the agents-schema plugin (claude plugin marketplace add dbt-labs/agents_schema; claude plugin install agents-schema@agents-schema) and start from AGENTS.ROOT
 ```

@@ -490,7 +490,7 @@ for a single command. Modelled on the Unix `man` / `--help` convention.
 | `/wire:semantic_layer-generate` | `<project-folder>` | Generate semantic layer (LookML, etc.) |
 | `/wire:semantic_layer-validate` | `<project-folder>` | Validate semantic layer |
 | `/wire:semantic_layer-review` | `<project-folder>` | Review semantic layer |
-| `/wire:agents_schema-generate` | `<release-folder> [--providers <list>] [--skills-source <path>]... [--provider <name>] [--no-guide] [--publish] [--no-warehouse] [--force]` | Publish the release's metadata into the warehouse AGENTS schema for AI agents: plan the providers (dbt manifest, LookML, Omni, OSI, Sigma, skills), write the pinned GitHub workflow, agents.yml and the skills, complete the warehouse guide, publish from CI or with --publish |
+| `/wire:agents_schema-generate` | `<release-folder> [--providers <list>] [--skills-source <path>]... [--provider <name>] [--no-guide] [--set-secrets] [--publish] [--no-warehouse] [--force]` | Publish the release's metadata into the warehouse AGENTS schema for AI agents: plan the providers (dbt manifest, LookML, Omni, OSI, Sigma, skills), write the pinned GitHub workflow, agents.yml and the skills, complete the warehouse guide, offer to set the repository secrets from the dbt profile, publish from CI or with --publish |
 | `/wire:agents_schema-validate` | `<release-folder> [--no-warehouse]` | Validate the Agents Schema publication — pinned workflow, sources unchanged, skills well formed, no credentials, AGENTS.ROOT providers, row counts, skill rows, no stale models |
 | `/wire:agents_schema-review` | `<release-folder>` | Review the Agents Schema publication with stakeholders |
 | `/wire:seed_data-generate` | `<project-folder>` | Generate seed data files from data model |

@@ -39,7 +39,9 @@ The same inputs always produce the same files, and a test in `wire/tests/develop
 
 **The skills are judgement.** The guide's business definitions come from the business rules register (one entry per agreed rule: the definition, the column and filter that implement it, the approver) or from the requirements where no register exists; the caveats come from the dbt work. Which knowledge files to publish, under which provider name, and whether to hand-write a `uses:` the script could not derive are decisions, and each one is a row in the generation report.
 
-With `--publish` the command then runs the publication from the consultant's machine, with the destination credentials in the `WAREHOUSE_CREDENTIALS` environment variable and nowhere else. Without it, the workflow publishes on the next push to the default branch once the client has added that secret (and `DBT_PROFILES_YML`, when the dbt job has to build the manifest itself).
+The two secrets the workflow needs usually already exist, in a different shape, in the consultant's dbt profile: a BigQuery service-account key, a Snowflake password or key pair, a Databricks token. So the command offers, once, to build them from that profile and set them on the repository with `gh secret set`: set both and publish now, set both only, or leave both to the repository owner (the usual answer on a client-owned repository). A second script, `scripts/agents_schema_secrets.py`, does the derivation in memory, trims `DBT_PROFILES_YML` to the one profile and target so other clients' credentials never leave the machine, and prints names and lengths only. `--set-secrets` answers without asking; a profile whose credential shape the upstream tool cannot use (OAuth, SSO) is reported and the secrets stay the owner's to add.
+
+With `--publish`, or the first option of that offer, the command then runs the publication from the consultant's machine with the credentials in the environment and nowhere else. Otherwise the workflow publishes on the next push to the default branch once the secrets exist (and `DBT_PROFILES_YML`, when the dbt job has to build the manifest itself).
 
 ## Validation
 
@@ -70,6 +72,7 @@ Recorded in the `agents-schema` skill so nobody rediscovers them:
 |---|---|
 | The three commands | `wire/specs/development/agents_schema/{generate,validate,review}.md` |
 | The plan script | `wire/scripts/agents_schema_plan.py`, shipped in the plugin under `scripts/` |
+| The secrets script | `wire/scripts/agents_schema_secrets.py`, shipped in the plugin under `scripts/`; tested by `wire/tests/development/validate_agents_schema_secrets.py` |
 | The pinned upstream tag | `wire/agents_schema/pinned_version.txt` |
 | The skill | `wire/skills/agents-schema/SKILL.md` |
 | The graph entries | `agents_schema` in `full_platform.yaml`, `dbt_development.yaml`, `dashboard_first.yaml`, `agentic_data_stack.yaml`, `bi_migration.yaml` (optional) |

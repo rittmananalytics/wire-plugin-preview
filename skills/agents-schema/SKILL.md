@@ -77,6 +77,18 @@ Two secrets, both the client's to add in the repository settings, never written 
 - `WAREHOUSE_CREDENTIALS`: the destination credentials as YAML (or JSON). Snowflake: `type: snowflake`, `account`, `user`, `warehouse`, `database`, optional `role`, and `private_key_pem` (recommended) or `password`. Databricks: `type: databricks`, `host`, `http_path`, `catalog`, `token`. BigQuery: `type: bigquery`, `project_id`, optional `location`, `credentials_json` (the service-account object). The service account or role needs to create the `AGENTS` schema and create, load, query, update and delete tables in it.
 - `DBT_PROFILES_YML`: the dbt `profiles.yml` text, only when the dbt job runs a managed parse because the repository does not commit `target/manifest.json`. The reusable workflow then runs `dbt deps` and `dbt parse --no-partial-parse` with the adapter inferred from the profile's `type`.
 
+### From the dbt profile, without retyping anything
+
+The two secrets usually already exist in `~/.dbt/profiles.yml` for the target the release builds with. `scripts/agents_schema_secrets.py` (shipped with the plugin) reads that one profile and target, builds `WAREHOUSE_CREDENTIALS` in the destination's shape and `DBT_PROFILES_YML` as that one profile and target only, and hands both to `gh secret set` on stdin; with `--publish` it also runs the release's `run.sh` with the credential in the child process's environment. It prints names, shapes and lengths, never a value:
+
+```bash
+uv run --with pyyaml python3 <plugin>/scripts/agents_schema_secrets.py --profile acme --target prod --check
+uv run --with pyyaml python3 <plugin>/scripts/agents_schema_secrets.py --profile acme --target prod \
+    --repo acme/warehouse --set-secrets --publish .wire/releases/<release>/dev/agents_schema/run.sh
+```
+
+`/wire:agents_schema-generate` offers this in its Step 5.5 (set and publish, set only, or leave to the repository owner) and `--set-secrets` answers without asking. Exit 3 means the profile's credential shape is not one the CLI accepts (BigQuery OAuth, Snowflake SSO, Databricks OAuth): the secrets are then the owner's to add by hand. On a client-owned repository, leaving them to the client is the usual answer unless the engagement says otherwise.
+
 ### From a laptop
 
 ```bash
@@ -143,7 +155,7 @@ Then follow the provider guidance in `content`. The lineage walk the spec gives 
 
 | Command | What it does with this skill |
 |---|---|
-| `/wire:agents_schema-generate <release> [--publish]` | Runs the plan over the release's sources, has the consultant complete the guide and the skill decisions, publishes from this machine with `--publish` or leaves it to the workflow |
+| `/wire:agents_schema-generate <release> [--set-secrets] [--publish]` | Runs the plan over the release's sources, has the consultant complete the guide and the skill decisions, offers to set the repository secrets from the dbt profile, publishes from this machine with `--publish` or leaves it to the workflow |
 | `/wire:agents_schema-validate <release>` | Ten checks: pinned workflow and files, sources unchanged, skills well formed and finished, no credentials, `ROOT` overview rows, row counts, skill rows, no stale models, other publishers listed, `agents.yml` settings |
 | `/wire:agents_schema-review <release>` | Presents what an agent will now be told about the warehouse for sign-off |
 | `/wire:ads_knowledge-skill-generate <release>` | Writes the `DOMAIN_REFERENCE.md` files the skills provider publishes on an `agentic_data_stack` release |

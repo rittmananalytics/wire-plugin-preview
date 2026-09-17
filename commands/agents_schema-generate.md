@@ -1,9 +1,9 @@
 ---
-description: Publish the release's metadata into the warehouse AGENTS schema for AI agents: plan the providers (dbt manifest, LookML, Omni, OSI, Sigma, skills), write the pinned GitHub workflow, agents.yml and the skills, complete the warehouse guide, publish from CI or with --publish
-argument-hint: <release-folder> [--providers <list>] [--skills-source <path>]... [--provider <name>] [--no-guide] [--publish] [--no-warehouse] [--force]
+description: Publish the release's metadata into the warehouse AGENTS schema for AI agents: plan the providers (dbt manifest, LookML, Omni, OSI, Sigma, skills), write the pinned GitHub workflow, agents.yml and the skills, complete the warehouse guide, offer to set the repository secrets from the dbt profile, publish from CI or with --publish
+argument-hint: <release-folder> [--providers <list>] [--skills-source <path>]... [--provider <name>] [--no-guide] [--set-secrets] [--publish] [--no-warehouse] [--force]
 ---
 
-# Publish the release's metadata into the warehouse AGENTS schema for AI agents: plan the providers (dbt manifest, LookML, Omni, OSI, Sigma, skills), write the pinned GitHub workflow, agents.yml and the skills, complete the warehouse guide, publish from CI or with --publish
+# Publish the release's metadata into the warehouse AGENTS schema for AI agents: plan the providers (dbt manifest, LookML, Omni, OSI, Sigma, skills), write the pinned GitHub workflow, agents.yml and the skills, complete the warehouse guide, offer to set the repository secrets from the dbt profile, publish from CI or with --publish
 
 ## User Input
 
@@ -203,7 +203,7 @@ inputs:
       description: "Path to the release folder"
   optional:
     - name: flags
-      description: "--providers dbt,looker,omni,osi,sigma,skills limits the plan to the named sources (default: every source the release has); --skills-source <path> adds a markdown file or folder to publish as skills (repeatable); --provider <name> sets the publisher of the skill rows (default: the engagement slug); --no-guide skips the warehouse guide draft; --publish runs the publication from this machine after the plan is written (needs WAREHOUSE_CREDENTIALS in the environment); --no-warehouse writes the plan only and never touches the warehouse; --force rewrites the workflow, agents.yml and the guide draft where they exist"
+      description: "--providers dbt,looker,omni,osi,sigma,skills limits the plan to the named sources (default: every source the release has); --skills-source <path> adds a markdown file or folder to publish as skills (repeatable); --provider <name> sets the publisher of the skill rows (default: the engagement slug); --no-guide skips the warehouse guide draft; --set-secrets derives WAREHOUSE_CREDENTIALS and DBT_PROFILES_YML from the release's dbt profile and sets them on the repository with gh, without asking; --publish runs the publication from this machine after the plan is written (WAREHOUSE_CREDENTIALS from the environment, or derived from the dbt profile when --set-secrets is given or the offer in Step 5.5 is accepted); --no-warehouse writes the plan only and never touches the warehouse; --force rewrites the workflow, agents.yml and the guide draft where they exist"
 preconditions: dynamic
 auto_validate: false
 produces:
@@ -229,7 +229,7 @@ delegates_to:
   - utils/jira_sync
   - utils/docstore_sync
 description: Publish the release's metadata into the warehouse AGENTS schema (dbt Labs' Agents Schema) — a deterministic plan detects the providers the release has (dbt manifest, LookML, Omni, OSI, Sigma, knowledge skills), writes the pinned GitHub workflow, agents.yml and the skills directory, the consultant completes the warehouse guide, and the publication runs from CI or, with --publish, from this machine
-argument-hint: <release-folder> [--providers <list>] [--skills-source <path>]... [--provider <name>] [--no-guide] [--publish] [--no-warehouse] [--force]
+argument-hint: <release-folder> [--providers <list>] [--skills-source <path>]... [--provider <name>] [--no-guide] [--set-secrets] [--publish] [--no-warehouse] [--force]
 workload: judgment
 ---
 
@@ -261,6 +261,7 @@ The command is in two halves, and the line between them is fixed:
 ```bash
 /wire:agents_schema-generate 01-dbt-foundation                          # plan and write the files; publication runs from CI
 /wire:agents_schema-generate 01-dbt-foundation --publish                # also run the publication from this machine
+/wire:agents_schema-generate 01-dbt-foundation --set-secrets --publish  # set both repository secrets from the dbt profile, then publish
 /wire:agents_schema-generate 01-dbt-foundation --providers dbt,skills   # dbt and skills only, even if LookML exists
 /wire:agents_schema-generate 01-dbt-foundation --skills-source docs/analyst_notes --provider acme
 /wire:agents_schema-generate 01-dbt-foundation --no-warehouse           # under warehouse_spend: none
@@ -278,7 +279,8 @@ Enforced by the precondition gate (`preconditions: dynamic`, resolved from `wire
 Also needed:
 
 - `uv` on the machine, for `uvx` (the plan's `run.sh` and the reusable workflows both run the CLI through it). Step 2 checks and stops with the install line if it is missing.
-- For `--publish`: the destination credentials YAML in the `WAREHOUSE_CREDENTIALS` environment variable, in the shape the [setup guide](https://github.com/dbt-labs/agents_schema/blob/main/dbt-setup.md) gives per destination. It is never written to a file in the repository.
+- For `--publish`: the destination credentials YAML in the `WAREHOUSE_CREDENTIALS` environment variable, in the shape the [setup guide](https://github.com/dbt-labs/agents_schema/blob/main/dbt-setup.md) gives per destination, or a dbt profile Step 5.5 can derive it from. It is never written to a file in the repository.
+- For `--set-secrets`, or to accept the offer in Step 5.5: `gh` authenticated with rights to set Actions secrets on the repository (`gh secret list` succeeds).
 
 ## Inputs
 
@@ -365,12 +367,46 @@ This is the judgement half. Record every decision in the generation report as a 
 4. **Disabled models.** `disabled_models_in_manifest` means dbt still lists a disabled model under `nodes` and the CLI will publish it as a model. Either rebuild the manifest without it (usually a `dbt clean` then `dbt compile`) or accept it and say so in the report.
 5. **The provider name.** Confirm it with the release director if the engagement context did not set it; it is visible in every skill row.
 
+### Step 5.5: Offer to set the repository secrets from the dbt profile
+
+The two secrets the workflow needs usually already exist, in a different shape, in the dbt profile the release builds with: a BigQuery service-account key (`keyfile_json` or `keyfile`), a Snowflake password or key pair, a Databricks token. Retyping them into the repository's settings is where a consultant who owns the repository loses an afternoon, and where a client-owned repository is rightly the client's job. So the command asks, once, unless a flag has already answered.
+
+1. Skip this step, saying so in one line, when `--no-warehouse` is given, `budget.warehouse_spend` is `none`, `status.md` already records `agents_schema.secrets_set`, or `gh secret list` fails (not authenticated, or no rights on the repository).
+2. Check what the profile can give:
+
+   ```bash
+   uv run --with pyyaml python3 <plugin>/scripts/agents_schema_secrets.py \
+     --profiles-yml ~/.dbt/profiles.yml --profile <profile> --target <target> --check
+   ```
+
+   Exit 3 means the target's credential shape is not one the agents-schema CLI accepts (BigQuery OAuth, Snowflake SSO, Databricks OAuth). Record the reason and go to Step 6: the secrets are the repository owner's to add by hand.
+3. With `--set-secrets` given, take option A below (with `--publish`) or B (without) and do not ask. Otherwise use AskUserQuestion:
+
+   ```json
+   {
+     "questions": [{
+       "question": "The dbt profile <profile>/<target> holds a <shape> the workflow's secrets can be built from. Set the repository secrets from it?",
+       "header": "Secrets",
+       "options": [
+         {"label": "Set both secrets and publish now", "description": "gh secret set WAREHOUSE_CREDENTIALS and DBT_PROFILES_YML from the profile, then run the publication from this machine so validate can check the warehouse today"},
+         {"label": "Set both secrets only", "description": "The workflow publishes on the next push to <branch>; nothing is written to the warehouse now"},
+         {"label": "Leave both to the repository owner", "description": "Record the two secrets as the client's to add; the publication stays pending CI"}
+       ],
+       "multiSelect": false
+     }]
+   }
+   ```
+
+4. Act on the answer with the same script. Option A: `--repo <owner/repo> --set-secrets --publish .wire/releases/<release>/dev/agents_schema/run.sh`. Option B: `--repo <owner/repo> --set-secrets`. Option C: nothing; record the choice. The script reads the one profile and target, builds `WAREHOUSE_CREDENTIALS` in the destination's shape and `DBT_PROFILES_YML` as that one profile and target (never the whole `profiles.yml`, which commonly holds other clients' credentials), passes both to `gh secret set` on stdin, and for option A runs `run.sh` with the credential in the child process's environment. It prints names, shapes and lengths only. Record `secrets_set: [WAREHOUSE_CREDENTIALS, DBT_PROFILES_YML]` in `status.md` and the option taken in the generation report.
+
+On a client-owned repository, option C is the usual answer unless the engagement brief says the consultant holds the client's CI secrets; say so when asking.
+
 ### Step 6: Publish, or leave it to CI
 
 Unless `--no-warehouse` or `budget.warehouse_spend: none`:
 
-- **With `--publish`:** run `bash .wire/releases/<release>/dev/agents_schema/run.sh` with `WAREHOUSE_CREDENTIALS` set in the environment. It runs `uvx --from agents-schema==<version> agents-schema <source> ...` once per planned provider in order. Each run replaces that provider's table family with `CREATE OR REPLACE` and upserts its rows in `AGENTS.ROOT`, and leaves every other provider's rows alone. The write is a warehouse write; under `warehouse_spend: estimate_required` or a cap the cost governance rules of `specs/utils/director_operating_model.md` apply and the run is disclosed in the report. Record the command output (`dbt: N models, N columns, N deps`; `skills: N skills, N uses`) in the report.
-- **Without `--publish`:** nothing runs. The workflow publishes on the next push to the default branch once the client has added the `WAREHOUSE_CREDENTIALS` secret (and `DBT_PROFILES_YML` where the plan says so). The report says the publication is pending and `status.md` records `published: pending_ci`.
+- **With `--publish`, or option A in Step 5.5:** run `bash .wire/releases/<release>/dev/agents_schema/run.sh` with `WAREHOUSE_CREDENTIALS` set in the environment (Step 5.5's script does this for option A; otherwise the consultant's shell provides it). On an Apple-silicon Mac set `UV_PYTHON=cpython-3.12-macos-aarch64-none` so `uvx` does not pick an Intel Python and fail building `cryptography`. It runs `uvx --from agents-schema==<version> agents-schema <source> ...` once per planned provider in order. Each run replaces that provider's table family with `CREATE OR REPLACE` and upserts its rows in `AGENTS.ROOT`, and leaves every other provider's rows alone. The write is a warehouse write; under `warehouse_spend: estimate_required` or a cap the cost governance rules of `specs/utils/director_operating_model.md` apply and the run is disclosed in the report. Record the command output (`dbt: N models, N columns, N deps`; `skills: N skills, N uses`) in the report.
+- **Otherwise:** nothing runs. The workflow publishes on the next push to the default branch once the `WAREHOUSE_CREDENTIALS` secret exists (and `DBT_PROFILES_YML` where the plan says so), whether Step 5.5 set them or the repository owner does. The report says the publication is pending and `status.md` records `published: pending_ci`.
 
 Never paste a credential into a file, a spec output or a chat; `run.sh` refuses to start without the environment variable for that reason.
 
@@ -382,6 +418,7 @@ Never paste a credential into a file, a spec output or a chat; `run.sh` refuses 
 - the provider table from `plan.json`: source, path, counts, tables, job
 - the skills table: key, source, `uses:` origin, and the decisions from Step 5
 - every `needs_human` and `skipped` item with its decision
+- the secrets: derived and set from the dbt profile (which profile and target, which shape), or left to the repository owner, or not derivable and why
 - the publication: `ran from this machine` with the CLI output, or `pending CI` with the secrets the client has to add
 - the files written and the files left alone (`skipped_existing`)
 
@@ -402,6 +439,7 @@ agents_schema:
   plan: "dev/agents_schema/plan.json"
   published: ran | pending_ci | not_run
   published_date: null
+  secrets_set: []                    # [WAREHOUSE_CREDENTIALS, DBT_PROFILES_YML] when Step 5.5 set them
   needs_human: N
   needs_human_resolved: N            # must equal needs_human before validate can pass
   guide_complete: true | false       # no wire: complete marker remains
@@ -428,7 +466,8 @@ Follow `specs/utils/jira_sync.md` (artifact `agents_schema`, action `generate`) 
 N skills: N copied with a derived uses:, N kept as authored, N without a uses: (decided), 1 warehouse guide (complete | N markers left)
 
 ### Publication
-Ran from this machine: <CLI output> | Pending CI: add WAREHOUSE_CREDENTIALS [and DBT_PROFILES_YML] to the repository secrets, then push to <branch> or run the workflow by hand
+Secrets: set from the dbt profile <profile>/<target> | left to the repository owner | not derivable (<reason>)
+Ran from this machine: <CLI output> | Pending CI: [add WAREHOUSE_CREDENTIALS and DBT_PROFILES_YML to the repository secrets, then] push to <branch> or run the workflow by hand
 
 ### Next steps
 1. /wire:agents_schema-validate <release>
@@ -456,9 +495,13 @@ Neither is overwritten. Read the existing workflow before deciding: if it publis
 
 `AGENTS.ROOT` is shared. Each provider's run replaces only its own table family and its own `ROOT` rows, so a second publisher of the same provider (two dbt projects, say) would overwrite the first. If validate's Check 9 later lists a provider the plan does not own, that is information, not a failure; two publishers of one provider is a decision for the release director and is recorded as such.
 
+### The consultant's `profiles.yml` holds many clients
+
+It usually does. Step 5.5's script writes `DBT_PROFILES_YML` as the one profile and the one target the release uses and nothing else, and never prints a value. Check the `--check` output's `profiles` and `targets` lists before accepting the offer if in doubt; `wire/tests/development/validate_agents_schema_secrets.py` holds the trimming rule.
+
 ### `warehouse_spend: none`
 
-The publication does not run and `--publish` is refused with the setting named. The plan, the workflow, `agents.yml` and the skills are still written. `agents_schema-validate` records every warehouse check as `unverified`, which is not a pass.
+The publication does not run, Step 5.5 is skipped, and `--publish` is refused with the setting named. The plan, the workflow, `agents.yml` and the skills are still written. `agents_schema-validate` records every warehouse check as `unverified`, which is not a pass.
 
 Execute the complete workflow as specified above.
 
